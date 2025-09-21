@@ -14,6 +14,8 @@ Built-in testing is done through Gradle and Jacoco. I ran the following two comm
 ./gradlew test
 ./gradlew jacocotestreport
 
-### Test Results
+### Test Results & Coverage
+The test results and coverage are appropriately named within their folders. You may have to scroll past all the various package folders to get to the actual html file that displays the info.
+
 My god, there are a lot of tests for this application. I guess I am not used to working hands-on with software at this scale, but geez, it's a lot. 16,741 tests were run, with some command-line test stuff being ignored. All of them were successful and was completed in under a minute, so didn't seem to be any efficiency problems. Test coverage is kind of across the board with some packages being at 100% and some packages at 0 and everything inbetween. It seems like the functional parts of the application, the ones you actually want to test, are largely at least 70% covered or better.  
 
