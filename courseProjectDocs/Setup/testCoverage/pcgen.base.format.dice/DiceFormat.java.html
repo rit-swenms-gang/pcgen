@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiceFormat.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.base.format.dice</a> &gt; <span class="el_source">DiceFormat.java</span></div><h1>DiceFormat.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2016-7 Tom Parker &lt;thpr@users.sourceforge.net&gt;
+ * 
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+package pcgen.base.format.dice;
+
+import java.util.Optional;
+
+import pcgen.base.util.BasicIndirect;
+import pcgen.base.util.FormatManager;
+import pcgen.base.util.Indirect;
+
+/**
+ * DiceFormat is a FormatManager for Dice objects.
+ */
+<span class="fc" id="L29">public class DiceFormat implements FormatManager&lt;Dice&gt;</span>
+{
+
+	@Override
+	public Dice convert(String inputStr)
+	{
+<span class="fc" id="L35">		int dLoc = inputStr.indexOf('d');</span>
+		int sides;
+		int quantity;
+<span class="fc bfc" id="L38" title="All 2 branches covered.">		if (dLoc == -1)</span>
+		{
+<span class="fc" id="L40">			sides = 1;</span>
+<span class="fc" id="L41">			quantity = Integer.parseInt(inputStr);</span>
+		}
+		else
+		{
+<span class="fc" id="L45">			sides = Integer.parseInt(inputStr.substring(dLoc + 1));</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">			if (dLoc == 0)</span>
+			{
+<span class="fc" id="L48">				quantity = 1;</span>
+			}
+			else
+			{
+<span class="fc" id="L52">				quantity = Integer.parseInt(inputStr.substring(0, dLoc));</span>
+			}
+		}
+<span class="fc" id="L55">		Die d = new Die(sides);</span>
+<span class="fc" id="L56">		return new Dice(quantity, d);</span>
+	}
+
+	@Override
+	public Indirect&lt;Dice&gt; convertIndirect(String inputStr)
+	{
+<span class="fc" id="L62">		return new BasicIndirect&lt;&gt;(this, convert(inputStr));</span>
+	}
+
+	@Override
+	public String unconvert(Dice d)
+	{
+<span class="fc" id="L68">		StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L69">		sb.append(d.quantity());</span>
+<span class="fc" id="L70">		int sides = d.die().sides();</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">		if (sides != 1)</span>
+		{
+<span class="fc" id="L73">			sb.append('d');</span>
+<span class="fc" id="L74">			sb.append(sides);</span>
+		}
+<span class="fc" id="L76">		return sb.toString();</span>
+	}
+
+	@Override
+	public Class&lt;Dice&gt; getManagedClass()
+	{
+<span class="fc" id="L82">		return Dice.class;</span>
+	}
+
+	@Override
+	public String getIdentifierType()
+	{
+<span class="fc" id="L88">		return &quot;DICE&quot;;</span>
+	}
+
+	@Override
+	public Optional&lt;FormatManager&lt;?&gt;&gt; getComponentManager()
+	{
+<span class="fc" id="L94">		return Optional.empty();</span>
+	}
+
+	@Override
+	public int hashCode()
+	{
+<span class="fc" id="L100">		return 74538940;</span>
+	}
+
+	@Override
+	public boolean equals(Object o)
+	{
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">		return (o == this) || (o instanceof DiceFormat);</span>
+	}
+
+	@Override
+	public boolean isDirect()
+	{
+<span class="nc" id="L112">		return true;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

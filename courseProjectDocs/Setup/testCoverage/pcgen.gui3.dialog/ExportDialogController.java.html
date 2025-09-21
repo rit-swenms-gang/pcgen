@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExportDialogController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui3.dialog</a> &gt; <span class="el_source">ExportDialogController.java</span></div><h1>ExportDialogController.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2021 (C) Eitan Adler &lt;lists@eitanadler.com&gt;
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+
+package pcgen.gui3.dialog;
+
+import static pcgen.io.ExportUtilities.HTML_EXPORT_DIR_PROP;
+
+import java.awt.Desktop;
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import javax.swing.JCheckBox;
+
+import pcgen.cdom.base.Constants;
+import pcgen.core.Globals;
+import pcgen.core.SettingsHandler;
+import pcgen.facade.core.CharacterFacade;
+import pcgen.facade.core.PartyFacade;
+import pcgen.gui2.UIPropertyContext;
+import pcgen.io.ExportUtilities;
+import pcgen.system.BatchExporter;
+import pcgen.system.CharacterManager;
+import pcgen.system.PCGenSettings;
+import pcgen.system.PropertyContext;
+import pcgen.util.Logging;
+
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ListView;
+import javafx.scene.control.ProgressBar;
+import javafx.stage.FileChooser;
+import org.apache.commons.collections4.IteratorUtils;
+import org.apache.commons.lang3.StringUtils;
+
+/**
+ * The dialog provides the list of output sheets for a character or party to
+ * be exported to.
+ */
+public class ExportDialogController
+{
+	@FXML
+	private ComboBox&lt;CharacterFacade&gt; selectCharacterBox;
+	@FXML
+	private CheckBox entireParty;
+	@FXML
+	private ComboBox&lt;ExportUtilities.SheetFilter&gt; exportSheetType;
+	@FXML
+	private ListView&lt;URI&gt; templateSelect;
+	@FXML
+	private ProgressBar progress;
+	@FXML
+	private Button doClose;
+	@FXML
+	private Button doExport;
+
+	private final List&lt;File&gt; allTemplates;
+
+	public ExportDialogController()
+<span class="nc" id="L88">	{</span>
+<span class="nc" id="L89">		allTemplates = ExportUtilities.getAllTemplates();</span>
+<span class="nc" id="L90">	}</span>
+
+	/*
+	 A lot of this logic is questionable to keep in the GUI later. Instead we should have some kind of &quot;Export
+	 Manager&quot; that knows how to actually perform all of the export duties and the GUI just pushes information down.
+	 It is split this way since the old gui (gui2) did this.
+	 In the meantime get the logic to be somewhat reasonable so future refactoring can do things properly.
+	 The logic is especially confusing because &quot;is PDF&quot; is a boolean which needs to be chained all the way down
+	 */
+
+	@FXML
+	private void doExport(final ActionEvent actionEvent)
+	{
+<span class="nc bnc" id="L103" title="All 2 branches missed.">		boolean isPDF = exportSheetType.getSelectionModel().getSelectedItem() == ExportUtilities.SheetFilter.PDF;</span>
+<span class="nc" id="L104">		URI selectedTemplate = templateSelect.getSelectionModel().getSelectedItem();</span>
+<span class="nc" id="L105">		String sheetFilterPath = exportSheetType.getSelectionModel().getSelectedItem().getPath();</span>
+		// this is kind of lie but really requires some refactoring to make this all work.
+		// it should be handled by a task manager with a 'start' and a 'finished' or 'failed' callback
+<span class="nc" id="L108">		progress.setVisible(true);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">		if (entireParty.isSelected())</span>
+		{
+<span class="nc" id="L111">			doExportEntireParty(sheetFilterPath, selectedTemplate, isPDF);</span>
+		} else
+		{
+<span class="nc" id="L114">			doExportSingleCharacter(sheetFilterPath, selectedTemplate, isPDF);</span>
+		}
+<span class="nc" id="L116">		progress.setVisible(false);</span>
+<span class="nc" id="L117">	}</span>
+
+	private static void doExportEntireParty(String sheetFilterPath, URI template, boolean isPDF)
+	{
+<span class="nc" id="L121">		File path = new File(PCGenSettings.getPcgDir());</span>
+<span class="nc" id="L122">		String name = &quot;Entire Party&quot;;</span>
+<span class="nc" id="L123">		FileChooser fileChooser = new FileChooser();</span>
+<span class="nc" id="L124">		String extension = ExportUtilities.getOutputExtension(template.toString(), isPDF);</span>
+<span class="nc" id="L125">		FileChooser.ExtensionFilter fileFilter = ExportUtilities.getExtensionFilter(isPDF, extension);</span>
+<span class="nc" id="L126">		fileChooser.getExtensionFilters().add(fileFilter);</span>
+<span class="nc" id="L127">		fileChooser.setSelectedExtensionFilter(fileFilter);</span>
+<span class="nc" id="L128">		fileChooser.setInitialDirectory(path);</span>
+<span class="nc" id="L129">		fileChooser.setTitle(&quot;Export &quot; + name);</span>
+<span class="nc" id="L130">		fileChooser.setInitialDirectory(ExportUtilities.getExportDialogBaseDir(isPDF));</span>
+<span class="nc" id="L131">		File outFile = fileChooser.showSaveDialog(null);</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">		if (outFile == null)</span>
+		{
+<span class="nc" id="L134">			return;</span>
+		}
+<span class="nc" id="L136">		PartyFacade party = CharacterManager.getCharacters();</span>
+<span class="nc" id="L137">		File templateAsFile = ExportUtilities.templateToAbsoluteTemplate(</span>
+				sheetFilterPath,
+				template
+		);
+<span class="nc bnc" id="L141" title="All 2 branches missed.">		if (isPDF)</span>
+		{
+<span class="nc" id="L143">			BatchExporter.exportPartyToPDF(party, outFile, templateAsFile);</span>
+		}
+		else
+		{
+<span class="nc" id="L147">			PropertyContext context = UIPropertyContext.createContext(&quot;ExportDialog&quot;);</span>
+<span class="nc" id="L148">			context.setProperty(HTML_EXPORT_DIR_PROP, outFile.getParent());</span>
+<span class="nc" id="L149">			SettingsHandler.setSelectedPartyHTMLOutputSheet(templateAsFile.getAbsolutePath());</span>
+<span class="nc" id="L150">			BatchExporter.exportPartyToNonPDF(party, outFile, templateAsFile);</span>
+<span class="nc" id="L151">			Globals.executePostExportCommandStandard(outFile.getAbsolutePath());</span>
+		}
+<span class="nc bnc" id="L153" title="All 2 branches missed.">		if (promptUserToOpenFile(outFile))</span>
+		{
+<span class="nc" id="L155">			doOpenFile(outFile);</span>
+		}
+<span class="nc" id="L157">	}</span>
+
+	private static boolean promptUserToOpenFile(File file)
+	{
+<span class="nc" id="L161">		JCheckBox checkbox = new JCheckBox();</span>
+<span class="nc" id="L162">		checkbox.setText(&quot;Always perform this action&quot;);</span>
+<span class="nc" id="L163">		PropertyContext context = UIPropertyContext.getInstance();</span>
+<span class="nc" id="L164">		String value = context.getProperty(UIPropertyContext.ALWAYS_OPEN_EXPORT_FILE);</span>
+<span class="nc" id="L165">		boolean alwaysOpenFile = Boolean.parseBoolean(value);</span>
+		// todo: allow setting this value via the prompt. maybe use RememberingChoiceDialog or similar
+<span class="nc bnc" id="L167" title="All 2 branches missed.">		if (alwaysOpenFile)</span>
+		{
+<span class="nc" id="L169">			return true;</span>
+		}
+<span class="nc" id="L171">		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);</span>
+<span class="nc" id="L172">		alert.setContentText(&quot;Do you want to open &quot; + file.getName() + '?');</span>
+<span class="nc" id="L173">		Optional&lt;ButtonType&gt; result = alert.showAndWait();</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">		return result.isPresent() &amp;&amp; !result.get().equals(ButtonType.NO);</span>
+	}
+
+	private static void doOpenFile(File file)
+	{
+<span class="nc bnc" id="L179" title="All 4 branches missed.">		if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN))</span>
+		{
+<span class="nc" id="L181">			Alert error = new Alert(Alert.AlertType.ERROR);</span>
+<span class="nc" id="L182">			error.setTitle(&quot;Cannot Open &quot; + file.getName());</span>
+<span class="nc" id="L183">			error.setContentText(&quot;Operating System does not support this operation&quot;);</span>
+<span class="nc" id="L184">			error.show();</span>
+<span class="nc" id="L185">			return;</span>
+		}
+		try
+		{
+<span class="nc" id="L189">			Desktop.getDesktop().open(file);</span>
+		}
+<span class="nc" id="L191">		catch (IOException ex)</span>
+		{
+<span class="nc" id="L193">			String message = &quot;Failed to open &quot; + file.getName();</span>
+<span class="nc" id="L194">			Alert error = new Alert(Alert.AlertType.ERROR);</span>
+<span class="nc" id="L195">			error.setTitle(&quot;Cannot Open &quot; + file.getName());</span>
+<span class="nc" id="L196">			error.setContentText(message);</span>
+<span class="nc" id="L197">			error.show();</span>
+<span class="nc" id="L198">			Logging.errorPrint(message, ex);</span>
+<span class="nc" id="L199">		}</span>
+<span class="nc" id="L200">	}</span>
+
+	private void doExportSingleCharacter(String sheetFilterPath, URI template, boolean isPDF)
+	{
+<span class="nc" id="L204">		File templateAsFile = ExportUtilities.templateToAbsoluteTemplate(</span>
+				sheetFilterPath,
+				template
+		);
+<span class="nc" id="L208">		CharacterFacade character = selectCharacterBox.getSelectionModel().getSelectedItem();</span>
+
+<span class="nc" id="L210">		FileChooser fileChooser = new FileChooser();</span>
+<span class="nc" id="L211">		File baseDir = ExportUtilities.getExportDialogBaseDir(isPDF);</span>
+<span class="nc" id="L212">		fileChooser.setInitialDirectory(baseDir);</span>
+
+<span class="nc" id="L214">		String extension = ExportUtilities.getOutputExtension(template.toString(), isPDF);</span>
+<span class="nc" id="L215">		FileChooser.ExtensionFilter fileFilter = ExportUtilities.getExtensionFilter(isPDF, extension);</span>
+<span class="nc" id="L216">		fileChooser.getExtensionFilters().add(fileFilter);</span>
+<span class="nc" id="L217">		fileChooser.setSelectedExtensionFilter(fileFilter);</span>
+		String name;
+<span class="nc" id="L219">		File path = character.getFileRef().get();</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">		if (path != null)</span>
+		{
+<span class="nc" id="L222">			path = path.getParentFile();</span>
+		}
+		else
+		{
+<span class="nc" id="L226">			path = new File(PCGenSettings.getPcgDir());</span>
+		}
+		// this should be on an &quot;exportable&quot; and have something like getExportedName
+<span class="nc" id="L229">		name = character.getTabNameRef().get();</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">		if (StringUtils.isEmpty(name))</span>
+		{
+<span class="nc" id="L232">			name = character.getNameRef().get();</span>
+		}
+<span class="nc" id="L234">		fileChooser.setInitialDirectory(path);</span>
+<span class="nc" id="L235">		fileChooser.setTitle(&quot;Export &quot; + name);</span>
+<span class="nc" id="L236">		File outFile = fileChooser.showSaveDialog(null);</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">		if (outFile == null)</span>
+		{
+<span class="nc" id="L239">			return;</span>
+		}
+
+<span class="nc bnc" id="L242" title="All 2 branches missed.">		if (isPDF)</span>
+		{
+			boolean result;
+<span class="nc" id="L245">			result = BatchExporter.exportCharacterToPDF(character, outFile, templateAsFile);</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">			if (!result)</span>
+			{
+<span class="nc" id="L248">				Alert alert = new Alert(Alert.AlertType.ERROR);</span>
+<span class="nc" id="L249">				alert.setTitle(Constants.APPLICATION_NAME);</span>
+<span class="nc" id="L250">				alert.setContentText(&quot;The character export failed. Please see the log for details.&quot;);</span>
+<span class="nc" id="L251">				alert.show();</span>
+<span class="nc" id="L252">				return;</span>
+			}
+<span class="nc" id="L254">			Globals.executePostExportCommandPDF(outFile.getAbsolutePath());</span>
+<span class="nc" id="L255">		}</span>
+		else
+		{
+<span class="nc" id="L258">			boolean result = BatchExporter.exportCharacterToNonPDF(character, outFile, templateAsFile);</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">			if (!result)</span>
+			{
+<span class="nc" id="L261">				Alert alert = new Alert(Alert.AlertType.ERROR);</span>
+<span class="nc" id="L262">				alert.setTitle(Constants.APPLICATION_NAME);</span>
+<span class="nc" id="L263">				alert.setContentText(&quot;The character export failed. Please see the log for details.&quot;);</span>
+<span class="nc" id="L264">				alert.show();</span>
+<span class="nc" id="L265">				return;</span>
+			}
+<span class="nc" id="L267">			Globals.executePostExportCommandStandard(outFile.getAbsolutePath());</span>
+		}
+<span class="nc bnc" id="L269" title="All 2 branches missed.">		if (promptUserToOpenFile(outFile))</span>
+		{
+<span class="nc" id="L271">			doOpenFile(outFile);</span>
+		}
+<span class="nc" id="L273">	}</span>
+
+
+
+
+<span class="nc" id="L278">	private class PartyCheckboxChangeListener implements ChangeListener&lt;Boolean&gt;</span>
+	{
+		@Override
+		public void changed(final ObservableValue&lt;? extends Boolean&gt; observable,
+		                    final Boolean oldValue,
+		                    final Boolean newValue)
+		{
+<span class="nc" id="L285">			templateSelect.getSelectionModel().clearSelection();</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">			if (newValue == true)</span>
+			{
+<span class="nc" id="L288">				selectCharacterBox.setDisable(true);</span>
+			}
+			else
+			{
+<span class="nc" id="L292">				selectCharacterBox.setDisable(false);</span>
+			}
+<span class="nc" id="L294">			refreshFiles(exportSheetType.getSelectionModel().getSelectedItem(), entireParty.isSelected());</span>
+<span class="nc" id="L295">		}</span>
+	}
+
+<span class="nc" id="L298">	private class TemplateSelectionListener implements ChangeListener&lt;URI&gt;</span>
+	{
+		@Override
+		public void changed(final ObservableValue&lt;? extends URI&gt; observable,
+		                    final URI oldValue,
+		                    final URI newValue)
+		{
+<span class="nc bnc" id="L305" title="All 2 branches missed.">			if (newValue != null)</span>
+			{
+<span class="nc" id="L307">				doExport.setDisable(false);</span>
+			} else
+			{
+<span class="nc" id="L310">				doExport.setDisable(true);</span>
+			}
+<span class="nc" id="L312">		}</span>
+	}
+
+	private void refreshFiles(ExportUtilities.SheetFilter sheetFilter, boolean exportParty)
+	{
+<span class="nc" id="L317">		URI[] validFiles = ExportUtilities.getValidFiles(allTemplates, sheetFilter, exportParty);</span>
+<span class="nc" id="L318">		List&lt;URI&gt; validFilesAsList = Arrays.stream(validFiles).collect(Collectors.toList());</span>
+<span class="nc" id="L319">		ObservableList&lt;URI&gt; observableTemplates = FXCollections.observableList(validFilesAsList);</span>
+<span class="nc" id="L320">		templateSelect.itemsProperty().setValue(observableTemplates);</span>
+<span class="nc" id="L321">	}</span>
+
+<span class="nc" id="L323">	private class ExportSheetTypeSelectionListener implements ChangeListener&lt;ExportUtilities.SheetFilter&gt;</span>
+	{
+		@Override
+		public void changed(final ObservableValue&lt;? extends ExportUtilities.SheetFilter&gt; observable,
+		                    final ExportUtilities.SheetFilter oldValue,
+		                    final ExportUtilities.SheetFilter newValue)
+		{
+<span class="nc" id="L330">			PropertyContext context = UIPropertyContext.createContext(&quot;ExportDialog&quot;);</span>
+<span class="nc" id="L331">			context.setProperty(UIPropertyContext.DEFAULT_OS_TYPE,</span>
+<span class="nc" id="L332">				exportSheetType.getSelectionModel().getSelectedItem().toString());</span>
+<span class="nc" id="L333">			refreshFiles(newValue, entireParty.isSelected());</span>
+<span class="nc" id="L334">		}</span>
+	}
+
+	@FXML
+	private void doOnClose(final ActionEvent actionEvent)
+	{
+<span class="nc" id="L340">		var button = (Button)actionEvent.getSource();</span>
+<span class="nc" id="L341">		button.getScene().getWindow().hide();</span>
+<span class="nc" id="L342">	}</span>
+
+	@FXML
+	void initialize()
+	{
+<span class="nc" id="L347">		PartyFacade characters = CharacterManager.getCharacters();</span>
+<span class="nc" id="L348">		ObservableList&lt;CharacterFacade&gt; observableList =</span>
+<span class="nc" id="L349">				FXCollections.observableList(IteratorUtils.toList(characters.iterator()));</span>
+<span class="nc" id="L350">		selectCharacterBox.setItems(observableList);</span>
+		// todo: maybe select &quot;current&quot; character pcgenFrame.getSelectedCharacterRef() ???
+<span class="nc" id="L352">		selectCharacterBox.getSelectionModel().select(0);</span>
+<span class="nc" id="L353">		entireParty.selectedProperty().addListener(new PartyCheckboxChangeListener());</span>
+<span class="nc" id="L354">		templateSelect.getSelectionModel().selectedItemProperty().addListener(new TemplateSelectionListener());</span>
+<span class="nc" id="L355">		List&lt;ExportUtilities.SheetFilter&gt; sheetFilterValues = Arrays.stream(</span>
+<span class="nc" id="L356">				ExportUtilities.SheetFilter.values()).collect(Collectors.toList());</span>
+<span class="nc" id="L357">		exportSheetType.setItems(FXCollections.observableList(sheetFilterValues));</span>
+<span class="nc" id="L358">		exportSheetType.getSelectionModel().selectedItemProperty().addListener(new ExportSheetTypeSelectionListener());</span>
+<span class="nc" id="L359">		exportSheetType.getSelectionModel().select(0);</span>
+<span class="nc" id="L360">		PropertyContext context = UIPropertyContext.createContext(&quot;ExportDialog&quot;);</span>
+<span class="nc" id="L361">		String defaultOSType = context.getProperty(UIPropertyContext.DEFAULT_OS_TYPE);</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">		if (defaultOSType != null)</span>
+		{
+<span class="nc" id="L364">			Arrays.stream(ExportUtilities.SheetFilter.values())</span>
+<span class="nc" id="L365">			      .filter(filter -&gt; defaultOSType.equals(filter.toString()))</span>
+<span class="nc" id="L366">			      .findFirst()</span>
+<span class="nc" id="L367">			      .ifPresent(filter -&gt; exportSheetType.getSelectionModel().select(filter));</span>
+		}
+<span class="nc" id="L369">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

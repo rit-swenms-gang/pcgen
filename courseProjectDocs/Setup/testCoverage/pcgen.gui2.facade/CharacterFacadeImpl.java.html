@@ -1,0 +1,4100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CharacterFacadeImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui2.facade</a> &gt; <span class="el_source">CharacterFacadeImpl.java</span></div><h1>CharacterFacadeImpl.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2009 (C) James Dempsey
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.gui2.facade;
+
+import java.awt.Rectangle;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.ConcurrentModificationException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+import pcgen.cdom.base.AssociatedPrereqObject;
+import pcgen.cdom.base.CDOMObject;
+import pcgen.cdom.base.CDOMReference;
+import pcgen.cdom.base.ChooseDriver;
+import pcgen.cdom.base.Constants;
+import pcgen.cdom.content.CNAbility;
+import pcgen.cdom.enumeration.CharID;
+import pcgen.cdom.enumeration.EquipmentLocation;
+import pcgen.cdom.enumeration.Gender;
+import pcgen.cdom.enumeration.Handed;
+import pcgen.cdom.enumeration.IntegerKey;
+import pcgen.cdom.enumeration.ListKey;
+import pcgen.cdom.enumeration.Nature;
+import pcgen.cdom.enumeration.ObjectKey;
+import pcgen.cdom.enumeration.PCStringKey;
+import pcgen.cdom.enumeration.SkillFilter;
+import pcgen.cdom.enumeration.StringKey;
+import pcgen.cdom.enumeration.Type;
+import pcgen.cdom.facet.AutoEquipmentFacet;
+import pcgen.cdom.facet.FacetLibrary;
+import pcgen.cdom.facet.event.DataFacetChangeEvent;
+import pcgen.cdom.facet.event.DataFacetChangeListener;
+import pcgen.cdom.facet.fact.XPFacet;
+import pcgen.cdom.facet.model.LanguageFacet;
+import pcgen.cdom.facet.model.TemplateFacet;
+import pcgen.cdom.helper.ClassSource;
+import pcgen.cdom.inst.PCClassLevel;
+import pcgen.cdom.meta.CorePerspective;
+import pcgen.cdom.reference.CDOMDirectSingleRef;
+import pcgen.cdom.reference.CDOMSingleRef;
+import pcgen.cdom.util.CControl;
+import pcgen.core.Ability;
+import pcgen.core.AbilityCategory;
+import pcgen.core.AgeSet;
+import pcgen.core.BonusManager.TempBonusInfo;
+import pcgen.core.Campaign;
+import pcgen.core.Deity;
+import pcgen.core.Domain;
+import pcgen.core.Equipment;
+import pcgen.core.EquipmentModifier;
+import pcgen.core.GameMode;
+import pcgen.core.GearBuySellScheme;
+import pcgen.core.Globals;
+import pcgen.core.Kit;
+import pcgen.core.Language;
+import pcgen.core.PCAlignment;
+import pcgen.core.PCClass;
+import pcgen.core.PCStat;
+import pcgen.core.PCTemplate;
+import pcgen.core.PObject;
+import pcgen.core.PlayerCharacter;
+import pcgen.core.QualifiedObject;
+import pcgen.core.Race;
+import pcgen.core.RollingMethods;
+import pcgen.core.RuleConstants;
+import pcgen.core.SettingsHandler;
+import pcgen.core.SizeAdjustment;
+import pcgen.core.Skill;
+import pcgen.core.VariableProcessor;
+import pcgen.core.analysis.DomainApplication;
+import pcgen.core.analysis.RaceUtilities;
+import pcgen.core.analysis.SkillRankControl;
+import pcgen.core.analysis.SpellCountCalc;
+import pcgen.core.character.CharacterSpell;
+import pcgen.core.character.EquipSet;
+import pcgen.core.character.Follower;
+import pcgen.core.chooser.ChoiceManagerList;
+import pcgen.core.chooser.ChooserUtilities;
+import pcgen.core.display.BonusDisplay;
+import pcgen.core.display.CharacterDisplay;
+import pcgen.core.kit.BaseKit;
+import pcgen.core.pclevelinfo.PCLevelInfo;
+import pcgen.core.prereq.PrereqHandler;
+import pcgen.core.spell.Spell;
+import pcgen.core.utils.CoreUtility;
+import pcgen.core.utils.MessageType;
+import pcgen.core.utils.ShowMessageDelegate;
+import pcgen.facade.core.AbilityFacade;
+import pcgen.facade.core.CharacterFacade;
+import pcgen.facade.core.CharacterLevelFacade;
+import pcgen.facade.core.CharacterLevelsFacade;
+import pcgen.facade.core.CharacterLevelsFacade.CharacterLevelEvent;
+import pcgen.facade.core.CharacterLevelsFacade.HitPointListener;
+import pcgen.facade.core.CharacterStubFacade;
+import pcgen.facade.core.CompanionSupportFacade;
+import pcgen.facade.core.CoreViewNodeFacade;
+import pcgen.facade.core.DataSetFacade;
+import pcgen.facade.core.DescriptionFacade;
+import pcgen.facade.core.EquipmentFacade;
+import pcgen.facade.core.EquipmentListFacade;
+import pcgen.facade.core.EquipmentListFacade.EquipmentListEvent;
+import pcgen.facade.core.EquipmentListFacade.EquipmentListListener;
+import pcgen.facade.core.EquipmentSetFacade;
+import pcgen.facade.core.GearBuySellFacade;
+import pcgen.facade.core.InfoFacade;
+import pcgen.facade.core.InfoFactory;
+import pcgen.facade.core.LanguageChooserFacade;
+import pcgen.facade.core.SpellFacade;
+import pcgen.facade.core.SpellSupportFacade;
+import pcgen.facade.core.TempBonusFacade;
+import pcgen.facade.core.TodoFacade;
+import pcgen.facade.core.UIDelegate;
+import pcgen.facade.core.UIDelegate.CustomEquipResult;
+import pcgen.facade.util.DefaultListFacade;
+import pcgen.facade.util.DefaultReferenceFacade;
+import pcgen.facade.util.ListFacade;
+import pcgen.facade.util.ListFacades;
+import pcgen.facade.util.ReferenceFacade;
+import pcgen.facade.util.WriteableListFacade;
+import pcgen.facade.util.WriteableReferenceFacade;
+import pcgen.facade.util.event.ChangeListener;
+import pcgen.facade.util.event.ListEvent;
+import pcgen.facade.util.event.ListListener;
+import pcgen.gui2.UIPropertyContext;
+import pcgen.gui2.util.CoreInterfaceUtilities;
+import pcgen.io.ExportException;
+import pcgen.io.ExportHandler;
+import pcgen.io.PCGIOHandler;
+import pcgen.output.channel.ChannelCompatibility;
+import pcgen.output.channel.ChannelUtilities;
+import pcgen.output.channel.compat.AlignmentCompat;
+import pcgen.output.channel.compat.GenderCompat;
+import pcgen.output.channel.compat.HandedCompat;
+import pcgen.pluginmgr.PluginManager;
+import pcgen.pluginmgr.messages.PlayerCharacterWasClosedMessage;
+import pcgen.system.CharacterManager;
+import pcgen.system.LanguageBundle;
+import pcgen.system.PCGenSettings;
+import pcgen.util.Logging;
+import pcgen.util.enumeration.Load;
+import pcgen.util.enumeration.Tab;
+import pcgen.util.enumeration.View;
+
+import org.apache.commons.lang3.StringUtils;
+
+/**
+ * The Class {@code CharacterFacadeImpl} is an implementation of
+ * the {@link CharacterFacade} interface for the new user interface. It is
+ * intended to provide a full implementation of the new ui/core
+ * interaction layer.
+ * TODO: Who is responsible for undo management and how will it work?
+ */
+public class CharacterFacadeImpl
+		implements CharacterFacade, EquipmentListListener, ListListener&lt;EquipmentFacade&gt;, HitPointListener
+{
+
+<span class="nc" id="L185">	private static final PlayerCharacter DUMMY_PC = new PlayerCharacter();</span>
+	private List&lt;PCClass&gt; pcClasses;
+	private DefaultListFacade&lt;TempBonusFacade&gt; appliedTempBonuses;
+	private DefaultListFacade&lt;TempBonusFacade&gt; availTempBonuses;
+	private WriteableReferenceFacade&lt;PCAlignment&gt; alignment;
+	private DefaultListFacade&lt;EquipmentSetFacade&gt; equipmentSets;
+	private DefaultReferenceFacade&lt;Gender&gt; gender;
+	private DefaultListFacade&lt;CharacterLevelFacade&gt; pcClassLevels;
+	private DefaultListFacade&lt;Gender&gt; availGenders;
+	private WriteableListFacade&lt;Handed&gt; availHands;
+	private Map&lt;PCStat, WriteableReferenceFacade&lt;Number&gt;&gt; statScoreMap;
+	private final DelegatingDataSet dataSet;
+	private DefaultReferenceFacade&lt;Race&gt; race;
+	private WriteableReferenceFacade&lt;Deity&gt; deity;
+	private DefaultReferenceFacade&lt;String&gt; tabName;
+	private DefaultReferenceFacade&lt;String&gt; name;
+	private DefaultReferenceFacade&lt;String&gt; playersName;
+	private PlayerCharacter theCharacter;
+	private CharacterDisplay charDisplay;
+	private DefaultReferenceFacade&lt;EquipmentSetFacade&gt; equipSet;
+	private DefaultListFacade&lt;Language&gt; languages;
+	private EquipmentListFacadeImpl purchasedEquip;
+	private DefaultReferenceFacade&lt;File&gt; file;
+	private WriteableReferenceFacade&lt;Handed&gt; handedness;
+	private final UIDelegate delegate;
+	private Set&lt;Language&gt; autoLanguagesCache;
+	private CharacterLevelsFacadeImpl charLevelsFacade;
+	private DefaultReferenceFacade&lt;Integer&gt; currentXP;
+	private DefaultReferenceFacade&lt;Integer&gt; xpForNextlevel;
+	private DefaultReferenceFacade&lt;String&gt; xpTableName;
+	private WriteableReferenceFacade&lt;String&gt; characterType;
+	private DefaultReferenceFacade&lt;String&gt; previewSheet;
+	private DefaultReferenceFacade&lt;SkillFilter&gt; skillFilter;
+	private WriteableReferenceFacade&lt;Integer&gt; age;
+	private DefaultReferenceFacade&lt;String&gt; ageCategory;
+	private DefaultListFacade&lt;String&gt; ageCategoryList;
+	private DefaultReferenceFacade&lt;String&gt; poolPointText;
+	private DefaultReferenceFacade&lt;String&gt; statTotalLabelText;
+	private DefaultReferenceFacade&lt;String&gt; statTotalText;
+	private DefaultReferenceFacade&lt;String&gt; modTotalLabelText;
+	private DefaultReferenceFacade&lt;String&gt; modTotalText;
+	private DefaultReferenceFacade&lt;Integer&gt; numBonusLang;
+	private DefaultReferenceFacade&lt;Integer&gt; numSkillLang;
+	private DefaultReferenceFacade&lt;Integer&gt; hpRef;
+	private DefaultReferenceFacade&lt;Integer&gt; rollMethodRef;
+	private DefaultReferenceFacade&lt;String&gt; carriedWeightRef;
+	private DefaultReferenceFacade&lt;String&gt; loadRef;
+	private DefaultReferenceFacade&lt;String&gt; weightLimitRef;
+	private DefaultListFacade&lt;QualifiedObject&lt;Domain&gt;&gt; domains;
+	private DefaultListFacade&lt;QualifiedObject&lt;Domain&gt;&gt; availDomains;
+	private DefaultReferenceFacade&lt;Integer&gt; maxDomains;
+	private DefaultReferenceFacade&lt;Integer&gt; remainingDomains;
+	private DefaultListFacade&lt;PCTemplate&gt; templates;
+	private DefaultListFacade&lt;Kit&gt; kitList;
+	private DefaultReferenceFacade&lt;File&gt; portrait;
+	private RectangleReference cropRect;
+	private String selectedGender;
+	private List&lt;Language&gt; currBonusLangs;
+	private WriteableReferenceFacade&lt;String&gt; skinColor;
+	private WriteableReferenceFacade&lt;String&gt; hairColor;
+	private DefaultReferenceFacade&lt;String&gt; eyeColor;
+	private DefaultReferenceFacade&lt;Integer&gt; weightRef;
+	private WriteableReferenceFacade&lt;BigDecimal&gt; fundsRef;
+	private DefaultReferenceFacade&lt;BigDecimal&gt; wealthRef;
+	private DefaultReferenceFacade&lt;GearBuySellFacade&gt; gearBuySellSchemeRef;
+
+	private Gui2InfoFactory infoFactory;
+	private CharacterAbilities characterAbilities;
+	private DescriptionFacade descriptionFacade;
+	private SpellSupportFacadeImpl spellSupportFacade;
+	private CompanionSupportFacadeImpl companionSupportFacade;
+	private TodoManager todoManager;
+	private boolean allowDebt;
+
+<span class="nc" id="L259">	private int lastExportCharSerial = 0;</span>
+<span class="nc" id="L260">	private PlayerCharacter lastExportChar = null;</span>
+	private LanguageListener langListener;
+	private TemplateListener templateListener;
+	private XPListener xpListener;
+	private AutoEquipListener autoEquipListener;
+
+	/**
+	 * Create a new character facade for an existing character.
+	 *
+	 * @param pc The character to be represented
+	 * @param delegate the UIDelegate for this CharacterFacade
+	 * @param dataSetFacade The data set in use for the character
+	 */
+	public CharacterFacadeImpl(PlayerCharacter pc, UIDelegate delegate, DataSetFacade dataSetFacade)
+<span class="nc" id="L274">	{</span>
+<span class="nc" id="L275">		this.delegate = delegate;</span>
+<span class="nc" id="L276">		theCharacter = pc;</span>
+<span class="nc" id="L277">		charDisplay = pc.getDisplay();</span>
+<span class="nc" id="L278">		dataSet = new DelegatingDataSet(dataSetFacade);</span>
+<span class="nc" id="L279">		buildAgeCategories();</span>
+<span class="nc" id="L280">		initForCharacter();</span>
+<span class="nc" id="L281">	}</span>
+
+	@Override
+	public void closeCharacter()
+	{
+<span class="nc" id="L286">		FacetLibrary.getFacet(LanguageFacet.class).removeDataFacetChangeListener(langListener);</span>
+<span class="nc" id="L287">		FacetLibrary.getFacet(TemplateFacet.class).removeDataFacetChangeListener(templateListener);</span>
+<span class="nc" id="L288">		FacetLibrary.getFacet(XPFacet.class).removeDataFacetChangeListener(xpListener);</span>
+<span class="nc" id="L289">		FacetLibrary.getFacet(AutoEquipmentFacet.class).removeDataFacetChangeListener(autoEquipListener);</span>
+
+<span class="nc" id="L291">		characterAbilities.closeCharacter();</span>
+<span class="nc" id="L292">		charLevelsFacade.closeCharacter();</span>
+<span class="nc" id="L293">		companionSupportFacade.closeCharacter();</span>
+<span class="nc" id="L294">		PluginManager.getInstance().getPostbox().handleMessage(new PlayerCharacterWasClosedMessage(this, theCharacter));</span>
+<span class="nc" id="L295">		Globals.getPCList().remove(theCharacter);</span>
+<span class="nc" id="L296">		lastExportChar = null;</span>
+		/*
+		 * Unfortunately, a dummy rather than null is necessary because the UI
+		 * does model swaps and such that do not pause events in the UI so that
+		 * it is trying to update things that do not exist
+		 */
+<span class="nc" id="L302">		theCharacter = DUMMY_PC;</span>
+<span class="nc" id="L303">		charDisplay = null;</span>
+<span class="nc" id="L304">		dataSet.detachDelegates();</span>
+<span class="nc" id="L305">	}</span>
+
+	private void initForCharacter()
+	{
+		// Calculate any active bonuses
+<span class="nc" id="L310">		theCharacter.preparePCForOutput();</span>
+
+<span class="nc" id="L312">		todoManager = new TodoManager();</span>
+
+<span class="nc" id="L314">		infoFactory = new Gui2InfoFactory(theCharacter);</span>
+<span class="nc" id="L315">		characterAbilities = new CharacterAbilities(theCharacter, delegate, dataSet, todoManager);</span>
+<span class="nc" id="L316">		descriptionFacade = new DescriptionFacadeImpl(theCharacter);</span>
+<span class="nc" id="L317">		spellSupportFacade = new SpellSupportFacadeImpl(theCharacter, delegate, dataSet, todoManager, this);</span>
+
+<span class="nc" id="L319">		name = new DefaultReferenceFacade&lt;&gt;(charDisplay.getName());</span>
+<span class="nc" id="L320">		file = new DefaultReferenceFacade&lt;&gt;(new File(charDisplay.getFileName()));</span>
+
+<span class="nc" id="L322">		companionSupportFacade = new CompanionSupportFacadeImpl(theCharacter, todoManager, name, file, this);</span>
+
+<span class="nc" id="L324">		availTempBonuses = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc" id="L325">		refreshAvailableTempBonuses();</span>
+<span class="nc" id="L326">		appliedTempBonuses = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc" id="L327">		buildAppliedTempBonusList();</span>
+<span class="nc" id="L328">		kitList = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc" id="L329">		refreshKitList();</span>
+
+<span class="nc" id="L331">		statScoreMap = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">		for (PCStat stat : dataSet.getStats())</span>
+		{
+<span class="nc" id="L334">			statScoreMap.put(stat, getStatReferenceFacade(stat));</span>
+<span class="nc" id="L335">		}</span>
+
+<span class="nc" id="L337">		File portraitFile = null;</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">		if (!StringUtils.isEmpty(charDisplay.getPortraitPath()))</span>
+		{
+<span class="nc" id="L340">			portraitFile = new File(charDisplay.getPortraitPath());</span>
+		}
+<span class="nc" id="L342">		portrait = new DefaultReferenceFacade&lt;&gt;(portraitFile);</span>
+<span class="nc" id="L343">		cropRect = new RectangleReference(charDisplay.getPortraitThumbnailRect());</span>
+<span class="nc" id="L344">		characterType = CoreInterfaceUtilities</span>
+<span class="nc" id="L345">				.getReferenceFacade(theCharacter.getCharID(), CControl.CHARACTERTYPE);</span>
+<span class="nc" id="L346">		previewSheet = new DefaultReferenceFacade&lt;&gt;(charDisplay.getPreviewSheet());</span>
+<span class="nc" id="L347">		skillFilter = new DefaultReferenceFacade&lt;&gt;(charDisplay.getSkillFilter());</span>
+
+<span class="nc" id="L349">		tabName = new DefaultReferenceFacade&lt;&gt;(charDisplay.getTabName());</span>
+<span class="nc" id="L350">		playersName = new DefaultReferenceFacade&lt;&gt;(charDisplay.getPlayersName());</span>
+<span class="nc" id="L351">		race = new DefaultReferenceFacade&lt;&gt;(charDisplay.getRace());</span>
+<span class="nc" id="L352">		handedness = CoreInterfaceUtilities</span>
+<span class="nc" id="L353">			.getReferenceFacade(theCharacter.getCharID(), CControl.HANDEDINPUT);</span>
+<span class="nc" id="L354">		gender = new DefaultReferenceFacade&lt;&gt;();</span>
+
+<span class="nc" id="L356">		availHands = HandedCompat.getAvailableHandedness(theCharacter.getCharID());</span>
+<span class="nc" id="L357">		availGenders = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">		for (Gender availableGender : GenderCompat.getAvailableGenders())</span>
+		{
+<span class="nc" id="L360">			availGenders.addElement(availableGender);</span>
+		}
+
+<span class="nc bnc" id="L363" title="All 2 branches missed.">		if (charDisplay.getRace() != null)</span>
+		{
+<span class="nc bnc" id="L365" title="All 2 branches missed.">			for (Gender pcGender : availGenders)</span>
+			{
+<span class="nc bnc" id="L367" title="All 2 branches missed.">				if (pcGender.equals(theCharacter.getGenderObject()))</span>
+				{
+<span class="nc" id="L369">					gender.set(pcGender);</span>
+<span class="nc" id="L370">					break;</span>
+				}
+<span class="nc" id="L372">			}</span>
+		}
+
+<span class="nc" id="L375">		GameMode game = dataSet.getGameMode();</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">		if (theCharacter.isFeatureEnabled(CControl.ALIGNMENTFEATURE))</span>
+		{
+<span class="nc" id="L378">			alignment = CoreInterfaceUtilities.getReferenceFacade(</span>
+<span class="nc" id="L379">				theCharacter.getCharID(), CControl.ALIGNMENTINPUT);</span>
+		}
+<span class="nc" id="L381">		age = CoreInterfaceUtilities</span>
+<span class="nc" id="L382">			.getReferenceFacade(theCharacter.getCharID(), CControl.AGEINPUT);</span>
+<span class="nc" id="L383">		ageCategory = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L384">		updateAgeCategoryForAge();</span>
+<span class="nc" id="L385">		currentXP = new DefaultReferenceFacade&lt;&gt;(theCharacter.getXP());</span>
+<span class="nc" id="L386">		xpListener = new XPListener();</span>
+<span class="nc" id="L387">		FacetLibrary.getFacet(XPFacet.class).addDataFacetChangeListener(xpListener);</span>
+<span class="nc" id="L388">		xpForNextlevel = new DefaultReferenceFacade&lt;&gt;(charDisplay.minXPForNextECL());</span>
+<span class="nc" id="L389">		xpTableName = new DefaultReferenceFacade&lt;&gt;(charDisplay.getXPTableName());</span>
+<span class="nc" id="L390">		hpRef = new DefaultReferenceFacade&lt;&gt;(theCharacter.hitPoints());</span>
+
+<span class="nc" id="L392">		skinColor = CoreInterfaceUtilities.getReferenceFacade(</span>
+<span class="nc" id="L393">			theCharacter.getCharID(), CControl.SKINCOLORINPUT);</span>
+<span class="nc" id="L394">		hairColor = CoreInterfaceUtilities.getReferenceFacade(</span>
+<span class="nc" id="L395">				theCharacter.getCharID(), CControl.HAIRCOLORINPUT);</span>
+<span class="nc" id="L396">		eyeColor = new DefaultReferenceFacade&lt;&gt;(charDisplay.getSafeStringFor(PCStringKey.EYECOLOR));</span>
+<span class="nc" id="L397">		weightRef = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L398">		refreshWeight();</span>
+
+<span class="nc" id="L400">		purchasedEquip = new EquipmentListFacadeImpl(theCharacter.getEquipmentMasterList());</span>
+<span class="nc" id="L401">		autoEquipListener = new AutoEquipListener();</span>
+<span class="nc" id="L402">		FacetLibrary.getFacet(AutoEquipmentFacet.class).addDataFacetChangeListener(autoEquipListener);</span>
+<span class="nc" id="L403">		carriedWeightRef = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L404">		loadRef = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L405">		weightLimitRef = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L406">		equipSet = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L407">		equipmentSets = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc" id="L408">		initEquipSet();</span>
+
+<span class="nc" id="L410">		rollMethodRef = new DefaultReferenceFacade&lt;&gt;(game.getRollMethod());</span>
+
+<span class="nc" id="L412">		charLevelsFacade = new CharacterLevelsFacadeImpl(theCharacter, delegate, todoManager, dataSet, this);</span>
+<span class="nc" id="L413">		pcClasses = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L414">		pcClassLevels = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc" id="L415">		refreshClassLevelModel();</span>
+<span class="nc" id="L416">		charLevelsFacade.addHitPointListener(this);</span>
+
+<span class="nc bnc" id="L418" title="All 2 branches missed.">		if (theCharacter.isFeatureEnabled(CControl.DOMAINFEATURE))</span>
+		{
+<span class="nc" id="L420">			deity = CoreInterfaceUtilities</span>
+<span class="nc" id="L421">					.getReferenceFacade(theCharacter.getCharID(), CControl.DEITYINPUT);</span>
+<span class="nc" id="L422">			domains = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc" id="L423">			maxDomains = new DefaultReferenceFacade&lt;&gt;(theCharacter.getMaxCharacterDomains());</span>
+<span class="nc" id="L424">			remainingDomains = new DefaultReferenceFacade&lt;&gt;(theCharacter.getMaxCharacterDomains() - domains.getSize());</span>
+<span class="nc" id="L425">			availDomains = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc" id="L426">			buildAvailableDomainsList();</span>
+		}
+
+<span class="nc" id="L429">		templates = new DefaultListFacade&lt;&gt;(charDisplay.getDisplayVisibleTemplateList());</span>
+<span class="nc" id="L430">		templateListener = new TemplateListener();</span>
+<span class="nc" id="L431">		FacetLibrary.getFacet(TemplateFacet.class).addDataFacetChangeListener(templateListener);</span>
+
+<span class="nc" id="L433">		initTodoList();</span>
+
+<span class="nc" id="L435">		poolPointText = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L436">		statTotalLabelText = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L437">		statTotalText = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L438">		modTotalLabelText = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L439">		modTotalText = new DefaultReferenceFacade&lt;&gt;();</span>
+<span class="nc" id="L440">		updateScorePurchasePool(false);</span>
+
+<span class="nc" id="L442">		languages = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc" id="L443">		numBonusLang = new DefaultReferenceFacade&lt;&gt;(0);</span>
+<span class="nc" id="L444">		numSkillLang = new DefaultReferenceFacade&lt;&gt;(0);</span>
+<span class="nc" id="L445">		refreshLanguageList();</span>
+<span class="nc" id="L446">		langListener = new LanguageListener();</span>
+<span class="nc" id="L447">		FacetLibrary.getFacet(LanguageFacet.class).addDataFacetChangeListener(langListener);</span>
+
+<span class="nc" id="L449">		purchasedEquip.addListListener(spellSupportFacade);</span>
+<span class="nc" id="L450">		purchasedEquip.addEquipmentListListener(spellSupportFacade);</span>
+<span class="nc" id="L451">		fundsRef = CoreInterfaceUtilities</span>
+<span class="nc" id="L452">				.getReferenceFacade(theCharacter.getCharID(), CControl.GOLDINPUT);</span>
+
+<span class="nc" id="L454">		wealthRef = new DefaultReferenceFacade&lt;&gt;(theCharacter.totalValue());</span>
+<span class="nc" id="L455">		gearBuySellSchemeRef = new DefaultReferenceFacade&lt;&gt;(findGearBuySellRate());</span>
+<span class="nc" id="L456">		allowDebt = false;</span>
+<span class="nc" id="L457">	}</span>
+
+	private WriteableReferenceFacade&lt;Number&gt; getStatReferenceFacade(PCStat stat)
+	{
+<span class="nc" id="L461">		return ChannelCompatibility.getStatScore(theCharacter.getCharID(), stat);</span>
+	}
+
+	/**
+	 * Build up the list of kits that the character has.
+	 */
+	private void refreshKitList()
+	{
+<span class="nc" id="L469">		List&lt;Kit&gt; kits = new ArrayList&lt;&gt;(charDisplay.getKitInfo());</span>
+<span class="nc" id="L470">		kitList.updateContents(kits);</span>
+<span class="nc" id="L471">	}</span>
+
+	private GearBuySellFacade findGearBuySellRate()
+	{
+<span class="nc" id="L475">		int buyRate = SettingsHandler.getGearTab_BuyRate();</span>
+<span class="nc" id="L476">		int sellRate = SettingsHandler.getGearTab_SellRate();</span>
+<span class="nc bnc" id="L477" title="All 2 branches missed.">		for (GearBuySellFacade buySell : dataSet.getGearBuySellSchemes())</span>
+		{
+<span class="nc" id="L479">			GearBuySellScheme scheme = (GearBuySellScheme) buySell;</span>
+<span class="nc bnc" id="L480" title="All 4 branches missed.">			if (scheme.getBuyRate().intValue() == buyRate &amp;&amp; scheme.getSellRate().intValue() == sellRate)</span>
+			{
+<span class="nc" id="L482">				return scheme;</span>
+			}
+<span class="nc" id="L484">		}</span>
+
+<span class="nc" id="L486">		return new GearBuySellScheme(LanguageBundle.getString(&quot;in_custom&quot;), //$NON-NLS-1$</span>
+			new BigDecimal(buyRate), new BigDecimal(sellRate), new BigDecimal(100));
+	}
+
+	/**
+	 * Initialize the equipment set facades, ensuring that the character has a
+	 * default equipment set.
+	 */
+	private void initEquipSet()
+	{
+		// Setup the default EquipSet if not already present
+<span class="nc bnc" id="L497" title="All 2 branches missed.">		if (!charDisplay.hasEquipSet())</span>
+		{
+<span class="nc" id="L499">			String id = EquipmentSetFacadeImpl.getNewIdPath(charDisplay, null);</span>
+<span class="nc" id="L500">			EquipSet eSet = new EquipSet(id, LanguageBundle.getString(&quot;in_ieDefault&quot;));</span>
+<span class="nc" id="L501">			theCharacter.addEquipSet(eSet);</span>
+<span class="nc" id="L502">			theCharacter.setCalcEquipSetId(id);</span>
+		}
+
+		// Detach listeners from old set
+<span class="nc bnc" id="L506" title="All 2 branches missed.">		if (equipSet.get() != null)</span>
+		{
+<span class="nc" id="L508">			EquipmentListFacade equippedItems = equipSet.get().getEquippedItems();</span>
+<span class="nc" id="L509">			equippedItems.removeListListener(this);</span>
+<span class="nc" id="L510">			equippedItems.removeEquipmentListListener(this);</span>
+		}
+
+		// Make facades for each root equipset.
+<span class="nc" id="L514">		List&lt;EquipmentSetFacade&gt; eqSetList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L515">		EquipmentSetFacade currSet = null;</span>
+<span class="nc" id="L516">		String currIdPath = theCharacter.getCalcEquipSetId();</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">		for (EquipSet es : charDisplay.getEquipSet())</span>
+		{
+<span class="nc bnc" id="L519" title="All 2 branches missed.">			if (es.getParentIdPath().equals(&quot;0&quot;))</span>
+			{
+<span class="nc" id="L521">				final EquipmentSetFacadeImpl facade = new EquipmentSetFacadeImpl(delegate, theCharacter, es, dataSet,</span>
+					purchasedEquip, todoManager, this);
+<span class="nc" id="L523">				eqSetList.add(facade);</span>
+<span class="nc bnc" id="L524" title="All 2 branches missed.">				if (es.getIdPath().equals(currIdPath))</span>
+				{
+<span class="nc" id="L526">					currSet = facade;</span>
+				}
+			}
+<span class="nc" id="L529">		}</span>
+<span class="nc" id="L530">		equipmentSets.updateContents(eqSetList);</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">		if (currSet != null)</span>
+		{
+<span class="nc" id="L533">			equipSet.set(currSet);</span>
+		}
+
+<span class="nc" id="L536">		EquipmentSetFacade set = equipSet.get();</span>
+<span class="nc" id="L537">		set.getEquippedItems().addListListener(this);</span>
+<span class="nc" id="L538">		set.getEquippedItems().addEquipmentListListener(this);</span>
+<span class="nc" id="L539">		refreshTotalWeight();</span>
+
+<span class="nc" id="L541">	}</span>
+
+	/**
+	 * Create the list of known age categories in the current BioSet.
+	 */
+	private void buildAgeCategories()
+	{
+<span class="nc" id="L548">		List&lt;String&gt; cats = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">		for (String aString : SettingsHandler.getGameAsProperty().get().getBioSet().getAgeCategories())</span>
+		{
+<span class="nc" id="L551">			final int idx = aString.indexOf('\t');</span>
+
+<span class="nc bnc" id="L553" title="All 2 branches missed.">			if (idx &gt;= 0)</span>
+			{
+<span class="nc" id="L555">				aString = aString.substring(0, idx);</span>
+			}
+
+<span class="nc bnc" id="L558" title="All 2 branches missed.">			if (!cats.contains(aString))</span>
+			{
+<span class="nc" id="L560">				cats.add(aString);</span>
+			}
+<span class="nc" id="L562">		}</span>
+<span class="nc" id="L563">		Collections.sort(cats);</span>
+<span class="nc" id="L564">		ageCategoryList = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc bnc" id="L565" title="All 2 branches missed.">		for (String ageCat : cats)</span>
+		{
+<span class="nc" id="L567">			ageCategoryList.addElement(ageCat);</span>
+<span class="nc" id="L568">		}</span>
+<span class="nc" id="L569">	}</span>
+
+	/**
+	 * Create an initial list of todo items
+	 */
+	private void initTodoList()
+	{
+<span class="nc bnc" id="L576" title="All 2 branches missed.">		if (isNewCharName(charDisplay.getName()))</span>
+		{
+<span class="nc" id="L578">			todoManager.addTodo(new TodoFacadeImpl(Tab.SUMMARY, &quot;Name&quot;, &quot;in_sumTodoName&quot;, 1));</span>
+		}
+<span class="nc bnc" id="L580" title="All 4 branches missed.">		if (charDisplay.getRace() == null || charDisplay.getRace().isUnselected())</span>
+		{
+<span class="nc" id="L582">			todoManager.addTodo(new TodoFacadeImpl(Tab.SUMMARY, &quot;Race&quot;, &quot;in_irTodoRace&quot;, 100));</span>
+		}
+
+		// Stats todo already done in updateScorePurchasePool
+<span class="nc" id="L586">		updateLevelTodo();</span>
+<span class="nc" id="L587">	}</span>
+
+	/**
+	 * Identify if the supplied name is a default one generated by the system
+	 * e.g. Unnamed 1 or Unnamed 2
+	 * @param charName The name to be checked.
+	 * @return True if the name is a default.
+	 */
+	private boolean isNewCharName(String charName)
+	{
+<span class="nc bnc" id="L597" title="All 2 branches missed.">		if (charName == null)</span>
+		{
+<span class="nc" id="L599">			return true;</span>
+		}
+
+<span class="nc" id="L602">		return charName.startsWith(&quot;Unnamed&quot;); //$NON-NLS-1$</span>
+	}
+
+	@Override
+	public ListFacade&lt;Handed&gt; getAvailableHands()
+	{
+<span class="nc" id="L608">		return availHands;</span>
+	}
+
+	@Override
+	public ListFacade&lt;Gender&gt; getAvailableGenders()
+	{
+<span class="nc" id="L614">		return availGenders;</span>
+	}
+
+	@Override
+	public void addAbility(AbilityCategory category, AbilityFacade ability)
+	{
+<span class="nc" id="L620">		characterAbilities.addAbility(category, ability);</span>
+<span class="nc" id="L621">		refreshKitList();</span>
+<span class="nc" id="L622">		refreshAvailableTempBonuses();</span>
+<span class="nc" id="L623">		buildAvailableDomainsList();</span>
+<span class="nc" id="L624">		companionSupportFacade.refreshCompanionData();</span>
+<span class="nc" id="L625">		refreshEquipment();</span>
+<span class="nc" id="L626">		hpRef.set(theCharacter.hitPoints());</span>
+<span class="nc" id="L627">	}</span>
+
+	@Override
+	public void removeAbility(AbilityCategory category, AbilityFacade ability)
+	{
+<span class="nc" id="L632">		characterAbilities.removeAbility(category, ability);</span>
+<span class="nc" id="L633">		refreshKitList();</span>
+<span class="nc" id="L634">		companionSupportFacade.refreshCompanionData();</span>
+<span class="nc" id="L635">		hpRef.set(theCharacter.hitPoints());</span>
+<span class="nc" id="L636">	}</span>
+
+	@Override
+	public ListFacade&lt;AbilityFacade&gt; getAbilities(AbilityCategory category)
+	{
+<span class="nc" id="L641">		return characterAbilities.getAbilities(category);</span>
+	}
+
+	@Override
+	public ListFacade&lt;AbilityCategory&gt; getActiveAbilityCategories()
+	{
+<span class="nc" id="L647">		return characterAbilities.getActiveAbilityCategories();</span>
+	}
+
+	@Override
+	public int getTotalSelections(AbilityCategory category)
+	{
+<span class="nc" id="L653">		return characterAbilities.getTotalSelections(category);</span>
+	}
+
+	@Override
+	public int getRemainingSelections(AbilityCategory category)
+	{
+<span class="nc" id="L659">		return characterAbilities.getRemainingSelections(category);</span>
+	}
+
+	@Override
+	public void addAbilityCatSelectionListener(ChangeListener listener)
+	{
+<span class="nc" id="L665">		characterAbilities.addAbilityCatSelectionListener(listener);</span>
+<span class="nc" id="L666">	}</span>
+
+	@Override
+	public void removeAbilityCatSelectionListener(ChangeListener listener)
+	{
+<span class="nc" id="L671">		characterAbilities.removeAbilityCatSelectionListener(listener);</span>
+<span class="nc" id="L672">	}</span>
+
+	@Override
+	public void setRemainingSelection(AbilityCategory category, int remaining)
+	{
+<span class="nc" id="L677">		characterAbilities.setRemainingSelection(category, remaining);</span>
+<span class="nc" id="L678">	}</span>
+
+	@Override
+	public Nature getAbilityNature(AbilityFacade ability)
+	{
+<span class="nc bnc" id="L683" title="All 2 branches missed.">		if (!(ability instanceof Ability))</span>
+		{
+<span class="nc" id="L685">			return null;</span>
+		}
+		/*
+		 * TODO This is making a somewhat DRASTIC assumption that ANY Ability
+		 * Category is appropriate. Unfortunately, the point at which this
+		 * method is called from the UI it is unclear to the untrained eye how
+		 * to get the category.
+		 */
+<span class="nc" id="L693">		List&lt;CNAbility&gt; cnas = theCharacter.getMatchingCNAbilities((Ability) ability);</span>
+<span class="nc" id="L694">		Nature nature = null;</span>
+<span class="nc bnc" id="L695" title="All 2 branches missed.">		for (CNAbility cna : cnas)</span>
+		{
+<span class="nc" id="L697">			nature = Nature.getBestNature(nature, cna.getNature());</span>
+<span class="nc" id="L698">		}</span>
+<span class="nc" id="L699">		return nature;</span>
+	}
+
+	@Override
+	public void addCharacterLevels(PCClass[] classes)
+	{
+<span class="nc" id="L705">		SettingsHandler.setShowHPDialogAtLevelUp(false);</span>
+		//SettingsHandler.setShowStatDialogAtLevelUp(false);
+
+<span class="nc" id="L708">		int oldLevel = charLevelsFacade.getSize();</span>
+<span class="nc" id="L709">		boolean needFullRefresh = false;</span>
+
+<span class="nc bnc" id="L711" title="All 2 branches missed.">		for (PCClass pcClass : classes)</span>
+		{
+<span class="nc" id="L713">			int totalLevels = charDisplay.getTotalLevels();</span>
+<span class="nc bnc" id="L714" title="All 2 branches missed.">			if (!validateAddLevel(pcClass))</span>
+			{
+<span class="nc" id="L716">				return;</span>
+			}
+<span class="nc" id="L718">			Logging.log(Logging.INFO,</span>
+<span class="nc" id="L719">				charDisplay.getName() + &quot;: Adding level &quot; + (totalLevels + 1) //$NON-NLS-1$</span>
+					+ &quot; in class &quot; + pcClass); //$NON-NLS-1$
+<span class="nc" id="L721">			theCharacter.incrementClassLevel(1, pcClass);</span>
+<span class="nc bnc" id="L722" title="All 2 branches missed.">			if (totalLevels == charDisplay.getTotalLevels())</span>
+			{
+				// The level change was rejected - no further processing needed.
+<span class="nc" id="L725">				return;</span>
+			}
+<span class="nc bnc" id="L727" title="All 2 branches missed.">			if (pcClass.containsKey(ObjectKey.EXCHANGE_LEVEL))</span>
+			{
+<span class="nc" id="L729">				needFullRefresh = true;</span>
+			}
+<span class="nc bnc" id="L731" title="All 2 branches missed.">			if (!pcClasses.contains(pcClass))</span>
+			{
+<span class="nc" id="L733">				pcClasses.add(pcClass);</span>
+			}
+<span class="nc" id="L735">			CharacterLevelFacadeImpl cl = new CharacterLevelFacadeImpl(pcClass, charLevelsFacade.getSize() + 1);</span>
+<span class="nc" id="L736">			pcClassLevels.addElement(cl);</span>
+<span class="nc" id="L737">			charLevelsFacade.addLevelOfClass(cl);</span>
+		}
+<span class="nc" id="L739">		CharacterUtils.selectClothes(getTheCharacter());</span>
+
+		// Calculate any active bonuses
+<span class="nc" id="L742">		theCharacter.calcActiveBonuses();</span>
+
+<span class="nc bnc" id="L744" title="All 2 branches missed.">		if (needFullRefresh)</span>
+		{
+<span class="nc" id="L746">			refreshClassLevelModel();</span>
+		}
+<span class="nc" id="L748">		postLevellingUpdates();</span>
+<span class="nc" id="L749">		delegate.showLevelUpInfo(this, oldLevel);</span>
+<span class="nc" id="L750">	}</span>
+
+	/**
+	 * Ensure any items that could be affected by the level up or down are refreshed.
+	 */
+	void postLevellingUpdates()
+	{
+<span class="nc" id="L757">		characterAbilities.rebuildAbilityLists();</span>
+<span class="nc" id="L758">		companionSupportFacade.refreshCompanionData();</span>
+<span class="nc" id="L759">		refreshKitList();</span>
+<span class="nc" id="L760">		refreshAvailableTempBonuses();</span>
+<span class="nc" id="L761">		refreshEquipment();</span>
+<span class="nc" id="L762">		currentXP.set(theCharacter.getXP());</span>
+<span class="nc" id="L763">		xpForNextlevel.set(charDisplay.minXPForNextECL());</span>
+<span class="nc" id="L764">		xpTableName.set(charDisplay.getXPTableName());</span>
+<span class="nc" id="L765">		hpRef.set(theCharacter.hitPoints());</span>
+<span class="nc" id="L766">		refreshWeight();</span>
+<span class="nc" id="L767">		refreshStatScores();</span>
+
+<span class="nc" id="L769">		updateLevelTodo();</span>
+<span class="nc" id="L770">		buildAvailableDomainsList();</span>
+<span class="nc" id="L771">		spellSupportFacade.refreshAvailableKnownSpells();</span>
+<span class="nc" id="L772">		updateScorePurchasePool(false);</span>
+<span class="nc" id="L773">		refreshLanguageList();</span>
+<span class="nc" id="L774">	}</span>
+
+	/**
+	 * Ensure any items that could be affected by the new equipment are refreshed.
+	 */
+	void postEquippingUpdates()
+	{
+<span class="nc" id="L781">		characterAbilities.rebuildAbilityLists();</span>
+<span class="nc" id="L782">		refreshAvailableTempBonuses();</span>
+<span class="nc" id="L783">		hpRef.set(theCharacter.hitPoints());</span>
+<span class="nc" id="L784">	}</span>
+
+	private void refreshWeight()
+	{
+<span class="nc" id="L788">		weightRef.set(Globals.getGameModeUnitSet().convertWeightToUnitSet(charDisplay.getWeight()));</span>
+<span class="nc" id="L789">	}</span>
+
+	@Override
+	public void removeCharacterLevels(int levels)
+	{
+<span class="nc bnc" id="L794" title="All 4 branches missed.">		for (int i = levels; i &gt; 0 &amp;&amp; !pcClassLevels.isEmpty(); i--)</span>
+		{
+<span class="nc" id="L796">			PCClass pcClass =</span>
+<span class="nc" id="L797">					charLevelsFacade.getClassTaken(pcClassLevels.getElementAt(pcClassLevels.getSize() - 1));</span>
+<span class="nc" id="L798">			pcClassLevels.removeElement(pcClassLevels.getSize() - 1);</span>
+<span class="nc" id="L799">			Logging.log(Logging.INFO,</span>
+<span class="nc" id="L800">				charDisplay.getName() + &quot;: Removing level &quot; //$NON-NLS-1$</span>
+<span class="nc" id="L801">					+ (pcClassLevels.getSize() + 1) + &quot; in class &quot; + pcClass); //$NON-NLS-1$</span>
+<span class="nc" id="L802">			theCharacter.incrementClassLevel(-1, pcClass);</span>
+<span class="nc" id="L803">			charLevelsFacade.removeLastLevel();</span>
+		}
+
+		// Clean up the class list
+<span class="nc bnc" id="L807" title="All 2 branches missed.">		for (Iterator&lt;PCClass&gt; iterator = pcClasses.iterator(); iterator.hasNext();)</span>
+		{
+<span class="nc" id="L809">			PCClass pcClass = iterator.next();</span>
+<span class="nc" id="L810">			boolean stillPresent = false;</span>
+<span class="nc bnc" id="L811" title="All 2 branches missed.">			for (CharacterLevelFacade charLevel : pcClassLevels)</span>
+			{
+<span class="nc bnc" id="L813" title="All 2 branches missed.">				if (charLevelsFacade.getClassTaken(charLevel) == pcClass)</span>
+				{
+<span class="nc" id="L815">					stillPresent = true;</span>
+<span class="nc" id="L816">					break;</span>
+				}
+<span class="nc" id="L818">			}</span>
+
+<span class="nc bnc" id="L820" title="All 2 branches missed.">			if (!stillPresent)</span>
+			{
+<span class="nc" id="L822">				iterator.remove();</span>
+			}
+<span class="nc" id="L824">		}</span>
+<span class="nc" id="L825">		postLevellingUpdates();</span>
+<span class="nc" id="L826">	}</span>
+
+	/**
+	 * Update the todo list to reflect the change in level or experience.
+	 */
+	private void updateLevelTodo()
+	{
+<span class="nc bnc" id="L833" title="All 2 branches missed.">		if (theCharacter.getXP() &gt;= charDisplay.minXPForNextECL())</span>
+		{
+<span class="nc" id="L835">			todoManager.addTodo(new TodoFacadeImpl(Tab.SUMMARY, &quot;Class&quot;, &quot;in_clTodoLevelUp&quot;, 120));</span>
+		}
+		else
+		{
+<span class="nc" id="L839">			todoManager.removeTodo(&quot;in_clTodoLevelUp&quot;);</span>
+		}
+<span class="nc" id="L841">	}</span>
+
+	@Override
+	public int getClassLevel(PCClass c)
+	{
+<span class="nc" id="L846">		int clsLevel = 0;</span>
+		// We have to compare by class key as classes get cloned and we may have
+		// multiple instances of the same class in our level list
+<span class="nc" id="L849">		String classKey = c.getKeyName();</span>
+<span class="nc bnc" id="L850" title="All 2 branches missed.">		for (CharacterLevelFacade charLevel : pcClassLevels)</span>
+		{
+<span class="nc bnc" id="L852" title="All 2 branches missed.">			if (charLevelsFacade.getClassTaken(charLevel).getKeyName().equals(classKey))</span>
+			{
+<span class="nc" id="L854">				clsLevel++;</span>
+			}
+<span class="nc" id="L856">		}</span>
+<span class="nc" id="L857">		return clsLevel;</span>
+	}
+
+	private boolean validateAddLevel(PCClass theClass)
+	{
+<span class="nc" id="L862">		int levels = 1;</span>
+
+<span class="nc bnc" id="L864" title="All 2 branches missed.">		if (theClass == null)</span>
+		{
+<span class="nc" id="L866">			return false;</span>
+		}
+
+<span class="nc bnc" id="L869" title="All 2 branches missed.">		if (!theCharacter.isQualified(theClass))</span>
+		{
+<span class="nc" id="L871">			delegate.showErrorMessage(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L872">				LanguageBundle.getString(&quot;in_clYouAreNotQualifiedToTakeTheClass&quot;));</span>
+<span class="nc" id="L873">			return false;</span>
+		}
+
+<span class="nc" id="L876">		final PCClass aClass = theCharacter.getClassKeyed(theClass.getKeyName());</span>
+
+		// Check if the subclass (if any) is qualified for
+<span class="nc bnc" id="L879" title="All 2 branches missed.">		if (aClass != null)</span>
+		{
+<span class="nc" id="L881">			String subClassKey = charDisplay.getSubClassName(aClass);</span>
+<span class="nc bnc" id="L882" title="All 2 branches missed.">			if (subClassKey != null)</span>
+			{
+<span class="nc" id="L884">				final PCClass subClass = aClass.getSubClassKeyed(subClassKey);</span>
+<span class="nc bnc" id="L885" title="All 4 branches missed.">				if (subClass != null &amp;&amp; !theCharacter.isQualified(subClass))</span>
+				{
+<span class="nc" id="L887">					delegate.showErrorMessage(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L888">						LanguageBundle.getFormattedString(&quot;in_sumYouAreNotQualifiedToTakeTheClass&quot;, //$NON-NLS-1$</span>
+<span class="nc" id="L889">							aClass.getDisplayName() + &quot;/&quot; + subClass.getDisplayName())); //$NON-NLS-1$</span>
+<span class="nc" id="L890">					return false;</span>
+				}
+			}
+		}
+
+<span class="nc bnc" id="L895" title="All 4 branches missed.">		if (!Globals.checkRule(RuleConstants.LEVELCAP) &amp;&amp; theClass.hasMaxLevel()</span>
+<span class="nc bnc" id="L896" title="All 4 branches missed.">			&amp;&amp; ((levels &gt; theClass.getSafe(IntegerKey.LEVEL_LIMIT)) || ((aClass != null)</span>
+<span class="nc bnc" id="L897" title="All 2 branches missed.">				&amp;&amp; ((charDisplay.getLevel(aClass) + levels) &gt; aClass.getSafe(IntegerKey.LEVEL_LIMIT)))))</span>
+		{
+<span class="nc" id="L899">			delegate.showInfoMessage(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L900">				LanguageBundle.getFormattedString(&quot;in_sumMaximumLevelIs&quot;, //$NON-NLS-1$</span>
+<span class="nc" id="L901">					String.valueOf(theClass.getSafe(IntegerKey.LEVEL_LIMIT))));</span>
+<span class="nc" id="L902">			return false;</span>
+		}
+
+		// Check with the user on their first level up
+<span class="nc bnc" id="L906" title="All 2 branches missed.">		if (charDisplay.getTotalLevels() == 0)</span>
+		{
+<span class="nc bnc" id="L908" title="All 2 branches missed.">			if (SettingsHandler.getGameAsProperty().get().isPurchaseStatMode()</span>
+<span class="nc bnc" id="L909" title="All 2 branches missed.">				&amp;&amp; (theCharacter.getPointBuyPoints() &gt; getUsedStatPool()))</span>
+			{
+                //$NON-NLS-1$
+<span class="nc" id="L912">                return delegate.showWarningConfirm(LanguageBundle.getString(&quot;in_sumLevelWarnTitle&quot;), //$NON-NLS-1$</span>
+<span class="nc" id="L913">                        LanguageBundle.getString(&quot;in_sumPoolWarning&quot;));</span>
+			}
+<span class="nc bnc" id="L915" title="All 2 branches missed.">			else if (allAbilitiesAreZero())</span>
+			{
+<span class="nc" id="L917">                return delegate.showWarningConfirm(LanguageBundle.getString(&quot;in_sumLevelWarnTitle&quot;),</span>
+<span class="nc" id="L918">                        LanguageBundle.getString(&quot;in_sumAbilitiesZeroWarning&quot;));</span>
+			}
+			else
+			{
+<span class="nc" id="L922">				Boolean proceed = delegate.maybeShowWarningConfirm(LanguageBundle.getString(&quot;in_sumLevelWarnTitle&quot;),</span>
+<span class="nc" id="L923">					LanguageBundle.getString(&quot;in_sumAbilitiesWarning&quot;),</span>
+<span class="nc" id="L924">					LanguageBundle.getString(&quot;in_sumAbilitiesWarningCheckBox&quot;), PCGenSettings.OPTIONS_CONTEXT,</span>
+					PCGenSettings.OPTION_SHOW_WARNING_AT_FIRST_LEVEL_UP);
+<span class="nc bnc" id="L926" title="All 2 branches missed.">                return !Boolean.FALSE.equals(proceed);</span>
+			}
+		}
+<span class="nc" id="L929">		return true;</span>
+	}
+
+	/**
+	 * Determine if all of the character's stats are still set to 0.
+	 *
+	 * @return True if they are all zero, false if any are non-zero.
+	 */
+	private boolean allAbilitiesAreZero()
+	{
+<span class="nc bnc" id="L939" title="All 2 branches missed.">		for (PCStat stat : dataSet.getStats())</span>
+		{
+<span class="nc" id="L941">			ReferenceFacade&lt;Number&gt; facade = getScoreBaseRef(stat);</span>
+
+<span class="nc bnc" id="L943" title="All 2 branches missed.">			if (facade.get().intValue() != 0)</span>
+			{
+<span class="nc" id="L945">				return false;</span>
+			}
+<span class="nc" id="L947">		}</span>
+
+<span class="nc" id="L949">		return true;</span>
+	}
+
+	/**
+	 * This method gets the number of stat points used in the pool
+	 * @return used stat pool
+	 */
+	private int getUsedStatPool()
+	{
+<span class="nc" id="L958">		int i = 0;</span>
+
+<span class="nc bnc" id="L960" title="All 2 branches missed.">		for (PCStat aStat : charDisplay.getStatSet())</span>
+		{
+<span class="nc bnc" id="L962" title="All 2 branches missed.">			if (!aStat.getSafe(ObjectKey.ROLLED))</span>
+			{
+<span class="nc" id="L964">				continue;</span>
+			}
+
+<span class="nc" id="L967">			final int statValue = theCharacter.getBaseStatFor(aStat);</span>
+<span class="nc" id="L968">			i += getPurchaseCostForStat(theCharacter, statValue);</span>
+<span class="nc" id="L969">		}</span>
+<span class="nc" id="L970">		i += (int) theCharacter.getTotalBonusTo(&quot;POINTBUY&quot;, &quot;SPENT&quot;); //$NON-NLS-1$ //$NON-NLS-2$</span>
+<span class="nc" id="L971">		return i;</span>
+	}
+
+	private static int getPurchaseCostForStat(final PlayerCharacter aPC, int statValue)
+	{
+<span class="nc" id="L976">		final int iMax = SettingsHandler.getGameAsProperty().get().getPurchaseScoreMax(aPC);</span>
+<span class="nc" id="L977">		final int iMin = SettingsHandler.getGameAsProperty().get().getPurchaseScoreMin(aPC);</span>
+
+<span class="nc bnc" id="L979" title="All 2 branches missed.">		if (statValue &gt; iMax)</span>
+		{
+<span class="nc" id="L981">			statValue = iMax;</span>
+		}
+
+<span class="nc bnc" id="L984" title="All 2 branches missed.">		if (statValue &gt;= iMin)</span>
+		{
+<span class="nc" id="L986">			return SettingsHandler.getGameAsProperty().get().getAbilityScoreCost(statValue - iMin);</span>
+		}
+<span class="nc" id="L988">		return 0;</span>
+	}
+
+	void refreshAvailableTempBonuses()
+	{
+<span class="nc" id="L993">		List&lt;TempBonusFacadeImpl&gt; tempBonuses = new ArrayList&lt;&gt;();</span>
+
+		// first objects on the PC
+<span class="nc bnc" id="L996" title="All 2 branches missed.">		for (CDOMObject cdo : theCharacter.getCDOMObjectList())</span>
+		{
+<span class="nc" id="L998">			scanForTempBonuses(tempBonuses, cdo);</span>
+<span class="nc" id="L999">		}</span>
+
+		//
+		// next do all abilities to get TEMPBONUS:ANYPC only
+<span class="nc" id="L1003">		GameMode game = dataSet.getGameMode();</span>
+<span class="nc bnc" id="L1004" title="All 2 branches missed.">		for (AbilityCategory cat : game.getAllAbilityCategories())</span>
+		{
+<span class="nc bnc" id="L1006" title="All 2 branches missed.">			if (cat.getParentCategory() == cat)</span>
+			{
+<span class="nc bnc" id="L1008" title="All 2 branches missed.">				for (Ability aFeat : Globals.getContext().getReferenceContext().getManufacturerId(cat).getAllObjects())</span>
+				{
+<span class="nc" id="L1010">					scanForAnyPcTempBonuses(tempBonuses, aFeat);</span>
+<span class="nc" id="L1011">				}</span>
+			}
+<span class="nc" id="L1013">		}</span>
+
+		//
+		// Do all the PC's spells
+<span class="nc bnc" id="L1017" title="All 2 branches missed.">		for (Spell aSpell : theCharacter.aggregateSpellList(&quot;&quot;, &quot;&quot;, &quot;&quot;, 0, 9))</span>
+		{
+<span class="nc" id="L1019">			scanForTempBonuses(tempBonuses, aSpell);</span>
+<span class="nc" id="L1020">		}</span>
+
+		// Do all the pc's innate spells.
+<span class="nc" id="L1023">		Collection&lt;CharacterSpell&gt; innateSpells =</span>
+<span class="nc" id="L1024">				theCharacter.getCharacterSpells(charDisplay.getRace(), Constants.INNATE_SPELL_BOOK_NAME);</span>
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">		for (CharacterSpell aCharacterSpell : innateSpells)</span>
+		{
+<span class="nc bnc" id="L1027" title="All 2 branches missed.">			if (aCharacterSpell == null)</span>
+			{
+<span class="nc" id="L1029">				continue;</span>
+			}
+<span class="nc" id="L1031">			scanForTempBonuses(tempBonuses, aCharacterSpell.getSpell());</span>
+<span class="nc" id="L1032">		}</span>
+
+		//
+		// Next do all spells to get TEMPBONUS:ANYPC or TEMPBONUS:EQUIP
+<span class="nc bnc" id="L1036" title="All 2 branches missed.">		for (Spell spell : Globals.getContext().getReferenceContext().getConstructedCDOMObjects(Spell.class))</span>
+		{
+<span class="nc" id="L1038">			scanForNonPcTempBonuses(tempBonuses, spell);</span>
+<span class="nc" id="L1039">		}</span>
+
+		// do all Templates to get TEMPBONUS:ANYPC or TEMPBONUS:EQUIP
+<span class="nc bnc" id="L1042" title="All 2 branches missed.">		for (PCTemplate aTemp : Globals.getContext().getReferenceContext().getConstructedCDOMObjects(PCTemplate.class))</span>
+		{
+<span class="nc" id="L1044">			scanForNonPcTempBonuses(tempBonuses, aTemp);</span>
+<span class="nc" id="L1045">		}</span>
+
+<span class="nc" id="L1047">		Collections.sort(tempBonuses);</span>
+<span class="nc" id="L1048">		availTempBonuses.updateContents(tempBonuses);</span>
+<span class="nc" id="L1049">	}</span>
+
+	private void scanForNonPcTempBonuses(List&lt;TempBonusFacadeImpl&gt; tempBonuses, PObject obj)
+	{
+<span class="nc bnc" id="L1053" title="All 2 branches missed.">		if (obj == null)</span>
+		{
+<span class="nc" id="L1055">			return;</span>
+		}
+<span class="nc bnc" id="L1057" title="All 2 branches missed.">		if (TempBonusHelper.hasNonPCTempBonus(obj))</span>
+		{
+<span class="nc" id="L1059">			tempBonuses.add(new TempBonusFacadeImpl(obj));</span>
+		}
+<span class="nc" id="L1061">	}</span>
+
+	private void scanForAnyPcTempBonuses(List&lt;TempBonusFacadeImpl&gt; tempBonuses, PObject obj)
+	{
+<span class="nc bnc" id="L1065" title="All 2 branches missed.">		if (obj == null)</span>
+		{
+<span class="nc" id="L1067">			return;</span>
+		}
+<span class="nc bnc" id="L1069" title="All 2 branches missed.">		if (TempBonusHelper.hasAnyPCTempBonus(obj))</span>
+		{
+<span class="nc" id="L1071">			tempBonuses.add(new TempBonusFacadeImpl(obj));</span>
+		}
+<span class="nc" id="L1073">	}</span>
+
+	private void scanForTempBonuses(List&lt;TempBonusFacadeImpl&gt; tempBonuses, CDOMObject obj)
+	{
+<span class="nc bnc" id="L1077" title="All 2 branches missed.">		if (obj == null)</span>
+		{
+<span class="nc" id="L1079">			return;</span>
+		}
+<span class="nc bnc" id="L1081" title="All 2 branches missed.">		if (TempBonusHelper.hasTempBonus(obj))</span>
+		{
+<span class="nc" id="L1083">			tempBonuses.add(new TempBonusFacadeImpl(obj));</span>
+		}
+<span class="nc" id="L1085">	}</span>
+
+	@Override
+	public ListFacade&lt;TempBonusFacade&gt; getAvailableTempBonuses()
+	{
+<span class="nc" id="L1090">		return availTempBonuses;</span>
+	}
+
+	/**
+	 * Build up the list of temporary bonuses which have been applied to this character.
+	 */
+	private void buildAppliedTempBonusList()
+	{
+<span class="nc" id="L1098">		Set&lt;String&gt; found = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L1099" title="All 2 branches missed.">		for (TempBonusInfo tbi : theCharacter.getTempBonusMap().values())</span>
+		{
+<span class="nc" id="L1101">			Object aC = tbi.source;</span>
+<span class="nc" id="L1102">			Object aT = tbi.target;</span>
+<span class="nc" id="L1103">			String name = BonusDisplay.getBonusDisplayName(tbi);</span>
+
+<span class="nc bnc" id="L1105" title="All 2 branches missed.">			if (!found.contains(name))</span>
+			{
+<span class="nc" id="L1107">				found.add(name);</span>
+<span class="nc" id="L1108">				TempBonusFacadeImpl facade = new TempBonusFacadeImpl((CDOMObject) aC, aT, name);</span>
+<span class="nc bnc" id="L1109" title="All 2 branches missed.">				facade.setActive(!theCharacter.getTempBonusFilters().contains(name));</span>
+<span class="nc" id="L1110">				appliedTempBonuses.addElement(facade);</span>
+			}
+<span class="nc" id="L1112">		}</span>
+
+<span class="nc" id="L1114">	}</span>
+
+	@Override
+	public void addTempBonus(TempBonusFacade bonusFacade)
+	{
+<span class="nc bnc" id="L1119" title="All 2 branches missed.">		if (!(bonusFacade instanceof TempBonusFacadeImpl tempBonus))</span>
+		{
+<span class="nc" id="L1121">			return;</span>
+		}
+
+		// Allow selection of target for bonus affecting equipment
+<span class="nc" id="L1125">		CDOMObject originObj = tempBonus.getOriginObj();</span>
+		Equipment aEq;
+<span class="nc" id="L1127">		Object target = TempBonusHelper.getTempBonusTarget(originObj, theCharacter, delegate, infoFactory);</span>
+<span class="nc bnc" id="L1128" title="All 2 branches missed.">		if (target == null)</span>
+		{
+<span class="nc" id="L1130">			return;</span>
+		}
+		TempBonusFacadeImpl appliedTempBonus;
+<span class="nc bnc" id="L1133" title="All 2 branches missed.">		if (target instanceof Equipment)</span>
+		{
+<span class="nc" id="L1135">			aEq = (Equipment) target;</span>
+<span class="nc" id="L1136">			appliedTempBonus = TempBonusHelper.applyBonusToCharacterEquipment(aEq, originObj, theCharacter);</span>
+		}
+		else
+		{
+<span class="nc" id="L1140">			appliedTempBonus = TempBonusHelper.applyBonusToCharacter(originObj, theCharacter);</span>
+		}
+
+		// Resolve choices and apply the bonus to the character.
+<span class="nc bnc" id="L1144" title="All 2 branches missed.">		if (appliedTempBonus == null)</span>
+		{
+<span class="nc" id="L1146">			return;</span>
+		}
+
+<span class="nc" id="L1149">		appliedTempBonuses.addElement(appliedTempBonus);</span>
+<span class="nc" id="L1150">		refreshStatScores();</span>
+<span class="nc" id="L1151">		postLevellingUpdates();</span>
+<span class="nc" id="L1152">	}</span>
+
+	@Override
+	public void removeTempBonus(TempBonusFacade bonusFacade)
+	{
+<span class="nc bnc" id="L1157" title="All 2 branches missed.">		if (!(bonusFacade instanceof TempBonusFacadeImpl tempBonus))</span>
+		{
+<span class="nc" id="L1159">			return;</span>
+		}
+
+<span class="nc" id="L1162">		Equipment aEq = null;</span>
+<span class="nc bnc" id="L1163" title="All 2 branches missed.">		if (tempBonus.getTarget() instanceof Equipment)</span>
+		{
+<span class="nc" id="L1165">			aEq = (Equipment) tempBonus.getTarget();</span>
+		}
+<span class="nc" id="L1167">		CDOMObject originObj = tempBonus.getOriginObj();</span>
+<span class="nc" id="L1168">		TempBonusHelper.removeBonusFromCharacter(theCharacter, aEq, originObj);</span>
+
+<span class="nc" id="L1170">		appliedTempBonuses.removeElement(tempBonus);</span>
+<span class="nc" id="L1171">		refreshStatScores();</span>
+<span class="nc" id="L1172">		postLevellingUpdates();</span>
+<span class="nc" id="L1173">	}</span>
+
+	@Override
+	public void setTempBonusActive(TempBonusFacade bonusFacade, boolean active)
+	{
+<span class="nc bnc" id="L1178" title="All 2 branches missed.">		if (!(bonusFacade instanceof TempBonusFacadeImpl tempBonus))</span>
+		{
+<span class="nc" id="L1180">			return;</span>
+		}
+
+<span class="nc bnc" id="L1183" title="All 2 branches missed.">		if (active)</span>
+		{
+<span class="nc" id="L1185">			theCharacter.unsetTempBonusFilter(tempBonus.toString());</span>
+		}
+		else
+		{
+<span class="nc" id="L1189">			theCharacter.setTempBonusFilter(tempBonus.toString());</span>
+		}
+<span class="nc" id="L1191">		tempBonus.setActive(active);</span>
+<span class="nc" id="L1192">		appliedTempBonuses.modifyElement(tempBonus);</span>
+<span class="nc" id="L1193">		refreshStatScores();</span>
+<span class="nc" id="L1194">	}</span>
+
+	@Override
+	public ListFacade&lt;TempBonusFacade&gt; getTempBonuses()
+	{
+<span class="nc" id="L1199">		return appliedTempBonuses;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;PCAlignment&gt; getAlignmentRef()
+	{
+<span class="nc" id="L1205">		return alignment;</span>
+	}
+
+	@Override
+	public void setAlignment(PCAlignment alignment)
+	{
+<span class="nc bnc" id="L1211" title="All 2 branches missed.">		if (!validateAlignmentChange(alignment))</span>
+		{
+<span class="nc" id="L1213">			return;</span>
+		}
+
+<span class="nc" id="L1216">		this.alignment.set(alignment);</span>
+<span class="nc" id="L1217">		refreshLanguageList();</span>
+
+<span class="nc" id="L1219">	}</span>
+
+	/**
+	 * Validate the new alignment matches those allowed for the character's
+	 * classes. If not offer the user a choice of backing out or making the
+	 * classes into ex-classes.
+	 *
+	 * @param newAlign The alignment to be set
+	 */
+	private boolean validateAlignmentChange(PCAlignment newAlign)
+	{
+<span class="nc" id="L1230">		PCAlignment oldAlign = this.alignment.get();</span>
+
+<span class="nc bnc" id="L1232" title="All 4 branches missed.">		if (oldAlign == null || newAlign.equals(oldAlign))</span>
+		{
+<span class="nc" id="L1234">			return true;</span>
+		}
+
+		//
+		// Get a list of classes that will become unqualified (and have an ex-class)
+		//
+<span class="nc" id="L1240">		StringBuilder unqualified = new StringBuilder(100);</span>
+<span class="nc" id="L1241">		List&lt;PCClass&gt; classList = charDisplay.getClassList();</span>
+<span class="nc" id="L1242">		List&lt;PCClass&gt; exclassList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L1243">		PCAlignment savedAlignmnet = AlignmentCompat.getCurrentAlignment(theCharacter.getCharID());</span>
+<span class="nc bnc" id="L1244" title="All 2 branches missed.">		for (PCClass aClass : classList)</span>
+		{
+<span class="nc" id="L1246">			AlignmentCompat.setCurrentAlignment(theCharacter.getCharID(), newAlign);</span>
+			{
+<span class="nc bnc" id="L1248" title="All 2 branches missed.">				if (!theCharacter.isQualified(aClass))</span>
+				{
+<span class="nc bnc" id="L1250" title="All 2 branches missed.">					if (aClass.containsKey(ObjectKey.EX_CLASS))</span>
+					{
+<span class="nc bnc" id="L1252" title="All 2 branches missed.">						if (!unqualified.isEmpty())</span>
+						{
+<span class="nc" id="L1254">							unqualified.append(&quot;, &quot;); //$NON-NLS-1$</span>
+						}
+
+<span class="nc" id="L1257">						unqualified.append(aClass.getKeyName());</span>
+<span class="nc" id="L1258">						exclassList.add(aClass);</span>
+					}
+				}
+			}
+<span class="nc" id="L1262">		}</span>
+
+		//
+		// Give the user a chance to bail
+		//
+<span class="nc bnc" id="L1267" title="All 2 branches missed.">		if (!unqualified.isEmpty())</span>
+		{
+<span class="nc bnc" id="L1269" title="All 2 branches missed.">			if (!delegate.showWarningConfirm(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L1270">				LanguageBundle.getString(&quot;in_sumExClassesWarning&quot;) + Constants.LINE_SEPARATOR + unqualified))</span>
+			{
+<span class="nc" id="L1272">				AlignmentCompat.setCurrentAlignment(theCharacter.getCharID(), savedAlignmnet);</span>
+<span class="nc" id="L1273">				return false;</span>
+			}
+
+		}
+
+		//
+		// Convert the class(es)
+		//
+<span class="nc bnc" id="L1281" title="All 2 branches missed.">		for (PCClass aClass : exclassList)</span>
+		{
+<span class="nc" id="L1283">			theCharacter.makeIntoExClass(aClass);</span>
+<span class="nc" id="L1284">		}</span>
+
+		// Update the facade and UI
+<span class="nc" id="L1287">		refreshClassLevelModel();</span>
+
+<span class="nc" id="L1289">		return true;</span>
+	}
+
+	void refreshClassLevelModel()
+	{
+<span class="nc" id="L1294">		List&lt;CharacterLevelFacade&gt; newlevels = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L1295">		List&lt;PCClass&gt; newClasses = charDisplay.getClassList();</span>
+<span class="nc" id="L1296">		Collection&lt;PCLevelInfo&gt; levelInfo = charDisplay.getLevelInfo();</span>
+
+<span class="nc" id="L1298">		Map&lt;String, PCClass&gt; classMap = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L1299" title="All 2 branches missed.">		for (PCClass pcClass : newClasses)</span>
+		{
+<span class="nc" id="L1301">			classMap.put(pcClass.getKeyName(), pcClass);</span>
+<span class="nc" id="L1302">		}</span>
+
+<span class="nc bnc" id="L1304" title="All 2 branches missed.">		for (PCLevelInfo lvlInfo : levelInfo)</span>
+		{
+<span class="nc" id="L1306">			final String classKeyName = lvlInfo.getClassKeyName();</span>
+<span class="nc" id="L1307">			PCClass currClass = classMap.get(classKeyName);</span>
+<span class="nc bnc" id="L1308" title="All 2 branches missed.">			if (currClass == null)</span>
+			{
+<span class="nc" id="L1310">				Logging</span>
+<span class="nc" id="L1311">					.errorPrint(&quot;No PCClass found for '&quot; + classKeyName + &quot;' in character's class list: &quot; + newClasses);</span>
+<span class="nc" id="L1312">				return;</span>
+			}
+
+<span class="nc" id="L1315">			CharacterLevelFacadeImpl cl = new CharacterLevelFacadeImpl(currClass, newlevels.size() + 1);</span>
+<span class="nc" id="L1316">			newlevels.add(cl);</span>
+<span class="nc" id="L1317">		}</span>
+
+<span class="nc" id="L1319">		pcClasses.clear();</span>
+<span class="nc" id="L1320">		pcClasses.addAll(newClasses);</span>
+
+<span class="nc" id="L1322">		pcClassLevels.updateContents(newlevels);</span>
+		// Now get the CharacterLevelsFacadeImpl to do a refresh too.
+<span class="nc" id="L1324">		charLevelsFacade.classListRefreshRequired();</span>
+<span class="nc" id="L1325">	}</span>
+
+	@Override
+	public DataSetFacade getDataSet()
+	{
+<span class="nc" id="L1330">		return dataSet;</span>
+	}
+
+	@Override
+	public ListFacade&lt;EquipmentSetFacade&gt; getEquipmentSets()
+	{
+<span class="nc" id="L1336">		return equipmentSets;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;Gender&gt; getGenderRef()
+	{
+<span class="nc" id="L1342">		return gender;</span>
+	}
+
+	@Override
+	public void setGender(Gender gender)
+	{
+<span class="nc" id="L1348">		theCharacter.setGender(gender);</span>
+<span class="nc" id="L1349">		Gender newGender = theCharacter.getGenderObject();</span>
+<span class="nc" id="L1350">		this.selectedGender = newGender.toString();</span>
+<span class="nc" id="L1351">		this.gender.set(newGender);</span>
+<span class="nc" id="L1352">		refreshLanguageList();</span>
+<span class="nc" id="L1353">	}</span>
+
+	@Override
+	public void setGender(String gender)
+	{
+<span class="nc" id="L1358">		this.selectedGender = gender;</span>
+<span class="nc bnc" id="L1359" title="All 2 branches missed.">		if (charDisplay.getRace() != null)</span>
+		{
+<span class="nc bnc" id="L1361" title="All 2 branches missed.">			for (Gender raceGender : availGenders)</span>
+			{
+<span class="nc bnc" id="L1363" title="All 2 branches missed.">				if (raceGender.toString().equals(gender))</span>
+				{
+<span class="nc" id="L1365">					setGender(raceGender);</span>
+				}
+<span class="nc" id="L1367">			}</span>
+		}
+<span class="nc" id="L1369">	}</span>
+
+	@Override
+	public int getModTotal(PCStat stat)
+	{
+<span class="nc bnc" id="L1374" title="All 2 branches missed.">		if (!charDisplay.isNonAbility(stat))</span>
+		{
+<span class="nc" id="L1376">			return theCharacter.getStatModFor(stat);</span>
+		}
+<span class="nc" id="L1378">		return 0;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;Number&gt; getScoreBaseRef(PCStat stat)
+	{
+<span class="nc" id="L1384">		WriteableReferenceFacade&lt;Number&gt; score = statScoreMap.get(stat);</span>
+<span class="nc bnc" id="L1385" title="All 2 branches missed.">		if (score == null)</span>
+		{
+<span class="nc" id="L1387">			score = getStatReferenceFacade(stat);</span>
+<span class="nc" id="L1388">			statScoreMap.put(stat, score);</span>
+		}
+<span class="nc" id="L1390">		return score;</span>
+	}
+
+	@Override
+	public int getScoreBase(PCStat stat)
+	{
+<span class="nc" id="L1396">		return theCharacter.getBaseStatFor(stat);</span>
+	}
+
+	@Override
+	public String getScoreTotalString(PCStat stat)
+	{
+<span class="nc bnc" id="L1402" title="All 2 branches missed.">		if (charDisplay.isNonAbility(stat))</span>
+		{
+<span class="nc" id="L1404">			return &quot;*&quot;; //$NON-NLS-1$</span>
+		}
+
+<span class="nc" id="L1407">		return SettingsHandler.getGameAsProperty().get().getStatDisplayText(theCharacter.getTotalStatFor(stat));</span>
+	}
+
+	@Override
+	public int getScoreRaceBonus(PCStat stat)
+	{
+<span class="nc bnc" id="L1413" title="All 2 branches missed.">		if (charDisplay.isNonAbility(stat))</span>
+		{
+<span class="nc" id="L1415">			return 0;</span>
+		}
+
+<span class="nc" id="L1418">		int rBonus = (int) theCharacter.getRaceBonusTo(&quot;STAT&quot;, stat.getKeyName()); //$NON-NLS-1$</span>
+<span class="nc" id="L1419">		rBonus += (int) theCharacter.getBonusDueToType(&quot;STAT&quot;, stat.getKeyName(), &quot;RACIAL&quot;);</span>
+
+<span class="nc" id="L1421">		return rBonus;</span>
+	}
+
+	@Override
+	public int getScoreOtherBonus(PCStat stat)
+	{
+<span class="nc bnc" id="L1427" title="All 2 branches missed.">		if (charDisplay.isNonAbility(stat))</span>
+		{
+<span class="nc" id="L1429">			return 0;</span>
+		}
+
+<span class="nc" id="L1432">		int iRace = (int) theCharacter.getRaceBonusTo(&quot;STAT&quot;, stat.getKeyName()); //$NON-NLS-1$</span>
+<span class="nc" id="L1433">		iRace += (int) theCharacter.getBonusDueToType(&quot;STAT&quot;, stat.getKeyName(), &quot;RACIAL&quot;);</span>
+
+<span class="nc" id="L1435">		return theCharacter.getTotalStatFor(stat) - theCharacter.getBaseStatFor(stat) - iRace;</span>
+	}
+
+	@Override
+	public void setScoreBase(PCStat stat, int score)
+	{
+<span class="nc" id="L1441">		WriteableReferenceFacade&lt;Number&gt; facade = statScoreMap.get(stat);</span>
+<span class="nc bnc" id="L1442" title="All 2 branches missed.">		if (facade == null)</span>
+		{
+<span class="nc" id="L1444">			facade = getStatReferenceFacade(stat);</span>
+<span class="nc" id="L1445">			facade.set(score);</span>
+<span class="nc" id="L1446">			statScoreMap.put(stat, facade);</span>
+		}
+
+<span class="nc" id="L1449">		PCStat pcStat = null;</span>
+<span class="nc" id="L1450">		final int pcPlayerLevels = charDisplay.totalNonMonsterLevels();</span>
+<span class="nc" id="L1451">		Collection&lt;PCStat&gt; pcStatList = charDisplay.getStatSet();</span>
+<span class="nc bnc" id="L1452" title="All 2 branches missed.">		for (PCStat aStat : pcStatList)</span>
+		{
+<span class="nc bnc" id="L1454" title="All 2 branches missed.">			if (stat.getKeyName().equals(aStat.getKeyName()))</span>
+			{
+<span class="nc" id="L1456">				pcStat = aStat;</span>
+<span class="nc" id="L1457">				break;</span>
+			}
+<span class="nc" id="L1459">		}</span>
+<span class="nc bnc" id="L1460" title="All 2 branches missed.">		if (pcStat == null)</span>
+		{
+<span class="nc" id="L1462">			Logging.errorPrint(&quot;Unexpected stat '&quot; + stat + &quot;' found - ignoring.&quot;);</span>
+<span class="nc" id="L1463">			return;</span>
+		}
+
+		// Checking for bounds, locked stats and pool points
+<span class="nc" id="L1467">		String errorMsg = validateNewStatBaseScore(score, pcStat, pcPlayerLevels);</span>
+<span class="nc bnc" id="L1468" title="All 2 branches missed.">		if (StringUtils.isNotBlank(errorMsg))</span>
+		{
+<span class="nc" id="L1470">			delegate.showErrorMessage(Constants.APPLICATION_NAME, errorMsg);</span>
+<span class="nc" id="L1471">			return;</span>
+		}
+
+<span class="nc" id="L1474">		final int baseScore = charDisplay.getStat(pcStat);</span>
+		// Deal with a point pool based game mode where you buy skills and feats as well as stats
+<span class="nc bnc" id="L1476" title="All 2 branches missed.">		if (Globals.getGameModeHasPointPool())</span>
+		{
+<span class="nc bnc" id="L1478" title="All 2 branches missed.">			if (pcPlayerLevels &gt; 0)</span>
+			{
+<span class="nc" id="L1480">				int poolMod =</span>
+<span class="nc" id="L1481">						getPurchaseCostForStat(theCharacter, score) - getPurchaseCostForStat(theCharacter, baseScore);</span>
+				//
+				// Adding to stat
+				//
+<span class="nc bnc" id="L1485" title="All 2 branches missed.">				if (poolMod &gt; 0)</span>
+				{
+<span class="nc bnc" id="L1487" title="All 2 branches missed.">					if (poolMod &gt; theCharacter.getSkillPoints())</span>
+					{
+<span class="nc" id="L1489">						delegate.showErrorMessage(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L1490">							LanguageBundle.getFormattedString(&quot;in_sumStatPoolEmpty&quot;, Globals //$NON-NLS-1$</span>
+<span class="nc" id="L1491">								.getGameModePointPoolName()));</span>
+<span class="nc" id="L1492">						return;</span>
+					}
+				}
+<span class="nc bnc" id="L1495" title="All 2 branches missed.">				else if (poolMod &lt; 0)</span>
+				{
+<span class="nc bnc" id="L1497" title="All 2 branches missed.">					if (theCharacter.getStatIncrease(pcStat, true) &lt; Math.abs(score - baseScore))</span>
+					{
+<span class="nc" id="L1499">						delegate.showErrorMessage(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L1500">							LanguageBundle.getString(&quot;in_sumStatStartedHigher&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L1501">						return;</span>
+					}
+				}
+
+<span class="nc" id="L1505">				theCharacter.adjustAbilities(AbilityCategory.FEAT, new BigDecimal(-poolMod));</span>
+<span class="nc" id="L1506">				showPointPool();</span>
+			}
+		}
+
+<span class="nc" id="L1510">		theCharacter.setStat(pcStat, score);</span>
+<span class="nc" id="L1511">		facade.set(score);</span>
+<span class="nc" id="L1512">		theCharacter.saveStatIncrease(pcStat, score - baseScore, false);</span>
+<span class="nc" id="L1513">		theCharacter.calcActiveBonuses();</span>
+<span class="nc" id="L1514">		hpRef.set(theCharacter.hitPoints());</span>
+<span class="nc" id="L1515">		refreshLanguageList();</span>
+
+<span class="nc" id="L1517">		updateScorePurchasePool(true);</span>
+<span class="nc bnc" id="L1518" title="All 2 branches missed.">		if (charLevelsFacade != null)</span>
+		{
+<span class="nc" id="L1520">			charLevelsFacade.fireSkillBonusEvent(this, 0, true);</span>
+		}
+<span class="nc" id="L1522">	}</span>
+
+	/**
+	 * Assess if the new score is valid for the stat.
+	 *
+	 * @param score The new score being checked.
+	 * @param pcStat The stats being checked
+	 * @param pcPlayerLevels The number of non monster levels the character currently has.
+	 * @return An error message if the score is not valid.
+	 */
+	private String validateNewStatBaseScore(int score, PCStat pcStat, final int pcPlayerLevels)
+	{
+<span class="nc bnc" id="L1534" title="All 2 branches missed.">		if (charDisplay.isNonAbility(pcStat))</span>
+		{
+<span class="nc" id="L1536">			return LanguageBundle.getString(&quot;in_sumCannotModifyANonAbility&quot;); //$NON-NLS-1$</span>
+		}
+<span class="nc bnc" id="L1538" title="All 2 branches missed.">		else if (score &lt; pcStat.getSafe(IntegerKey.MIN_VALUE))</span>
+		{
+<span class="nc" id="L1540">			return LanguageBundle.getFormattedString(</span>
+<span class="nc" id="L1541">				&quot;in_sumCannotLowerStatBelow&quot;, SettingsHandler.getGameAsProperty().get() //$NON-NLS-1$</span>
+<span class="nc" id="L1542">				.getStatDisplayText(pcStat.getSafe(IntegerKey.MIN_VALUE)));</span>
+		}
+<span class="nc bnc" id="L1544" title="All 2 branches missed.">		else if (score &gt; pcStat.getSafe(IntegerKey.MAX_VALUE))</span>
+		{
+<span class="nc" id="L1546">			return LanguageBundle.getFormattedString(</span>
+<span class="nc" id="L1547">				&quot;in_sumCannotRaiseStatAbove&quot;, SettingsHandler.getGameAsProperty().get() //$NON-NLS-1$</span>
+<span class="nc" id="L1548">				.getStatDisplayText(pcStat.getSafe(IntegerKey.MAX_VALUE)));</span>
+		}
+<span class="nc bnc" id="L1550" title="All 4 branches missed.">		else if ((pcPlayerLevels &lt; 2) &amp;&amp; SettingsHandler.getGameAsProperty().get().isPurchaseStatMode())</span>
+		{
+<span class="nc" id="L1552">			final int maxPurchaseScore = SettingsHandler.getGameAsProperty().get().getPurchaseScoreMax(theCharacter);</span>
+
+<span class="nc bnc" id="L1554" title="All 2 branches missed.">			if (score &gt; maxPurchaseScore)</span>
+			{
+<span class="nc" id="L1556">				return LanguageBundle.getFormattedString(</span>
+					&quot;in_sumCannotRaiseStatAbovePurchase&quot;, SettingsHandler //$NON-NLS-1$
+<span class="nc" id="L1558">					.getGameAsProperty().get().getStatDisplayText(maxPurchaseScore));</span>
+			}
+
+<span class="nc" id="L1561">			final int minPurchaseScore = SettingsHandler.getGameAsProperty().get().getPurchaseScoreMin(theCharacter);</span>
+
+<span class="nc bnc" id="L1563" title="All 2 branches missed.">			if (score &lt; minPurchaseScore)</span>
+			{
+<span class="nc" id="L1565">				return LanguageBundle.getFormattedString(</span>
+					&quot;in_sumCannotLowerStatBelowPurchase&quot;, SettingsHandler //$NON-NLS-1$
+<span class="nc" id="L1567">					.getGameAsProperty().get().getStatDisplayText(minPurchaseScore));</span>
+			}
+		}
+
+<span class="nc" id="L1571">		return null;</span>
+	}
+
+	@Override
+	public void rollStats()
+	{
+<span class="nc" id="L1577">		GameMode game = dataSet.getGameMode();</span>
+<span class="nc" id="L1578">		int rollMethod = game.getRollMethod();</span>
+<span class="nc bnc" id="L1579" title="All 4 branches missed.">		if (rollMethod == Constants.CHARACTER_STAT_METHOD_ROLLED &amp;&amp; game.getCurrentRollingMethod() == null)</span>
+		{
+<span class="nc" id="L1581">			return;</span>
+		}
+<span class="nc bnc" id="L1583" title="All 2 branches missed.">		if (rollMethod == Constants.CHARACTER_STAT_METHOD_USER)</span>
+		{
+			// If a user asks to roll in user mode, set it to the current all same value.
+<span class="nc" id="L1586">			rollMethod = Constants.CHARACTER_STAT_METHOD_ALL_THE_SAME;</span>
+		}
+<span class="nc" id="L1588">		theCharacter.rollStats(rollMethod);</span>
+		//XXX This is here to stop the stat mod from being stale. Can be removed once we merge with CDOM
+<span class="nc" id="L1590">		theCharacter.calcActiveBonuses();</span>
+<span class="nc" id="L1591">		refreshStatScores();</span>
+<span class="nc" id="L1592">		updateScorePurchasePool(true);</span>
+<span class="nc" id="L1593">	}</span>
+
+	private void refreshStatScores()
+	{
+<span class="nc bnc" id="L1597" title="All 2 branches missed.">		if (charLevelsFacade != null)</span>
+		{
+<span class="nc" id="L1599">			charLevelsFacade.fireSkillBonusEvent(this, 0, true);</span>
+<span class="nc" id="L1600">			charLevelsFacade.updateSkillsTodo();</span>
+		}
+<span class="nc" id="L1602">	}</span>
+
+	@Override
+	public boolean isStatRollEnabled()
+	{
+<span class="nc bnc" id="L1607" title="All 2 branches missed.">		return (charLevelsFacade.getSize() == 0);</span>
+	}
+
+	/**
+	 * Update the
+	 */
+	private void showPointPool()
+	{
+<span class="nc bnc" id="L1615" title="All 2 branches missed.">		if (poolPointText == null)</span>
+		{
+<span class="nc" id="L1617">			return;</span>
+		}
+
+<span class="nc" id="L1620">		int poolPointsTotal = 0;</span>
+
+<span class="nc bnc" id="L1622" title="All 2 branches missed.">		for (PCLevelInfo pcl : charDisplay.getLevelInfo())</span>
+		{
+<span class="nc" id="L1624">			poolPointsTotal += pcl.getSkillPointsGained(theCharacter);</span>
+<span class="nc" id="L1625">		}</span>
+
+<span class="nc" id="L1627">		int poolPointsUsed = poolPointsTotal - theCharacter.getSkillPoints();</span>
+
+<span class="nc" id="L1629">		poolPointText.set(poolPointsUsed + &quot; / &quot; + poolPointsTotal); //$NON-NLS-1$</span>
+<span class="nc" id="L1630">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;Race&gt; getRaceRef()
+	{
+<span class="nc" id="L1635">		return race;</span>
+	}
+
+	@Override
+	public void setRace(Race race)
+	{
+		// TODO: We don't have a HP dialog implemented yet, so don't try to show it
+<span class="nc" id="L1642">		SettingsHandler.setShowHPDialogAtLevelUp(false);</span>
+		//SettingsHandler.setShowStatDialogAtLevelUp(false);
+<span class="nc" id="L1644">		int oldLevel = charLevelsFacade.getSize();</span>
+
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">		if (race == null)</span>
+		{
+<span class="nc" id="L1648">			race = RaceUtilities.getUnselectedRace();</span>
+		}
+<span class="nc" id="L1650">		this.race.set(race);</span>
+<span class="nc bnc" id="L1651" title="All 2 branches missed.">		if (race != charDisplay.getRace())</span>
+		{
+<span class="nc" id="L1653">			Logging.log(Logging.INFO, charDisplay.getName() + &quot;: Setting race to &quot; + race); //$NON-NLS-1$</span>
+<span class="nc" id="L1654">			theCharacter.setRace(race);</span>
+		}
+<span class="nc" id="L1656">		refreshLanguageList();</span>
+<span class="nc bnc" id="L1657" title="All 2 branches missed.">		if (selectedGender != null)</span>
+		{
+<span class="nc" id="L1659">			setGender(selectedGender);</span>
+		}
+<span class="nc" id="L1661">		refreshRaceRelatedFields();</span>
+
+<span class="nc bnc" id="L1663" title="All 2 branches missed.">		if (oldLevel != charLevelsFacade.getSize())</span>
+		{
+<span class="nc" id="L1665">			delegate.showLevelUpInfo(this, oldLevel);</span>
+		}
+<span class="nc" id="L1667">	}</span>
+
+	private void refreshRaceRelatedFields()
+	{
+<span class="nc" id="L1671">		race.set(charDisplay.getRace());</span>
+
+<span class="nc bnc" id="L1673" title="All 2 branches missed.">		if (charDisplay.getRace() != null)</span>
+		{
+<span class="nc bnc" id="L1675" title="All 2 branches missed.">			for (Gender pcGender : availGenders)</span>
+			{
+<span class="nc bnc" id="L1677" title="All 2 branches missed.">				if (pcGender.equals(theCharacter.getGenderObject()))</span>
+				{
+<span class="nc" id="L1679">					gender.set(pcGender);</span>
+<span class="nc" id="L1680">					break;</span>
+				}
+<span class="nc" id="L1682">			}</span>
+		}
+<span class="nc" id="L1684">		refreshClassLevelModel();</span>
+<span class="nc" id="L1685">		refreshStatScores();</span>
+<span class="nc" id="L1686">		updateAgeCategoryForAge();</span>
+<span class="nc" id="L1687">		refreshWeight();</span>
+<span class="nc" id="L1688">		characterAbilities.rebuildAbilityLists();</span>
+<span class="nc" id="L1689">		currentXP.set(theCharacter.getXP());</span>
+<span class="nc" id="L1690">		xpForNextlevel.set(charDisplay.minXPForNextECL());</span>
+<span class="nc" id="L1691">		xpTableName.set(charDisplay.getXPTableName());</span>
+<span class="nc" id="L1692">		hpRef.set(theCharacter.hitPoints());</span>
+<span class="nc" id="L1693">		refreshAvailableTempBonuses();</span>
+<span class="nc" id="L1694">		companionSupportFacade.refreshCompanionData();</span>
+
+<span class="nc" id="L1696">		updateLevelTodo();</span>
+<span class="nc" id="L1697">		buildAvailableDomainsList();</span>
+<span class="nc" id="L1698">		spellSupportFacade.refreshAvailableKnownSpells();</span>
+<span class="nc" id="L1699">		updateScorePurchasePool(false);</span>
+<span class="nc" id="L1700">		refreshEquipment();</span>
+
+<span class="nc bnc" id="L1702" title="All 4 branches missed.">		if (charDisplay.getRace() == null || charDisplay.getRace().isUnselected())</span>
+		{
+<span class="nc" id="L1704">			todoManager.addTodo(new TodoFacadeImpl(Tab.SUMMARY, &quot;Race&quot;, &quot;in_irTodoRace&quot;, 100));</span>
+		}
+		else
+		{
+<span class="nc" id="L1708">			todoManager.removeTodo(&quot;in_irTodoRace&quot;);</span>
+		}
+<span class="nc" id="L1710">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getTabNameRef()
+	{
+<span class="nc" id="L1715">		return tabName;</span>
+	}
+
+	@Override
+	public void setTabName(String name)
+	{
+<span class="nc" id="L1721">		tabName.set(name);</span>
+<span class="nc" id="L1722">		theCharacter.setPCAttribute(PCStringKey.TABNAME, name);</span>
+<span class="nc" id="L1723">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getNameRef()
+	{
+<span class="nc" id="L1728">		return name;</span>
+	}
+
+	@Override
+	public void setName(String name)
+	{
+<span class="nc" id="L1734">		this.name.set(name);</span>
+<span class="nc" id="L1735">		theCharacter.setName(name);</span>
+<span class="nc bnc" id="L1736" title="All 2 branches missed.">		if (isNewCharName(charDisplay.getName()))</span>
+		{
+<span class="nc" id="L1738">			todoManager.addTodo(new TodoFacadeImpl(Tab.SUMMARY, &quot;Name&quot;, &quot;in_sumTodoName&quot;, 1));</span>
+		}
+		else
+		{
+<span class="nc" id="L1742">			todoManager.removeTodo(&quot;in_sumTodoName&quot;);</span>
+		}
+<span class="nc" id="L1744">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getSkinColorRef()
+	{
+<span class="nc" id="L1749">		return skinColor;</span>
+	}
+
+	@Override
+	public void setSkinColor(String color)
+	{
+<span class="nc" id="L1755">		skinColor.set(color);</span>
+<span class="nc" id="L1756">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getHairColorRef()
+	{
+<span class="nc" id="L1761">		return hairColor;</span>
+	}
+
+	@Override
+	public void setHairColor(String color)
+	{
+<span class="nc" id="L1767">		hairColor.set(color);</span>
+<span class="nc" id="L1768">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getEyeColorRef()
+	{
+<span class="nc" id="L1773">		return eyeColor;</span>
+	}
+
+	@Override
+	public void setEyeColor(String color)
+	{
+<span class="nc" id="L1779">		eyeColor.set(color);</span>
+<span class="nc" id="L1780">		theCharacter.setEyeColor(color);</span>
+<span class="nc" id="L1781">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;Integer&gt; getWeightRef()
+	{
+<span class="nc" id="L1786">		return weightRef;</span>
+	}
+
+	@Override
+	public void setWeight(int weight)
+	{
+<span class="nc" id="L1792">		int weightInPounds = (int) Globals.getGameModeUnitSet().convertWeightFromUnitSet(weight);</span>
+<span class="nc" id="L1793">		weightRef.set(weight);</span>
+<span class="nc" id="L1794">		theCharacter.setWeight(weightInPounds);</span>
+<span class="nc" id="L1795">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;Deity&gt; getDeityRef()
+	{
+<span class="nc" id="L1800">		return deity;</span>
+	}
+
+	@Override
+	public void setDeity(Deity deity)
+	{
+<span class="nc bnc" id="L1806" title="All 2 branches missed.">		if (theCharacter.canSelectDeity(deity))</span>
+		{
+<span class="nc" id="L1808">			this.deity.set(deity);</span>
+<span class="nc" id="L1809">			refreshLanguageList();</span>
+<span class="nc" id="L1810">			buildAvailableDomainsList();</span>
+		}
+<span class="nc" id="L1812">	}</span>
+
+	@Override
+	public void addDomain(QualifiedObject&lt;Domain&gt; wrappedDomain)
+	{
+<span class="nc" id="L1817">		Domain domain = wrappedDomain.getRawObject();</span>
+<span class="nc bnc" id="L1818" title="All 2 branches missed.">		if (charDisplay.hasDomain(domain))</span>
+		{
+<span class="nc" id="L1820">			return;</span>
+		}
+
+<span class="nc bnc" id="L1823" title="All 2 branches missed.">		if (!isQualifiedFor(wrappedDomain))</span>
+		{
+<span class="nc" id="L1825">			delegate.showErrorMessage(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L1826">				LanguageBundle.getFormattedString(&quot;in_qualifyMess&quot;, domain.getDisplayName()));</span>
+
+<span class="nc" id="L1828">			return;</span>
+		}
+
+		// Check selected domains vs Max number allowed
+<span class="nc bnc" id="L1832" title="All 2 branches missed.">		if (charDisplay.getDomainCount() &gt;= theCharacter.getMaxCharacterDomains())</span>
+		{
+<span class="nc" id="L1834">			delegate.showErrorMessage(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L1835">				LanguageBundle.getFormattedString(&quot;in_errorNoMoreDomains&quot;));</span>
+
+<span class="nc" id="L1837">			return;</span>
+		}
+
+<span class="nc bnc" id="L1840" title="All 2 branches missed.">		if (!theCharacter.hasDefaultDomainSource())</span>
+		{
+			// No source for the domain yet? Default to the last added class level
+<span class="nc" id="L1843">			int level = charDisplay.getLevelInfoSize();</span>
+<span class="nc" id="L1844">			PCLevelInfo highestLevelInfo = charDisplay.getLevelInfo(level - 1);</span>
+<span class="nc" id="L1845">			PCClass cls = theCharacter.getClassKeyed(highestLevelInfo.getClassKeyName());</span>
+<span class="nc" id="L1846">			theCharacter.setDefaultDomainSource(new ClassSource(cls, highestLevelInfo.getClassLevel()));</span>
+		}
+
+<span class="nc bnc" id="L1849" title="All 2 branches missed.">		if (theCharacter.addDomain(domain))</span>
+		{
+<span class="nc" id="L1851">			domains.addElement(wrappedDomain);</span>
+<span class="nc" id="L1852">			DomainApplication.applyDomain(theCharacter, domain);</span>
+
+<span class="nc" id="L1854">			theCharacter.calcActiveBonuses();</span>
+
+<span class="nc" id="L1856">			remainingDomains.set(theCharacter.getMaxCharacterDomains() - charDisplay.getDomainCount());</span>
+<span class="nc" id="L1857">			updateDomainTodo();</span>
+<span class="nc" id="L1858">			spellSupportFacade.refreshAvailableKnownSpells();</span>
+<span class="nc" id="L1859">			companionSupportFacade.refreshCompanionData();</span>
+		}
+<span class="nc" id="L1861">	}</span>
+
+	@Override
+	public ListFacade&lt;QualifiedObject&lt;Domain&gt;&gt; getDomains()
+	{
+<span class="nc" id="L1866">		return domains;</span>
+	}
+
+	@Override
+	public void removeDomain(QualifiedObject&lt;Domain&gt; domain)
+	{
+<span class="nc bnc" id="L1872" title="All 2 branches missed.">		if (domains.removeElement(domain))</span>
+		{
+<span class="nc" id="L1874">			Domain dom = domain.getRawObject();</span>
+<span class="nc" id="L1875">			DomainApplication.removeDomain(theCharacter, dom);</span>
+<span class="nc" id="L1876">			theCharacter.removeDomain(dom);</span>
+<span class="nc" id="L1877">			remainingDomains.set(theCharacter.getMaxCharacterDomains() - charDisplay.getDomainCount());</span>
+<span class="nc" id="L1878">			updateDomainTodo();</span>
+<span class="nc" id="L1879">			spellSupportFacade.refreshAvailableKnownSpells();</span>
+		}
+<span class="nc" id="L1881">	}</span>
+
+	/**
+	 * Update the todo list to reflect the change in number of domains.
+	 */
+	private void updateDomainTodo()
+	{
+<span class="nc bnc" id="L1888" title="All 2 branches missed.">		if (remainingDomains.get() &gt; 0)</span>
+		{
+<span class="nc" id="L1890">			todoManager.addTodo(new TodoFacadeImpl(Tab.DOMAINS, &quot;Domains&quot;, &quot;in_domTodoDomainsLeft&quot;, 120));</span>
+<span class="nc" id="L1891">			todoManager.removeTodo(&quot;in_domTodoTooManyDomains&quot;);</span>
+		}
+<span class="nc bnc" id="L1893" title="All 2 branches missed.">		else if (remainingDomains.get() &lt; 0)</span>
+		{
+<span class="nc" id="L1895">			todoManager.addTodo(new TodoFacadeImpl(Tab.DOMAINS, &quot;Domains&quot;, &quot;in_domTodoTooManyDomains&quot;, 120));</span>
+<span class="nc" id="L1896">			todoManager.removeTodo(&quot;in_domTodoDomainsLeft&quot;);</span>
+		}
+		else
+		{
+<span class="nc" id="L1900">			todoManager.removeTodo(&quot;in_domTodoDomainsLeft&quot;);</span>
+<span class="nc" id="L1901">			todoManager.removeTodo(&quot;in_domTodoTooManyDomains&quot;);</span>
+		}
+<span class="nc" id="L1903">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;Integer&gt; getRemainingDomainSelectionsRef()
+	{
+<span class="nc" id="L1908">		return remainingDomains;</span>
+	}
+
+	@Override
+	public ListFacade&lt;QualifiedObject&lt;Domain&gt;&gt; getAvailableDomains()
+	{
+<span class="nc" id="L1914">		return availDomains;</span>
+	}
+
+	/**
+	 * This method returns all available domains, without filtering.
+	 */
+	private void buildAvailableDomainsList()
+	{
+<span class="nc" id="L1922">		List&lt;QualifiedObject&lt;Domain&gt;&gt; availDomainList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L1923">		List&lt;QualifiedObject&lt;Domain&gt;&gt; selDomainList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L1924">		Deity pcDeity = (Deity) ChannelUtilities.readControlledChannel(</span>
+<span class="nc" id="L1925">			charDisplay.getCharID(), CControl.DEITYINPUT);</span>
+
+<span class="nc bnc" id="L1927" title="All 2 branches missed.">		if (pcDeity != null)</span>
+		{
+<span class="nc bnc" id="L1929" title="All 2 branches missed.">			for (CDOMReference&lt;Domain&gt; domainRef : pcDeity.getSafeListMods(Deity.DOMAINLIST))</span>
+			{
+<span class="nc" id="L1931">				Collection&lt;AssociatedPrereqObject&gt; assoc = pcDeity.getListAssociations(Deity.DOMAINLIST, domainRef);</span>
+<span class="nc bnc" id="L1932" title="All 2 branches missed.">				for (AssociatedPrereqObject apo : assoc)</span>
+				{
+<span class="nc bnc" id="L1934" title="All 2 branches missed.">					for (Domain d : domainRef.getContainedObjects())</span>
+					{
+<span class="nc bnc" id="L1936" title="All 2 branches missed.">						if (!isDomainInList(availDomainList, d))</span>
+						{
+<span class="nc" id="L1938">							availDomainList.add(new QualifiedObject&lt;&gt;(d, apo.getPrerequisiteList()));</span>
+						}
+<span class="nc" id="L1940">					}</span>
+<span class="nc" id="L1941">				}</span>
+<span class="nc" id="L1942">			}</span>
+		}
+
+		// Loop through the available prestige domains
+<span class="nc bnc" id="L1946" title="All 2 branches missed.">		for (PCClass aClass : charDisplay.getClassList())</span>
+		{
+			/*
+			 * Need to do for the class, for compatibility, since level 0 is
+			 * loaded into the class itself
+			 */
+<span class="nc" id="L1952">			processDomainList(aClass, availDomainList);</span>
+<span class="nc" id="L1953">			processAddDomains(aClass, availDomainList);</span>
+<span class="nc bnc" id="L1954" title="All 2 branches missed.">			for (int lvl = 0; lvl &lt;= charDisplay.getLevel(aClass); lvl++)</span>
+			{
+<span class="nc" id="L1956">				PCClassLevel cl = charDisplay.getActiveClassLevel(aClass, lvl);</span>
+<span class="nc" id="L1957">				processAddDomains(cl, availDomainList);</span>
+<span class="nc" id="L1958">				processDomainList(cl, availDomainList);</span>
+			}
+<span class="nc" id="L1960">		}</span>
+
+		// Loop through the character's selected domains
+<span class="nc bnc" id="L1963" title="All 2 branches missed.">		for (Domain d : charDisplay.getDomainSet())</span>
+		{
+<span class="nc" id="L1965">			QualifiedObject&lt;Domain&gt; domainFI = new QualifiedObject&lt;&gt;(d);</span>
+<span class="nc" id="L1966">			boolean found = false;</span>
+<span class="nc bnc" id="L1967" title="All 2 branches missed.">			for (QualifiedObject&lt;Domain&gt; row : availDomainList)</span>
+			{
+<span class="nc bnc" id="L1969" title="All 2 branches missed.">				if (d.equals(row.getRawObject()))</span>
+				{
+<span class="nc" id="L1971">					domainFI = row;</span>
+<span class="nc" id="L1972">					found = true;</span>
+<span class="nc" id="L1973">					break;</span>
+				}
+<span class="nc" id="L1975">			}</span>
+
+<span class="nc bnc" id="L1977" title="All 2 branches missed.">			if (!found)</span>
+			{
+<span class="nc" id="L1979">				availDomainList.add(domainFI);</span>
+			}
+
+<span class="nc bnc" id="L1982" title="All 2 branches missed.">			if (!isDomainInList(selDomainList, d))</span>
+			{
+<span class="nc" id="L1984">				selDomainList.add(domainFI);</span>
+			}
+<span class="nc" id="L1986">		}</span>
+
+<span class="nc" id="L1988">		availDomains.updateContents(availDomainList);</span>
+<span class="nc" id="L1989">		domains.updateContents(selDomainList);</span>
+<span class="nc" id="L1990">		maxDomains.set(theCharacter.getMaxCharacterDomains());</span>
+<span class="nc" id="L1991">		remainingDomains.set(theCharacter.getMaxCharacterDomains() - charDisplay.getDomainCount());</span>
+<span class="nc" id="L1992">		updateDomainTodo();</span>
+<span class="nc" id="L1993">	}</span>
+
+	/**
+	 * Check if a domain is a list of domains, irrespective of prerequisites.
+	 *
+	 * @param qualDomainList The list of domains with their prerequisites.
+	 * @param domain The domain to search for.
+	 * @return true if the domain is in the list
+	 */
+	private boolean isDomainInList(List&lt;QualifiedObject&lt;Domain&gt;&gt; qualDomainList, Domain domain)
+	{
+<span class="nc bnc" id="L2004" title="All 2 branches missed.">		for (QualifiedObject&lt;Domain&gt; row : qualDomainList)</span>
+		{
+<span class="nc bnc" id="L2006" title="All 2 branches missed.">			if (domain.equals(row.getRawObject()))</span>
+			{
+<span class="nc" id="L2008">				return true;</span>
+			}
+<span class="nc" id="L2010">		}</span>
+<span class="nc" id="L2011">		return false;</span>
+	}
+
+	private void processAddDomains(CDOMObject cdo, final List&lt;QualifiedObject&lt;Domain&gt;&gt; availDomainList)
+	{
+<span class="nc" id="L2016">		Collection&lt;CDOMReference&lt;Domain&gt;&gt; domainRefs = cdo.getListMods(PCClass.ALLOWED_DOMAINS);</span>
+<span class="nc bnc" id="L2017" title="All 2 branches missed.">		if (domainRefs != null)</span>
+		{
+<span class="nc bnc" id="L2019" title="All 2 branches missed.">			for (CDOMReference&lt;Domain&gt; ref : domainRefs)</span>
+			{
+<span class="nc" id="L2021">				Collection&lt;AssociatedPrereqObject&gt; assoc = cdo.getListAssociations(PCClass.ALLOWED_DOMAINS, ref);</span>
+<span class="nc bnc" id="L2022" title="All 2 branches missed.">				for (AssociatedPrereqObject apo : assoc)</span>
+				{
+<span class="nc bnc" id="L2024" title="All 2 branches missed.">					for (Domain d : ref.getContainedObjects())</span>
+					{
+						/*
+						 * TODO This gate produces a rather interesting, and
+						 * potentially wrong situation. What if two ADDDOMAINS
+						 * exist with different PRE? Doesn't this fail?
+						 */
+<span class="nc bnc" id="L2031" title="All 2 branches missed.">						if (!isDomainInList(availDomainList, d))</span>
+						{
+<span class="nc" id="L2033">							availDomainList.add(new QualifiedObject&lt;&gt;(d, apo.getPrerequisiteList()));</span>
+						}
+<span class="nc" id="L2035">					}</span>
+<span class="nc" id="L2036">				}</span>
+<span class="nc" id="L2037">			}</span>
+		}
+<span class="nc" id="L2039">	}</span>
+
+	private void processDomainList(CDOMObject obj, final List&lt;QualifiedObject&lt;Domain&gt;&gt; availDomainList)
+	{
+<span class="nc bnc" id="L2043" title="All 2 branches missed.">		for (QualifiedObject&lt;CDOMSingleRef&lt;Domain&gt;&gt; qo : obj.getSafeListFor(ListKey.DOMAIN))</span>
+		{
+<span class="nc" id="L2045">			CDOMSingleRef&lt;Domain&gt; ref = qo.getRawObject();</span>
+<span class="nc" id="L2046">			Domain domain = ref.get();</span>
+<span class="nc bnc" id="L2047" title="All 2 branches missed.">			if (!isDomainInList(availDomainList, domain))</span>
+			{
+<span class="nc" id="L2049">				availDomainList.add(new QualifiedObject&lt;&gt;(domain, qo.getPrerequisiteList()));</span>
+			}
+<span class="nc" id="L2051">		}</span>
+<span class="nc" id="L2052">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;EquipmentSetFacade&gt; getEquipmentSetRef()
+	{
+<span class="nc" id="L2057">		return equipSet;</span>
+	}
+
+	@Override
+	public void setEquipmentSet(EquipmentSetFacade set)
+	{
+<span class="nc" id="L2063">		EquipmentSetFacade oldSet = equipSet.get();</span>
+<span class="nc bnc" id="L2064" title="All 2 branches missed.">		if (oldSet != null)</span>
+		{
+<span class="nc" id="L2066">			oldSet.getEquippedItems().removeListListener(this);</span>
+<span class="nc" id="L2067">			oldSet.getEquippedItems().removeEquipmentListListener(this);</span>
+		}
+<span class="nc bnc" id="L2069" title="All 2 branches missed.">		if (set instanceof EquipmentSetFacadeImpl)</span>
+		{
+<span class="nc" id="L2071">			((EquipmentSetFacadeImpl) set).activateEquipSet();</span>
+		}
+<span class="nc" id="L2073">		equipSet.set(set);</span>
+<span class="nc" id="L2074">		set.getEquippedItems().addListListener(this);</span>
+<span class="nc" id="L2075">		set.getEquippedItems().addEquipmentListListener(this);</span>
+<span class="nc" id="L2076">		refreshTotalWeight();</span>
+<span class="nc" id="L2077">	}</span>
+
+	/**
+	 * Regenerate the character's list of languages.
+	 */
+	void refreshLanguageList()
+	{
+<span class="nc" id="L2084">		List&lt;Language&gt; sortedLanguages = new ArrayList&lt;&gt;(charDisplay.getLanguageSet());</span>
+<span class="nc" id="L2085">		Collections.sort(sortedLanguages);</span>
+<span class="nc" id="L2086">		languages.updateContents(sortedLanguages);</span>
+<span class="nc" id="L2087">		autoLanguagesCache = null;</span>
+
+<span class="nc" id="L2089">		boolean allowBonusLangAfterFirst = Globals.checkRule(RuleConstants.INTBONUSLANG);</span>
+<span class="nc bnc" id="L2090" title="All 2 branches missed.">		boolean atFirstLvl = theCharacter.getTotalLevels() &lt;= 1;</span>
+
+<span class="nc" id="L2092">		int bonusLangMax = theCharacter.getBonusLanguageCount();</span>
+
+<span class="nc" id="L2094">		currBonusLangs = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L2095">		CNAbility a = theCharacter.getBonusLanguageAbility();</span>
+<span class="nc" id="L2096">		List&lt;String&gt; currBonusLangNameList = theCharacter.getAssociationList(a);</span>
+<span class="nc bnc" id="L2097" title="All 2 branches missed.">		for (Language lang : languages)</span>
+		{
+<span class="nc bnc" id="L2099" title="All 2 branches missed.">			if (currBonusLangNameList.contains(lang.getKeyName()))</span>
+			{
+<span class="nc" id="L2101">				currBonusLangs.add(lang);</span>
+			}
+<span class="nc" id="L2103">		}</span>
+<span class="nc" id="L2104">		int bonusLangRemain = bonusLangMax - currBonusLangs.size();</span>
+<span class="nc bnc" id="L2105" title="All 4 branches missed.">		if (!allowBonusLangAfterFirst &amp;&amp; !atFirstLvl)</span>
+		{
+<span class="nc" id="L2107">			bonusLangRemain = 0;</span>
+		}
+<span class="nc" id="L2109">		numBonusLang.set(bonusLangRemain);</span>
+<span class="nc bnc" id="L2110" title="All 2 branches missed.">		if (bonusLangRemain &gt; 0)</span>
+		{
+<span class="nc bnc" id="L2112" title="All 2 branches missed.">			if (allowBonusLangAfterFirst)</span>
+			{
+<span class="nc" id="L2114">				todoManager.addTodo(new TodoFacadeImpl(Tab.SUMMARY, &quot;Languages&quot;, &quot;in_sumTodoBonusLanguage&quot;, 110));</span>
+<span class="nc" id="L2115">				todoManager.removeTodo(&quot;in_sumTodoBonusLanguageFirstOnly&quot;);</span>
+			}
+			else
+			{
+<span class="nc" id="L2119">				todoManager</span>
+<span class="nc" id="L2120">					.addTodo(new TodoFacadeImpl(Tab.SUMMARY, &quot;Languages&quot;, &quot;in_sumTodoBonusLanguageFirstOnly&quot;, 110));</span>
+<span class="nc" id="L2121">				todoManager.removeTodo(&quot;in_sumTodoBonusLanguage&quot;);</span>
+			}
+		}
+		else
+		{
+<span class="nc" id="L2126">			todoManager.removeTodo(&quot;in_sumTodoBonusLanguage&quot;);</span>
+<span class="nc" id="L2127">			todoManager.removeTodo(&quot;in_sumTodoBonusLanguageFirstOnly&quot;);</span>
+		}
+
+<span class="nc" id="L2130">		int numSkillLangSelected = 0;</span>
+<span class="nc" id="L2131">		int skillLangMax = 0;</span>
+		//TODO: Need to cope with multiple skill languages
+<span class="nc" id="L2133">		Skill speakLangSkill = dataSet.getSpeakLanguageSkill();</span>
+<span class="nc bnc" id="L2134" title="All 2 branches missed.">		if (speakLangSkill != null)</span>
+		{
+<span class="nc" id="L2136">			List&lt;String&gt; langList = theCharacter.getAssociationList(speakLangSkill);</span>
+<span class="nc" id="L2137">			numSkillLangSelected = langList.size();</span>
+<span class="nc" id="L2138">			skillLangMax = SkillRankControl.getTotalRank(theCharacter, speakLangSkill).intValue();</span>
+		}
+
+<span class="nc" id="L2141">		int skillLangRemain = skillLangMax - numSkillLangSelected;</span>
+<span class="nc" id="L2142">		numSkillLang.set(skillLangRemain);</span>
+<span class="nc bnc" id="L2143" title="All 2 branches missed.">		if (skillLangRemain &gt; 0)</span>
+		{
+<span class="nc" id="L2145">			todoManager.addTodo(new TodoFacadeImpl(Tab.SUMMARY, &quot;Languages&quot;, &quot;in_sumTodoSkillLanguage&quot;, 112));</span>
+		}
+		else
+		{
+<span class="nc" id="L2149">			todoManager.removeTodo(&quot;in_sumTodoSkillLanguage&quot;);</span>
+		}
+<span class="nc bnc" id="L2151" title="All 2 branches missed.">		if (skillLangRemain &lt; 0)</span>
+		{
+<span class="nc" id="L2153">			todoManager.addTodo(new TodoFacadeImpl(Tab.SUMMARY, &quot;Languages&quot;, &quot;in_sumTodoSkillLanguageTooMany&quot;, 112));</span>
+		}
+		else
+		{
+<span class="nc" id="L2157">			todoManager.removeTodo(&quot;in_sumTodoSkillLanguageTooMany&quot;);</span>
+		}
+<span class="nc" id="L2159">	}</span>
+
+	@Override
+	public ListFacade&lt;Language&gt; getLanguages()
+	{
+<span class="nc" id="L2164">		return languages;</span>
+	}
+
+	@Override
+	public ListFacade&lt;LanguageChooserFacade&gt; getLanguageChoosers()
+	{
+<span class="nc" id="L2170">		CNAbility cna = theCharacter.getBonusLanguageAbility();</span>
+<span class="nc" id="L2171">		WriteableListFacade&lt;LanguageChooserFacade&gt; chooserList = new DefaultListFacade&lt;&gt;();</span>
+<span class="nc" id="L2172">		chooserList.addElement(</span>
+<span class="nc" id="L2173">			new LanguageChooserFacadeImpl(this, LanguageBundle.getString(&quot;in_sumLangBonus&quot;), cna)); //$NON-NLS-1$</span>
+
+<span class="nc" id="L2175">		Skill speakLangSkill = dataSet.getSpeakLanguageSkill();</span>
+<span class="nc bnc" id="L2176" title="All 2 branches missed.">		if (speakLangSkill != null)</span>
+		{
+<span class="nc" id="L2178">			chooserList.addElement(</span>
+<span class="nc" id="L2179">				new LanguageChooserFacadeImpl(this, LanguageBundle.getString(&quot;in_sumLangSkill&quot;), //$NON-NLS-1$</span>
+				speakLangSkill));
+		}
+<span class="nc" id="L2182">		return chooserList;</span>
+	}
+
+	@Override
+	public void removeLanguage(Language lang)
+	{
+<span class="nc" id="L2188">		ChooseDriver owner = getLaguageOwner(lang);</span>
+<span class="nc bnc" id="L2189" title="All 2 branches missed.">		if (owner == null)</span>
+		{
+<span class="nc" id="L2191">			return;</span>
+		}
+
+<span class="nc" id="L2194">		List&lt;Language&gt; availLangs = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L2195">		List&lt;Language&gt; selLangs = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L2196">		ChoiceManagerList&lt;Language&gt; choiceManager = ChooserUtilities.getChoiceManager(owner, theCharacter);</span>
+<span class="nc" id="L2197">		choiceManager.getChoices(theCharacter, availLangs, selLangs);</span>
+<span class="nc" id="L2198">		selLangs.remove(lang);</span>
+<span class="nc" id="L2199">		choiceManager.applyChoices(theCharacter, selLangs);</span>
+<span class="nc" id="L2200">	}</span>
+
+	/**
+	 * Identify the object that the language is associated with. i.e. The rules
+	 * object that granted the ability to use the language.
+	 * @param lang The language to be found.
+	 * @return The granting rules object, or null if none or automatic.
+	 */
+	private ChooseDriver getLaguageOwner(Language lang)
+	{
+<span class="nc bnc" id="L2210" title="All 2 branches missed.">		if (currBonusLangs.contains(lang))</span>
+		{
+<span class="nc" id="L2212">			return theCharacter.getBonusLanguageAbility();</span>
+		}
+<span class="nc bnc" id="L2214" title="All 4 branches missed.">		else if (languages.containsElement(lang) &amp;&amp; !isAutomatic(lang))</span>
+		{
+<span class="nc" id="L2216">			return dataSet.getSpeakLanguageSkill();</span>
+		}
+<span class="nc" id="L2218">		return null;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;File&gt; getFileRef()
+	{
+<span class="nc" id="L2224">		return file;</span>
+	}
+
+	@Override
+	public void setFile(File file)
+	{
+<span class="nc bnc" id="L2230" title="All 2 branches missed.">		if (file == null)</span>
+		{
+<span class="nc" id="L2232">			throw new IllegalArgumentException(&quot;Cannot set a null as a character's file&quot;);</span>
+		}
+
+<span class="nc" id="L2235">		this.file.set(file);</span>
+		try
+		{
+<span class="nc" id="L2238">			theCharacter.setFileName(file.getCanonicalPath());</span>
+		}
+<span class="nc" id="L2240">		catch (IOException e)</span>
+		{
+<span class="nc" id="L2242">			Logging.errorPrint(&quot;CharacterFacadeImpl.setFile failed for &quot; + file, e);</span>
+<span class="nc" id="L2243">			theCharacter.setFileName(file.getPath());</span>
+<span class="nc" id="L2244">		}</span>
+<span class="nc" id="L2245">	}</span>
+
+	/**
+	 * Retrieve a copy of the current character suitable for export. This
+	 * attempts to minimize the expensive cloning function, by returning the
+	 * previously cloned character if the base character has not changed in
+	 * the meantime.
+	 * @return A copy of the current character.
+	 */
+	private synchronized PlayerCharacter getExportCharacter()
+	{
+<span class="nc" id="L2256">		PlayerCharacter exportPc = lastExportChar;</span>
+<span class="nc bnc" id="L2257" title="All 4 branches missed.">		if (exportPc == null || theCharacter.getSerial() != lastExportCharSerial)</span>
+		{
+			// Calling preparePCForOutput will mark export character as modified, so compare original character
+			// serial when checking for real changes
+			// Get serial at beginning so we can detect if a change occurs during clone and preparePCForOutput
+<span class="nc" id="L2262">			lastExportCharSerial = theCharacter.getSerial();</span>
+<span class="nc" id="L2263">			exportPc = theCharacter.clone();</span>
+
+			// Get the PC all up to date, (equipment and active bonuses etc)
+<span class="nc" id="L2266">			exportPc.preparePCForOutput();</span>
+
+<span class="nc" id="L2268">			lastExportChar = exportPc;</span>
+
+			// It is possible another thread changed PC during export; log for now, the next export will rebuild
+<span class="nc" id="L2271">			int countSerialChanges = theCharacter.getSerial() - lastExportCharSerial;</span>
+<span class="nc bnc" id="L2272" title="All 2 branches missed.">			if (countSerialChanges &gt; 0)</span>
+			{
+<span class="nc" id="L2274">				Logging.log(Logging.DEBUG, &quot;Player character &quot; + exportPc.getName() + &quot; changed &quot; + countSerialChanges</span>
+					+ &quot; times during export.&quot;);
+			}
+		}
+<span class="nc" id="L2278">		return exportPc;</span>
+	}
+
+	@Override
+	public void export(ExportHandler theHandler, BufferedWriter buf) throws ExportException
+	{
+<span class="nc" id="L2284">		final int maxRetries = 3;</span>
+<span class="nc bnc" id="L2285" title="All 2 branches missed.">		for (int i = 0; i &lt; maxRetries; i++)</span>
+		{
+			try
+			{
+<span class="nc" id="L2289">				Logging.log(Logging.DEBUG,</span>
+<span class="nc" id="L2290">					&quot;Starting export at serial &quot; + theCharacter.getSerial() + &quot; to &quot; + theHandler.getTemplateFile());</span>
+<span class="nc" id="L2291">				PlayerCharacter exportPc = getExportCharacter();</span>
+<span class="nc" id="L2292">				theHandler.write(exportPc, buf);</span>
+<span class="nc" id="L2293">				Logging.log(Logging.DEBUG,</span>
+<span class="nc" id="L2294">					&quot;Finished export at serial &quot; + theCharacter.getSerial() + &quot; to &quot; + theHandler.getTemplateFile());</span>
+<span class="nc" id="L2295">				return;</span>
+			}
+<span class="nc" id="L2297">			catch (ConcurrentModificationException e)</span>
+			{
+<span class="nc" id="L2299">				Map&lt;Thread, StackTraceElement[]&gt; allStackTraces = Thread.getAllStackTraces();</span>
+<span class="nc bnc" id="L2300" title="All 2 branches missed.">				for (Entry&lt;Thread, StackTraceElement[]&gt; threadEntry : allStackTraces.entrySet())</span>
+				{
+<span class="nc bnc" id="L2302" title="All 2 branches missed.">					if (threadEntry.getValue().length &gt; 1)</span>
+					{
+<span class="nc" id="L2304">						StringBuilder sb = new StringBuilder(&quot;Thread: &quot; + threadEntry.getKey() + &quot;\n&quot;);</span>
+<span class="nc bnc" id="L2305" title="All 2 branches missed.">						for (StackTraceElement elem : threadEntry.getValue())</span>
+						{
+<span class="nc" id="L2307">							sb.append(&quot;  &quot;);</span>
+<span class="nc" id="L2308">							sb.append(elem.toString());</span>
+<span class="nc" id="L2309">							sb.append(&quot;\n&quot;);</span>
+						}
+<span class="nc" id="L2311">						Logging.log(Logging.INFO, sb.toString());</span>
+					}
+<span class="nc" id="L2313">				}</span>
+<span class="nc" id="L2314">				Logging.log(Logging.WARNING, &quot;Retrying export after ConcurrentModificationException&quot;, e);</span>
+				try
+				{
+<span class="nc" id="L2317">					Thread.sleep(1000);</span>
+				}
+<span class="nc" id="L2319">				catch (InterruptedException e1)</span>
+				{
+<span class="nc" id="L2321">					Logging.errorPrint(&quot;Interrupted sleep - probably closing.&quot;);</span>
+<span class="nc" id="L2322">					return;</span>
+
+<span class="nc" id="L2324">				}</span>
+			}
+		}
+<span class="nc" id="L2327">		Logging</span>
+<span class="nc" id="L2328">			.errorPrint(&quot;Unable to export using &quot; + theHandler.getTemplateFile() + &quot; due to concurrent modifications.&quot;);</span>
+<span class="nc" id="L2329">	}</span>
+
+	@Override
+	public void setDefaultOutputSheet(boolean pdf, File outputSheet)
+	{
+<span class="nc" id="L2334">		UIPropertyContext context = UIPropertyContext.getInstance();</span>
+<span class="nc" id="L2335">		String outputSheetPath = outputSheet.getAbsolutePath();</span>
+<span class="nc bnc" id="L2336" title="All 2 branches missed.">		if (pdf)</span>
+		{
+<span class="nc" id="L2338">			context.setProperty(UIPropertyContext.DEFAULT_PDF_OUTPUT_SHEET, outputSheetPath);</span>
+		}
+		else
+		{
+<span class="nc" id="L2342">			context.setProperty(UIPropertyContext.DEFAULT_HTML_OUTPUT_SHEET, outputSheetPath);</span>
+		}
+<span class="nc bnc" id="L2344" title="All 2 branches missed.">		if (context.getBoolean(UIPropertyContext.SAVE_OUTPUT_SHEET_WITH_PC))</span>
+		{
+<span class="nc bnc" id="L2346" title="All 2 branches missed.">			if (pdf)</span>
+			{
+<span class="nc" id="L2348">				theCharacter.setSelectedCharacterPDFOutputSheet(outputSheetPath);</span>
+			}
+			else
+			{
+<span class="nc" id="L2352">				theCharacter.setSelectedCharacterHTMLOutputSheet(outputSheetPath);</span>
+			}
+		}
+<span class="nc" id="L2355">	}</span>
+
+	@Override
+	public String getDefaultOutputSheet(boolean pdf)
+	{
+<span class="nc" id="L2360">		UIPropertyContext context = UIPropertyContext.getInstance();</span>
+<span class="nc bnc" id="L2361" title="All 2 branches missed.">		if (context.getBoolean(UIPropertyContext.SAVE_OUTPUT_SHEET_WITH_PC))</span>
+		{
+			String sheet;
+<span class="nc bnc" id="L2364" title="All 2 branches missed.">			if (pdf)</span>
+			{
+<span class="nc" id="L2366">				sheet = theCharacter.getSelectedCharacterPDFOutputSheet();</span>
+			}
+			else
+			{
+<span class="nc" id="L2370">				sheet = theCharacter.getSelectedCharacterHTMLOutputSheet();</span>
+			}
+<span class="nc bnc" id="L2372" title="All 2 branches missed.">			if (StringUtils.isNotEmpty(sheet))</span>
+			{
+<span class="nc" id="L2374">				return sheet;</span>
+			}
+		}
+
+<span class="nc bnc" id="L2378" title="All 2 branches missed.">		if (pdf)</span>
+		{
+<span class="nc" id="L2380">			return context.getProperty(UIPropertyContext.DEFAULT_PDF_OUTPUT_SHEET);</span>
+		}
+<span class="nc" id="L2382">		return context.getProperty(UIPropertyContext.DEFAULT_HTML_OUTPUT_SHEET);</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;Handed&gt; getHandedRef()
+	{
+<span class="nc" id="L2388">		return handedness;</span>
+	}
+
+	@Override
+	public void setHanded(Handed handedness)
+	{
+<span class="nc" id="L2394">		HandedCompat.setCurrentHandedness(theCharacter.getCharID(), handedness);</span>
+<span class="nc" id="L2395">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getPlayersNameRef()
+	{
+<span class="nc" id="L2400">		return playersName;</span>
+	}
+
+	@Override
+	public void setPlayersName(String name)
+	{
+<span class="nc" id="L2406">		playersName.set(name);</span>
+<span class="nc" id="L2407">		theCharacter.setPCAttribute(PCStringKey.PLAYERSNAME, name);</span>
+<span class="nc" id="L2408">	}</span>
+
+	@Override
+	public boolean isQualifiedFor(PCClass c)
+	{
+<span class="nc" id="L2413">		return theCharacter.isQualified(c);</span>
+	}
+
+	@Override
+	public UIDelegate getUIDelegate()
+	{
+<span class="nc" id="L2419">		return delegate;</span>
+	}
+
+	/**
+	 * Save the character to disc using its filename. Note this method is not
+	 * part of the CharacterFacade and should only be used by the
+	 * ChracterManager class.
+	 */
+	public void save()
+	{
+<span class="nc" id="L2429">		GameMode mode = dataSet.getGameMode();</span>
+<span class="nc" id="L2430">		List&lt;Campaign&gt; campaigns = ListFacades.wrap(dataSet.getCampaigns());</span>
+<span class="nc" id="L2431">		(new PCGIOHandler()).write(theCharacter, mode, campaigns, file.get());</span>
+<span class="nc" id="L2432">		theCharacter.setDirty(false);</span>
+<span class="nc" id="L2433">	}</span>
+
+	@Override
+	public boolean isAutomatic(Language language)
+	{
+<span class="nc bnc" id="L2438" title="All 2 branches missed.">		if (autoLanguagesCache == null)</span>
+		{
+<span class="nc" id="L2440">			autoLanguagesCache = charDisplay.getAutoLanguages();</span>
+		}
+<span class="nc" id="L2442">		return autoLanguagesCache.contains(language);</span>
+	}
+
+	@Override
+	public boolean isRemovable(Language language)
+	{
+<span class="nc bnc" id="L2448" title="All 2 branches missed.">		if (isAutomatic(language))</span>
+		{
+<span class="nc" id="L2450">			return false;</span>
+		}
+<span class="nc bnc" id="L2452" title="All 2 branches missed.">		if (currBonusLangs.contains(language))</span>
+		{
+<span class="nc" id="L2454">			boolean allowBonusLangAfterFirst = Globals.checkRule(RuleConstants.INTBONUSLANG);</span>
+<span class="nc bnc" id="L2455" title="All 2 branches missed.">			boolean atFirstLvl = theCharacter.getTotalLevels() &lt;= 1;</span>
+<span class="nc bnc" id="L2456" title="All 4 branches missed.">			return allowBonusLangAfterFirst || atFirstLvl;</span>
+		}
+
+<span class="nc" id="L2459">		return true;</span>
+	}
+
+	@Override
+	public CharacterLevelsFacade getCharacterLevelsFacade()
+	{
+<span class="nc" id="L2465">		return charLevelsFacade;</span>
+	}
+
+	@Override
+	public DescriptionFacade getDescriptionFacade()
+	{
+<span class="nc" id="L2471">		return descriptionFacade;</span>
+	}
+
+	@Override
+	public void setXP(final int xp)
+	{
+<span class="nc bnc" id="L2477" title="All 2 branches missed.">		if (xp == currentXP.get())</span>
+		{
+			// We've already processed this change, most likely via the adjustXP method
+<span class="nc" id="L2480">			return;</span>
+		}
+<span class="nc" id="L2482">		theCharacter.setXP(xp);</span>
+<span class="nc" id="L2483">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;Integer&gt; getXPRef()
+	{
+<span class="nc" id="L2488">		return currentXP;</span>
+	}
+
+	@Override
+	public void adjustXP(final int xp)
+	{
+<span class="nc" id="L2494">		int currVal = currentXP.get();</span>
+<span class="nc" id="L2495">		int newVal = currVal + xp;</span>
+<span class="nc" id="L2496">		theCharacter.setXP(newVal);</span>
+<span class="nc" id="L2497">		checkForNewLevel();</span>
+<span class="nc" id="L2498">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;Integer&gt; getXPForNextLevelRef()
+	{
+<span class="nc" id="L2503">		return xpForNextlevel;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getXPTableNameRef()
+	{
+<span class="nc" id="L2509">		return xpTableName;</span>
+	}
+
+	@Override
+	public void setXPTable(String newTable)
+	{
+
+<span class="nc" id="L2516">		xpTableName.set(newTable);</span>
+<span class="nc" id="L2517">		theCharacter.setXPTable(newTable);</span>
+<span class="nc" id="L2518">		checkForNewLevel();</span>
+<span class="nc" id="L2519">	}</span>
+
+	private void checkForNewLevel()
+	{
+<span class="nc" id="L2523">		currentXP.set(theCharacter.getXP());</span>
+<span class="nc" id="L2524">		xpForNextlevel.set(charDisplay.minXPForNextECL());</span>
+
+<span class="nc bnc" id="L2526" title="All 2 branches missed.">		if (theCharacter.getXP() &gt;= charDisplay.minXPForNextECL())</span>
+		{
+<span class="nc" id="L2528">			delegate.showInfoMessage(Constants.APPLICATION_NAME, SettingsHandler.getGameAsProperty().get().getLevelUpMessage());</span>
+		}
+<span class="nc" id="L2530">		updateLevelTodo();</span>
+<span class="nc" id="L2531">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getCharacterTypeRef()
+	{
+<span class="nc" id="L2536">		return characterType;</span>
+	}
+
+	@Override
+	public void setCharacterType(String newType)
+	{
+
+<span class="nc" id="L2543">		characterType.set(newType);</span>
+<span class="nc" id="L2544">		theCharacter.calcActiveBonuses();</span>
+
+		// This can affect traits mainly.
+<span class="nc" id="L2547">		characterAbilities.rebuildAbilityLists();</span>
+<span class="nc" id="L2548">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getPreviewSheetRef()
+	{
+<span class="nc" id="L2553">		return previewSheet;</span>
+	}
+
+	@Override
+	public void setPreviewSheet(String newSheet)
+	{
+<span class="nc" id="L2559">		previewSheet.set(newSheet);</span>
+<span class="nc" id="L2560">		theCharacter.setPreviewSheet(newSheet);</span>
+<span class="nc" id="L2561">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;SkillFilter&gt; getSkillFilterRef()
+	{
+<span class="nc" id="L2566">		return skillFilter;</span>
+	}
+
+	@Override
+	public void setSkillFilter(SkillFilter newFilter)
+	{
+<span class="nc" id="L2572">		skillFilter.set(newFilter);</span>
+<span class="nc" id="L2573">		theCharacter.setSkillFilter(newFilter);</span>
+<span class="nc" id="L2574">	}</span>
+
+	@Override
+	public void setAge(final int age)
+	{
+<span class="nc" id="L2579">		this.age.set(age);</span>
+<span class="nc" id="L2580">		updateAgeCategoryForAge();</span>
+<span class="nc" id="L2581">		refreshStatScores();</span>
+<span class="nc" id="L2582">		refreshLanguageList();</span>
+<span class="nc" id="L2583">	}</span>
+
+	/**
+	 * Update the character's age category based on their age.
+	 */
+	private void updateAgeCategoryForAge()
+	{
+<span class="nc" id="L2590">		AgeSet ageSet = charDisplay.getAgeSet();</span>
+<span class="nc bnc" id="L2591" title="All 2 branches missed.">		if (ageSet != null)</span>
+		{
+<span class="nc" id="L2593">			String ageCatName = ageSet.getKeyName();</span>
+<span class="nc bnc" id="L2594" title="All 2 branches missed.">			for (String ageCatFacade : ageCategoryList)</span>
+			{
+<span class="nc bnc" id="L2596" title="All 2 branches missed.">				if (ageCatFacade.equals(ageCatName))</span>
+				{
+<span class="nc" id="L2598">					ageCategory.set(ageCatFacade);</span>
+				}
+<span class="nc" id="L2600">			}</span>
+		}
+<span class="nc" id="L2602">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;Integer&gt; getAgeRef()
+	{
+<span class="nc" id="L2607">		return age;</span>
+	}
+
+	@Override
+	public ListFacade&lt;String&gt; getAgeCategories()
+	{
+<span class="nc" id="L2613">		return ageCategoryList;</span>
+	}
+
+	@Override
+	public void setAgeCategory(final String ageCat)
+	{
+<span class="nc bnc" id="L2619" title="All 2 branches missed.">		if (ageCat == this.ageCategory.get())</span>
+		{
+			// We've already processed this change, most likely via the setAge method
+<span class="nc" id="L2622">			return;</span>
+		}
+
+<span class="nc" id="L2625">		final Race pcRace = charDisplay.getRace();</span>
+<span class="nc" id="L2626">		final String selAgeCat = ageCat.toString();</span>
+
+<span class="nc bnc" id="L2628" title="All 4 branches missed.">		if ((pcRace != null) &amp;&amp; !pcRace.isUnselected())</span>
+		{
+<span class="nc" id="L2630">            final int idx = SettingsHandler.getGameAsProperty().get().getBioSet().getAgeSetNamed(selAgeCat);</span>
+
+<span class="nc bnc" id="L2632" title="All 2 branches missed.">            if (idx &gt;= 0)</span>
+            {
+<span class="nc" id="L2634">                ageCategory.set(ageCat);</span>
+<span class="nc" id="L2635">                SettingsHandler.getGameAsProperty().get().getBioSet().randomize(&quot;AGECAT&quot; + Integer.toString(idx), theCharacter);</span>
+<span class="nc" id="L2636">                ageCategory.set(ageCat);</span>
+<span class="nc" id="L2637">                refreshStatScores();</span>
+<span class="nc" id="L2638">                refreshLanguageList();</span>
+            }
+        }
+<span class="nc" id="L2641">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getAgeCategoryRef()
+	{
+<span class="nc" id="L2646">		return ageCategory;</span>
+	}
+
+	/**
+	 * This method updates the purchase point pool and the stat total text. The
+	 * stat total text will be updated whether we are in purchase mode or not.
+	 * displayed
+	 * @param checkPurchasePoints boolean true if the pool should be checked
+	 * for available points before doing the update.
+	 */
+	private void updateScorePurchasePool(boolean checkPurchasePoints)
+	{
+<span class="nc" id="L2658">		int usedStatPool = getUsedStatPool();</span>
+
+		// Handle purchase mode for stats
+<span class="nc bnc" id="L2661" title="All 2 branches missed.">		if (SettingsHandler.getGameAsProperty().get().isPurchaseStatMode())</span>
+		{
+			// Let them dink on stats at 0th or 1st PC levels
+<span class="nc bnc" id="L2664" title="All 2 branches missed.">			if (canChangePurchasePool())</span>
+			{
+<span class="nc" id="L2666">				theCharacter.setCostPool(usedStatPool);</span>
+<span class="nc" id="L2667">				theCharacter.setPoolAmount(usedStatPool);</span>
+			}
+
+<span class="nc" id="L2670">			final String bString = Integer.toString(theCharacter.getCostPool());</span>
+			//	int availablePool = SettingsHandler.getPurchaseModeMethodPool();
+<span class="nc" id="L2672">			int availablePool = theCharacter.getPointBuyPoints();</span>
+<span class="nc bnc" id="L2673" title="All 2 branches missed.">			if (availablePool &lt; 0)</span>
+			{
+<span class="nc" id="L2675">				availablePool = RollingMethods.roll(SettingsHandler.getGameAsProperty().get().getPurchaseModeMethodPoolFormula());</span>
+<span class="nc" id="L2676">				theCharacter.setPointBuyPoints(availablePool);</span>
+			}
+
+<span class="nc bnc" id="L2679" title="All 2 branches missed.">			if (availablePool != 0)</span>
+			{
+<span class="nc" id="L2681">				statTotalLabelText.set(LanguageBundle.getFormattedString(&quot;in_sumStatCost&quot;, SettingsHandler //$NON-NLS-1$</span>
+<span class="nc" id="L2682">					.getGameAsProperty().get().getPurchaseModeMethodName()));</span>
+<span class="nc" id="L2683">				statTotalText.set(</span>
+<span class="nc" id="L2684">					LanguageBundle.getFormattedString(</span>
+<span class="nc" id="L2685">						&quot;in_sumStatPurchaseDisplay&quot;, bString, availablePool)); //$NON-NLS-1$</span>
+<span class="nc" id="L2686">				modTotalLabelText.set(&quot;&quot;);</span>
+<span class="nc" id="L2687">				modTotalText.set(&quot;&quot;);</span>
+			}
+
+<span class="nc bnc" id="L2690" title="All 4 branches missed.">			if (checkPurchasePoints &amp;&amp; (availablePool != 0))</span>
+			{
+				//
+				// Let the user know that they've exceeded their goal, but allow them to keep going if they want...
+				// Only do this at 1st level or lower
+				//
+<span class="nc bnc" id="L2696" title="All 6 branches missed.">				if (canChangePurchasePool() &amp;&amp; (availablePool &gt; 0) &amp;&amp; (usedStatPool &gt; availablePool))</span>
+				{
+<span class="nc" id="L2698">					delegate.showInfoMessage(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L2699">						LanguageBundle.getFormattedString(&quot;in_sumYouHaveExcededTheMaximumPointsOf&quot;, //$NON-NLS-1$</span>
+<span class="nc" id="L2700">							String.valueOf(availablePool), SettingsHandler.getGameAsProperty().get().getPurchaseModeMethodName()));</span>
+				}
+			}
+		}
+
+		// Non-purchase mode for stats
+<span class="nc bnc" id="L2706" title="All 4 branches missed.">		if (!SettingsHandler.getGameAsProperty().get().isPurchaseStatMode() || (theCharacter.getPointBuyPoints() == 0))</span>
+		{
+<span class="nc" id="L2708">			int statTotal = 0;</span>
+<span class="nc" id="L2709">			int modTotal = 0;</span>
+
+<span class="nc bnc" id="L2711" title="All 2 branches missed.">			for (PCStat aStat : charDisplay.getStatSet())</span>
+			{
+<span class="nc bnc" id="L2713" title="All 4 branches missed.">				if (charDisplay.isNonAbility(aStat) || !aStat.getSafe(ObjectKey.ROLLED))</span>
+				{
+<span class="nc" id="L2715">					continue;</span>
+				}
+
+<span class="nc" id="L2718">				final int currentStat = theCharacter.getBaseStatFor(aStat);</span>
+<span class="nc" id="L2719">				final int currentMod = theCharacter.getStatModFor(aStat);</span>
+
+<span class="nc" id="L2721">				statTotal += currentStat;</span>
+<span class="nc" id="L2722">				modTotal += currentMod;</span>
+<span class="nc" id="L2723">			}</span>
+
+<span class="nc" id="L2725">			statTotalLabelText.set(LanguageBundle.getString(&quot;in_sumStatTotalLabel&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L2726">			statTotalText.set(LanguageBundle.getFormattedString(&quot;in_sumStatTotal&quot;, Integer.toString(statTotal)));</span>
+<span class="nc" id="L2727">			modTotalLabelText.set(LanguageBundle.getString(&quot;in_sumModTotalLabel&quot;));</span>
+<span class="nc" id="L2728">			modTotalText.set(LanguageBundle.getFormattedString(&quot;in_sumModTotal&quot;, Integer.toString(modTotal)));</span>
+		}
+
+<span class="nc bnc" id="L2731" title="All 6 branches missed.">		if (charLevelsFacade.getSize() == 0 &amp;&amp; (allAbilitiesAreZero() || (SettingsHandler.getGameAsProperty().get().isPurchaseStatMode()</span>
+<span class="nc bnc" id="L2732" title="All 2 branches missed.">			&amp;&amp; (theCharacter.getPointBuyPoints() != getUsedStatPool()))))</span>
+		{
+<span class="nc" id="L2734">			todoManager.addTodo(new TodoFacadeImpl(Tab.SUMMARY, &quot;Ability Scores&quot;, &quot;in_sumTodoStats&quot;, 50));</span>
+		}
+		else
+		{
+<span class="nc" id="L2738">			todoManager.removeTodo(&quot;in_sumTodoStats&quot;);</span>
+		}
+<span class="nc" id="L2740">	}</span>
+
+	/**
+	 * Identify if the character can still change purchase pool values - spent
+	 * or available. This action is restricted by level.
+	 * @return true if the character is allowed to change the purchase pool
+	 */
+	public boolean canChangePurchasePool()
+	{
+		// This is a problem for races with non-0 level
+		// adjustment so only count PC &amp; NPC levels, not
+		// monster levels XXX
+<span class="nc" id="L2752">		int pcPlayerLevels = charDisplay.totalNonMonsterLevels();</span>
+
+		int maxDiddleLevel;
+<span class="nc bnc" id="L2755" title="All 2 branches missed.">		if (poolPointText != null)</span>
+		{
+<span class="nc" id="L2757">			maxDiddleLevel = 0;</span>
+		}
+		else
+		{
+<span class="nc" id="L2761">			maxDiddleLevel = 1;</span>
+		}
+<span class="nc bnc" id="L2763" title="All 2 branches missed.">		return pcPlayerLevels &lt;= maxDiddleLevel;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getStatTotalLabelTextRef()
+	{
+<span class="nc" id="L2769">		return statTotalLabelText;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getStatTotalTextRef()
+	{
+<span class="nc" id="L2775">		return statTotalText;</span>
+	}
+
+	/**
+	 * @return A reference to the label text for the character's modifier total
+	 */
+	@Override
+	public ReferenceFacade&lt;String&gt; getModTotalLabelTextRef()
+	{
+<span class="nc" id="L2784">		return modTotalLabelText;</span>
+	}
+
+	/**
+	 * @return A reference to the text for the character's modifier total
+	 */
+	@Override
+	public ReferenceFacade&lt;String&gt; getModTotalTextRef()
+	{
+<span class="nc" id="L2793">		return modTotalText;</span>
+	}
+
+	@Override
+	public ListFacade&lt;TodoFacade&gt; getTodoList()
+	{
+<span class="nc" id="L2799">		return todoManager.getTodoList();</span>
+	}
+
+	/**
+	 * @return the PlayerCharacter the facade is fronting for.
+	 */
+	PlayerCharacter getTheCharacter()
+	{
+<span class="nc" id="L2807">		return theCharacter;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;Integer&gt; getTotalHPRef()
+	{
+<span class="nc" id="L2813">		return hpRef;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;Integer&gt; getRollMethodRef()
+	{
+<span class="nc" id="L2819">		return rollMethodRef;</span>
+	}
+
+	@Override
+	public void refreshRollMethod()
+	{
+<span class="nc bnc" id="L2825" title="All 2 branches missed.">		if (!canChangePurchasePool())</span>
+		{
+<span class="nc" id="L2827">			return;</span>
+		}
+<span class="nc" id="L2829">		GameMode game = dataSet.getGameMode();</span>
+<span class="nc" id="L2830">		rollMethodRef.set(game.getRollMethod());</span>
+<span class="nc bnc" id="L2831" title="All 2 branches missed.">		if (SettingsHandler.getGameAsProperty().get().isPurchaseStatMode())</span>
+		{
+<span class="nc" id="L2833">			int availablePool = RollingMethods.roll(SettingsHandler.getGameAsProperty().get().getPurchaseModeMethodPoolFormula());</span>
+<span class="nc" id="L2834">			theCharacter.setPointBuyPoints(availablePool);</span>
+
+			// Make sure all scores are within the valid range
+<span class="nc" id="L2837">			statScoreMap.forEach((key, score) -&gt; {</span>
+<span class="nc bnc" id="L2838" title="All 2 branches missed.">				if (score.get().intValue() &lt; SettingsHandler.getGameAsProperty().get().getPurchaseScoreMin(theCharacter))</span>
+				{
+<span class="nc" id="L2840">					setStatToPurchaseNeutral(key, score);</span>
+				}
+<span class="nc" id="L2842">			});</span>
+
+		}
+
+<span class="nc" id="L2846">		hpRef.set(theCharacter.hitPoints());</span>
+<span class="nc" id="L2847">		updateScorePurchasePool(false);</span>
+<span class="nc" id="L2848">	}</span>
+
+	/**
+	 * Reset the stat score to the neutral value (usually 10) for
+	 * the point buy method.
+	 *
+	 * @param pcStat The stat being adjusted.
+	 * @param scoreRef The reference to the current score.
+	 */
+	private void setStatToPurchaseNeutral(PCStat pcStat, WriteableReferenceFacade&lt;Number&gt; scoreRef)
+	{
+<span class="nc" id="L2859">		int newScore = SettingsHandler.getGameAsProperty().get().getPurchaseModeBaseStatScore(theCharacter);</span>
+<span class="nc bnc" id="L2860" title="All 2 branches missed.">		if (StringUtils.isNotEmpty(validateNewStatBaseScore(newScore, pcStat, charDisplay.totalNonMonsterLevels())))</span>
+		{
+<span class="nc" id="L2862">			newScore = SettingsHandler.getGameAsProperty().get().getPurchaseScoreMin(theCharacter);</span>
+<span class="nc bnc" id="L2863" title="All 2 branches missed.">			if (StringUtils.isNotEmpty(validateNewStatBaseScore(newScore, pcStat, charDisplay.totalNonMonsterLevels())))</span>
+			{
+<span class="nc" id="L2865">				return;</span>
+			}
+		}
+
+<span class="nc" id="L2869">		theCharacter.setStat(pcStat, newScore);</span>
+<span class="nc" id="L2870">		scoreRef.set(newScore);</span>
+<span class="nc" id="L2871">	}</span>
+
+	@Override
+	public void adjustFunds(BigDecimal modVal)
+	{
+<span class="nc" id="L2876">		BigDecimal currFunds = fundsRef.get();</span>
+<span class="nc" id="L2877">		fundsRef.set(currFunds.add(modVal));</span>
+<span class="nc" id="L2878">		updateWealthFields();</span>
+<span class="nc" id="L2879">	}</span>
+
+	@Override
+	public void setFunds(BigDecimal newVal)
+	{
+<span class="nc" id="L2884">		fundsRef.set(newVal);</span>
+<span class="nc" id="L2885">		updateWealthFields();</span>
+<span class="nc" id="L2886">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;BigDecimal&gt; getFundsRef()
+	{
+<span class="nc" id="L2891">		return fundsRef;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;BigDecimal&gt; getWealthRef()
+	{
+<span class="nc" id="L2897">		return wealthRef;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;GearBuySellFacade&gt; getGearBuySellRef()
+	{
+<span class="nc" id="L2903">		return gearBuySellSchemeRef;</span>
+	}
+
+	@Override
+	public void setGearBuySellRef(GearBuySellFacade gearBuySell)
+	{
+<span class="nc" id="L2909">		gearBuySellSchemeRef.set(gearBuySell);</span>
+<span class="nc" id="L2910">		GearBuySellScheme scheme = (GearBuySellScheme) gearBuySell;</span>
+<span class="nc" id="L2911">		int rate = scheme.getBuyRate().intValue();</span>
+<span class="nc" id="L2912">		SettingsHandler.setGearTab_BuyRate(rate);</span>
+<span class="nc" id="L2913">		rate = scheme.getSellRate().intValue();</span>
+<span class="nc" id="L2914">		SettingsHandler.setGearTab_SellRate(rate);</span>
+<span class="nc" id="L2915">	}</span>
+
+	/**
+	 * Update the wealth related fields.
+	 */
+	private void updateWealthFields()
+	{
+<span class="nc" id="L2922">		wealthRef.set(theCharacter.totalValue());</span>
+<span class="nc" id="L2923">	}</span>
+
+	@Override
+	public void setAllowDebt(boolean allowDebt)
+	{
+<span class="nc" id="L2928">		this.allowDebt = allowDebt;</span>
+<span class="nc" id="L2929">	}</span>
+
+	@Override
+	public boolean isAllowDebt()
+	{
+<span class="nc" id="L2934">		return allowDebt;</span>
+	}
+
+	@Override
+	public EquipmentListFacade getPurchasedEquipment()
+	{
+<span class="nc" id="L2940">		return purchasedEquip;</span>
+	}
+
+	@Override
+	public void addPurchasedEquipment(EquipmentFacade equipment, int quantity, boolean customize, boolean free)
+	{
+<span class="nc bnc" id="L2946" title="All 4 branches missed.">		if (equipment == null || quantity &lt;= 0)</span>
+		{
+<span class="nc" id="L2948">			return;</span>
+		}
+
+		//		int nextOutputIndex = 1;
+<span class="nc" id="L2952">		Equipment equipItemToAdjust = (Equipment) equipment;</span>
+
+<span class="nc bnc" id="L2954" title="All 2 branches missed.">		if (customize)</span>
+		{
+<span class="nc" id="L2956">			equipItemToAdjust = openCustomizer(equipItemToAdjust);</span>
+<span class="nc bnc" id="L2957" title="All 2 branches missed.">			if (equipItemToAdjust == null)</span>
+			{
+<span class="nc" id="L2959">				return;</span>
+			}
+		}
+		else
+		{
+<span class="nc bnc" id="L2964" title="All 2 branches missed.">			if (equipItemToAdjust.getSafe(ObjectKey.MOD_CONTROL).getModifiersRequired())</span>
+			{
+<span class="nc bnc" id="L2966" title="All 2 branches missed.">				if (!hasBeenAdjusted(equipItemToAdjust))</span>
+				{
+<span class="nc" id="L2968">					delegate.showErrorMessage(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L2969">						LanguageBundle.getString(&quot;in_igBuyMustCustomizeItemFirst&quot;)); //$NON-NLS-1$</span>
+
+<span class="nc" id="L2971">					return;</span>
+				}
+			}
+		}
+<span class="nc" id="L2975">		Equipment updatedItem = theCharacter.getEquipmentNamed(equipItemToAdjust.getName());</span>
+
+<span class="nc bnc" id="L2977" title="All 4 branches missed.">		if (!free &amp;&amp; !canAfford(equipItemToAdjust, new BigDecimal(quantity), (GearBuySellScheme) gearBuySellSchemeRef.get()))</span>
+		{
+<span class="nc" id="L2979">			delegate.showInfoMessage(Constants.APPLICATION_NAME,</span>
+<span class="nc" id="L2980">				LanguageBundle.getFormattedString(&quot;in_igBuyInsufficientFunds&quot;, quantity, equipItemToAdjust.getName()));</span>
+<span class="nc" id="L2981">			return;</span>
+		}
+
+<span class="nc bnc" id="L2984" title="All 2 branches missed.">		if (updatedItem != null)</span>
+		{
+			// item is already in inventory; update it
+<span class="nc bnc" id="L2987" title="All 2 branches missed.">			final double prevQty = (updatedItem.qty() &lt; 0) ? 0 : updatedItem.qty();</span>
+<span class="nc" id="L2988">			final double newQty = prevQty + quantity;</span>
+
+<span class="nc" id="L2990">			theCharacter.updateEquipmentQty(updatedItem, prevQty, newQty);</span>
+<span class="nc" id="L2991">			Float qty = (float) newQty;</span>
+<span class="nc" id="L2992">			updatedItem.setQty(qty);</span>
+<span class="nc" id="L2993">			purchasedEquip.setQuantity(equipment, qty.intValue());</span>
+<span class="nc" id="L2994">		}</span>
+		else
+		{
+			// item is not in inventory; add it
+<span class="nc" id="L2998">			updatedItem = equipItemToAdjust.clone();</span>
+
+<span class="nc bnc" id="L3000" title="All 2 branches missed.">			if (updatedItem != null)</span>
+			{
+				// Set the number carried and add it to the character
+<span class="nc" id="L3003">				Float qty = (float) quantity;</span>
+<span class="nc" id="L3004">				updatedItem.setQty(qty);</span>
+<span class="nc" id="L3005">				theCharacter.addEquipment(updatedItem);</span>
+			}
+<span class="nc" id="L3007">			purchasedEquip.addElement(updatedItem, quantity);</span>
+		}
+
+		// Update the PC and equipment
+<span class="nc bnc" id="L3011" title="All 2 branches missed.">		if (!free)</span>
+		{
+<span class="nc" id="L3013">			BigDecimal itemCost = calcItemCost(updatedItem, new BigDecimal(quantity),</span>
+<span class="nc" id="L3014">				(GearBuySellScheme) gearBuySellSchemeRef.get());</span>
+<span class="nc" id="L3015">			BigDecimal currentGold = new BigDecimal(ChannelUtilities</span>
+<span class="nc" id="L3016">				.readControlledChannel(theCharacter.getCharID(), CControl.GOLDINPUT).toString());</span>
+<span class="nc" id="L3017">			ChannelUtilities.setControlledChannel(theCharacter.getCharID(),</span>
+<span class="nc" id="L3018">				CControl.GOLDINPUT, currentGold.subtract(itemCost));</span>
+		}
+<span class="nc" id="L3020">		theCharacter.setCalcEquipmentList();</span>
+<span class="nc" id="L3021">		theCharacter.setDirty(true);</span>
+<span class="nc" id="L3022">		updateWealthFields();</span>
+<span class="nc" id="L3023">	}</span>
+
+	private boolean hasBeenAdjusted(Equipment equipItemToAdjust)
+	{
+<span class="nc" id="L3027">		Set&lt;EquipmentModifier&gt; allEqMods = new HashSet&lt;&gt;(equipItemToAdjust.getEqModifierList(true));</span>
+<span class="nc" id="L3028">		allEqMods.addAll(equipItemToAdjust.getEqModifierList(false));</span>
+<span class="nc bnc" id="L3029" title="All 2 branches missed.">		for (EquipmentModifier eqMod : allEqMods)</span>
+		{
+<span class="nc bnc" id="L3031" title="All 2 branches missed.">			if (!eqMod.isType(Constants.EQMOD_TYPE_BASEMATERIAL))</span>
+			{
+<span class="nc" id="L3033">				return true;</span>
+			}
+<span class="nc" id="L3035">		}</span>
+<span class="nc" id="L3036">		return false;</span>
+	}
+
+	/**
+	 * This method is called to determine whether the character can afford to buy
+	 * the requested quantity of an item at the rate selected.
+	 * @param selected Equipment item being bought, used to determine the base price
+	 * @param purchaseQty double number of the item bought
+	 * @param gearBuySellScheme The scheme for buying and selling rates
+	 *
+	 * This method was overhauled March, 2003 by sage_sam as part of FREQ 606205
+	 * @return true if it can be afforded
+	 */
+	private boolean canAfford(Equipment selected, BigDecimal purchaseQty, GearBuySellScheme gearBuySellScheme)
+	{
+<span class="nc" id="L3051">		BigDecimal currentGold = new BigDecimal(ChannelUtilities</span>
+<span class="nc" id="L3052">			.readControlledChannel(theCharacter.getCharID(), CControl.GOLDINPUT).toString());</span>
+
+<span class="nc" id="L3054">		BigDecimal itemCost = calcItemCost(selected, purchaseQty, gearBuySellScheme);</span>
+
+<span class="nc bnc" id="L3056" title="All 4 branches missed.">		return allowDebt || (itemCost.compareTo(currentGold) &lt;= 0);</span>
+	}
+
+	private BigDecimal calcItemCost(Equipment selected, BigDecimal purchaseQty, GearBuySellScheme gearBuySellScheme)
+	{
+<span class="nc bnc" id="L3061" title="All 2 branches missed.">		if (selected == null)</span>
+		{
+<span class="nc" id="L3063">			return BigDecimal.ZERO;</span>
+		}
+
+<span class="nc bnc" id="L3066" title="All 2 branches missed.">		BigDecimal rate = purchaseQty.compareTo(BigDecimal.ZERO) &gt; 0 ? gearBuySellScheme.getBuyRate() : gearBuySellScheme.getSellRate();</span>
+<span class="nc bnc" id="L3067" title="All 4 branches missed.">		if (purchaseQty.compareTo(BigDecimal.ZERO) &lt; 0 &amp;&amp; selected.isSellAsCash())</span>
+		{
+<span class="nc" id="L3069">			rate = gearBuySellScheme.getCashSellRate();</span>
+		}
+
+<span class="nc" id="L3072">		return purchaseQty.multiply(rate)</span>
+<span class="nc" id="L3073">			.multiply(new BigDecimal(&quot;0.01&quot;))</span>
+<span class="nc" id="L3074">			.multiply(selected.getCost(theCharacter));</span>
+	}
+
+	private Equipment openCustomizer(Equipment aEq)
+	{
+<span class="nc bnc" id="L3079" title="All 2 branches missed.">		if (aEq == null)</span>
+		{
+<span class="nc" id="L3081">			return null;</span>
+		}
+
+<span class="nc" id="L3084">		Equipment newEquip = aEq.clone();</span>
+<span class="nc bnc" id="L3085" title="All 2 branches missed.">		if (!newEquip.containsKey(ObjectKey.BASE_ITEM))</span>
+		{
+<span class="nc" id="L3087">			newEquip.put(ObjectKey.BASE_ITEM, CDOMDirectSingleRef.getRef(aEq));</span>
+		}
+
+<span class="nc" id="L3090">		EquipmentBuilderFacadeImpl builder = new EquipmentBuilderFacadeImpl(newEquip, theCharacter, delegate);</span>
+<span class="nc" id="L3091">		CustomEquipResult result = delegate.showCustomEquipDialog(this, builder);</span>
+<span class="nc bnc" id="L3092" title="All 2 branches missed.">		if (result != CustomEquipResult.CANCELLED)</span>
+		{
+<span class="nc" id="L3094">			dataSet.addEquipment(newEquip);</span>
+		}
+		//TODO if this is returning null, then the SolverManager needs to destroy the unused channels :/
+<span class="nc bnc" id="L3097" title="All 2 branches missed.">		return result == CustomEquipResult.PURCHASE ? newEquip : null;</span>
+	}
+
+	@Override
+	public void removePurchasedEquipment(EquipmentFacade equipment, int quantity, boolean free)
+	{
+<span class="nc bnc" id="L3103" title="All 4 branches missed.">		if (equipment == null || quantity &lt;= 0)</span>
+		{
+<span class="nc" id="L3105">			return;</span>
+		}
+
+<span class="nc" id="L3108">		Equipment equipItemToAdjust = (Equipment) equipment;</span>
+
+<span class="nc" id="L3110">		Equipment updatedItem = theCharacter.getEquipmentNamed(equipItemToAdjust.getName());</span>
+<span class="nc" id="L3111">		double numRemoved = 0;</span>
+
+		// see if item is already in inventory; update it
+<span class="nc bnc" id="L3114" title="All 2 branches missed.">		if (updatedItem != null)</span>
+		{
+<span class="nc bnc" id="L3116" title="All 2 branches missed.">			final double prevQty = (updatedItem.qty() &lt; 0) ? 0 : updatedItem.qty();</span>
+<span class="nc" id="L3117">			numRemoved = Math.min(quantity, prevQty);</span>
+<span class="nc" id="L3118">			final double newQty = Math.max(prevQty - numRemoved, 0);</span>
+
+<span class="nc bnc" id="L3120" title="All 2 branches missed.">			if (newQty &lt;= 0)</span>
+			{
+				// completely remove item
+<span class="nc" id="L3123">				updatedItem.setNumberCarried((float) 0);</span>
+<span class="nc" id="L3124">				updatedItem.setLocation(EquipmentLocation.NOT_CARRIED);</span>
+
+<span class="nc" id="L3126">				final Equipment eqParent = updatedItem.getParent();</span>
+
+<span class="nc bnc" id="L3128" title="All 2 branches missed.">				if (eqParent != null)</span>
+				{
+<span class="nc" id="L3130">					eqParent.removeChild(theCharacter, updatedItem);</span>
+				}
+
+<span class="nc" id="L3133">				theCharacter.removeEquipment(updatedItem);</span>
+<span class="nc" id="L3134">				purchasedEquip.removeElement(updatedItem);</span>
+<span class="nc" id="L3135">			}</span>
+			else
+			{
+				// update item count
+<span class="nc" id="L3139">				theCharacter.updateEquipmentQty(updatedItem, prevQty, newQty);</span>
+<span class="nc" id="L3140">				Float qty = (float) newQty;</span>
+<span class="nc" id="L3141">				updatedItem.setQty(qty);</span>
+<span class="nc" id="L3142">				updatedItem.setNumberCarried(qty);</span>
+<span class="nc" id="L3143">				purchasedEquip.setQuantity(equipment, qty.intValue());</span>
+			}
+
+<span class="nc" id="L3146">			theCharacter.updateEquipmentQty(updatedItem, prevQty, newQty);</span>
+<span class="nc" id="L3147">			Float qty = (float) newQty;</span>
+<span class="nc" id="L3148">			updatedItem.setQty(qty);</span>
+<span class="nc" id="L3149">			updatedItem.setNumberCarried(qty);</span>
+		}
+
+		// Update the PC and equipment
+<span class="nc bnc" id="L3153" title="All 2 branches missed.">		if (!free)</span>
+		{
+<span class="nc" id="L3155">			BigDecimal removed = BigDecimal.valueOf(numRemoved);</span>
+<span class="nc" id="L3156">			BigDecimal itemCost = calcItemCost(updatedItem, removed.negate(),</span>
+<span class="nc" id="L3157">				(GearBuySellScheme) gearBuySellSchemeRef.get());</span>
+<span class="nc" id="L3158">			BigDecimal currentGold =</span>
+<span class="nc" id="L3159">					new BigDecimal(ChannelUtilities.readControlledChannel(</span>
+<span class="nc" id="L3160">						theCharacter.getCharID(), CControl.GOLDINPUT).toString());</span>
+<span class="nc" id="L3161">			ChannelUtilities.setControlledChannel(theCharacter.getCharID(),</span>
+<span class="nc" id="L3162">				CControl.GOLDINPUT, currentGold.subtract(itemCost));</span>
+		}
+<span class="nc" id="L3164">		theCharacter.setCalcEquipmentList();</span>
+<span class="nc" id="L3165">		theCharacter.setDirty(true);</span>
+<span class="nc" id="L3166">		updateWealthFields();</span>
+<span class="nc" id="L3167">	}</span>
+
+	@Override
+	public void deleteCustomEquipment(EquipmentFacade eqFacade)
+	{
+<span class="nc bnc" id="L3172" title="All 2 branches missed.">		if (!(eqFacade instanceof Equipment itemToBeDeleted))</span>
+		{
+<span class="nc" id="L3174">			return;</span>
+		}
+
+<span class="nc bnc" id="L3177" title="All 2 branches missed.">		if (!itemToBeDeleted.isType(Constants.TYPE_CUSTOM))</span>
+		{
+<span class="nc" id="L3179">			return;</span>
+		}
+
+<span class="nc bnc" id="L3182" title="All 2 branches missed.">		if (!delegate.showWarningConfirm(LanguageBundle.getString(&quot;in_igDeleteCustomWarnTitle&quot;), //$NON-NLS-1$</span>
+<span class="nc" id="L3183">			LanguageBundle.getFormattedString(&quot;in_igDeleteCustomWarning&quot;, //$NON-NLS-1$</span>
+				itemToBeDeleted)))
+		{
+<span class="nc" id="L3186">			return;</span>
+		}
+
+<span class="nc" id="L3189">		removePurchasedEquipment(itemToBeDeleted, Integer.MAX_VALUE, false);</span>
+<span class="nc" id="L3190">		Globals.getContext().getReferenceContext().forget(itemToBeDeleted);</span>
+
+<span class="nc bnc" id="L3192" title="All 2 branches missed.">		if (dataSet.getEquipment() instanceof DefaultListFacade&lt;?&gt;)</span>
+		{
+<span class="nc" id="L3194">			((DefaultListFacade&lt;EquipmentFacade&gt;) dataSet.getEquipment()).removeElement(itemToBeDeleted);</span>
+		}
+
+<span class="nc" id="L3197">	}</span>
+
+	@Override
+	public boolean isQualifiedFor(EquipmentFacade equipment)
+	{
+<span class="nc" id="L3202">		final Equipment equip = (Equipment) equipment;</span>
+<span class="nc" id="L3203">		final boolean accept = PrereqHandler.passesAll(equip, theCharacter, equip);</span>
+
+<span class="nc bnc" id="L3205" title="All 8 branches missed.">		if (accept &amp;&amp; (equip.isShield() || equip.isWeapon() || equip.isArmor()))</span>
+		{
+<span class="nc" id="L3207">			return theCharacter.isProficientWith(equip);</span>
+		}
+
+<span class="nc" id="L3210">		return accept;</span>
+	}
+
+	@Override
+	public EquipmentFacade getEquipmentSizedForCharacter(EquipmentFacade equipment)
+	{
+<span class="nc" id="L3216">		final Equipment equip = (Equipment) equipment;</span>
+<span class="nc" id="L3217">		final SizeAdjustment newSize = theCharacter.getSizeAdjustment();</span>
+<span class="nc bnc" id="L3218" title="All 4 branches missed.">		if (equip.getSizeAdjustment() == newSize || !Globals.canResizeHaveEffect(equip.typeList()))</span>
+		{
+<span class="nc" id="L3220">			return equipment;</span>
+		}
+
+<span class="nc" id="L3223">		final String existingKey = equip.getKeyName();</span>
+<span class="nc" id="L3224">		final String newKey = equip.createKeyForAutoResize(newSize);</span>
+
+		Equipment potential =
+<span class="nc" id="L3227">				Globals.getContext().getReferenceContext().silentlyGetConstructedCDOMObject(Equipment.class, newKey);</span>
+
+<span class="nc bnc" id="L3229" title="All 2 branches missed.">		if (newKey.equals(existingKey))</span>
+		{
+<span class="nc" id="L3231">			return equipment;</span>
+		}
+
+		// If we've already resized this piece of equipment to this size
+		// on a previous occasion, just substitute that piece of equipment
+		// in place of the selected equipment.
+<span class="nc bnc" id="L3237" title="All 2 branches missed.">		if (potential != null)</span>
+		{
+<span class="nc" id="L3239">			return potential;</span>
+		}
+
+<span class="nc" id="L3242">		final String newName = equip.createNameForAutoResize(newSize);</span>
+		potential =
+<span class="nc" id="L3244">				Globals.getContext().getReferenceContext().silentlyGetConstructedCDOMObject(Equipment.class, newName);</span>
+
+<span class="nc bnc" id="L3246" title="All 2 branches missed.">		if (potential != null)</span>
+		{
+<span class="nc" id="L3248">			return potential;</span>
+		}
+
+<span class="nc" id="L3251">		final Equipment newEq = equip.clone();</span>
+
+<span class="nc bnc" id="L3253" title="All 2 branches missed.">		if (!newEq.containsKey(ObjectKey.BASE_ITEM))</span>
+		{
+<span class="nc" id="L3255">			newEq.put(ObjectKey.BASE_ITEM, CDOMDirectSingleRef.getRef(equip));</span>
+		}
+
+<span class="nc" id="L3258">		newEq.setName(newName);</span>
+<span class="nc" id="L3259">		newEq.put(StringKey.OUTPUT_NAME, newName);</span>
+<span class="nc" id="L3260">		newEq.put(StringKey.KEY_NAME, newKey);</span>
+<span class="nc" id="L3261">		newEq.resizeItem(theCharacter, newSize);</span>
+<span class="nc" id="L3262">		newEq.removeType(Type.AUTO_GEN);</span>
+<span class="nc" id="L3263">		newEq.removeType(Type.STANDARD);</span>
+<span class="nc bnc" id="L3264" title="All 2 branches missed.">		if (!newEq.isType(Constants.TYPE_CUSTOM))</span>
+		{
+<span class="nc" id="L3266">			newEq.addType(Type.CUSTOM);</span>
+		}
+
+<span class="nc" id="L3269">		Globals.getContext().getReferenceContext().importObject(newEq);</span>
+
+<span class="nc" id="L3271">		return newEq;</span>
+	}
+
+	/**
+	 * Whether we should automatically resize all purchased gear to match the
+	 * character's size.
+	 * @return true if equipment should be auto resize.
+	 */
+	@Override
+	public boolean isAutoResize()
+	{
+<span class="nc" id="L3282">		return theCharacter.isAutoResize();</span>
+	}
+
+	/**
+	 * Update whether we should automatically resize all purchased gear to match
+	 * the character's size.
+	 *
+	 * @param autoResize The new value for auto resize equipment option.
+	 */
+	@Override
+	public void setAutoResize(boolean autoResize)
+	{
+<span class="nc" id="L3294">		theCharacter.setAutoResize(autoResize);</span>
+<span class="nc" id="L3295">	}</span>
+
+	@Override
+	public EquipmentSetFacade createEquipmentSet(String setName)
+	{
+<span class="nc" id="L3300">		String id = EquipmentSetFacadeImpl.getNewIdPath(charDisplay, null);</span>
+<span class="nc" id="L3301">		EquipSet eSet = new EquipSet(id, setName);</span>
+<span class="nc" id="L3302">		theCharacter.addEquipSet(eSet);</span>
+<span class="nc" id="L3303">		final EquipmentSetFacadeImpl facade =</span>
+				new EquipmentSetFacadeImpl(delegate, theCharacter, eSet, dataSet, purchasedEquip, todoManager, this);
+<span class="nc" id="L3305">		equipmentSets.addElement(facade);</span>
+
+<span class="nc" id="L3307">		return facade;</span>
+	}
+
+	@Override
+	public void deleteEquipmentSet(EquipmentSetFacade set)
+	{
+<span class="nc bnc" id="L3313" title="All 2 branches missed.">		if (!(set instanceof EquipmentSetFacadeImpl setImpl))</span>
+		{
+<span class="nc" id="L3315">			return;</span>
+		}
+<span class="nc" id="L3317">		EquipSet eSet = setImpl.getEquipSet();</span>
+
+<span class="nc" id="L3319">		theCharacter.delEquipSet(eSet);</span>
+<span class="nc" id="L3320">		equipmentSets.removeElement(set);</span>
+<span class="nc" id="L3321">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getCarriedWeightRef()
+	{
+<span class="nc" id="L3326">		return carriedWeightRef;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getLoadRef()
+	{
+<span class="nc" id="L3332">		return loadRef;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;String&gt; getWeightLimitRef()
+	{
+<span class="nc" id="L3338">		return weightLimitRef;</span>
+	}
+
+	@Override
+	public void quantityChanged(EquipmentListEvent e)
+	{
+<span class="nc" id="L3344">		refreshTotalWeight();</span>
+<span class="nc" id="L3345">	}</span>
+
+	@Override
+	public void elementAdded(ListEvent&lt;EquipmentFacade&gt; e)
+	{
+<span class="nc" id="L3350">		refreshTotalWeight();</span>
+<span class="nc" id="L3351">	}</span>
+
+	@Override
+	public void elementRemoved(ListEvent&lt;EquipmentFacade&gt; e)
+	{
+<span class="nc" id="L3356">		refreshTotalWeight();</span>
+<span class="nc" id="L3357">	}</span>
+
+	@Override
+	public void elementsChanged(ListEvent&lt;EquipmentFacade&gt; e)
+	{
+<span class="nc" id="L3362">		refreshTotalWeight();</span>
+<span class="nc" id="L3363">	}</span>
+
+	@Override
+	public void elementModified(ListEvent&lt;EquipmentFacade&gt; e)
+	{
+<span class="nc" id="L3368">		refreshTotalWeight();</span>
+<span class="nc" id="L3369">	}</span>
+
+	/**
+	 * Refreshes the total weight by reading it from the current equipment set.
+	 */
+	private void refreshTotalWeight()
+	{
+<span class="nc" id="L3376">		String weight = Globals.getGameModeUnitSet().displayWeightInUnitSet(charDisplay.totalWeight().doubleValue());</span>
+<span class="nc" id="L3377">		carriedWeightRef.set(weight);</span>
+
+<span class="nc" id="L3379">		Load load = charDisplay.getLoadType();</span>
+<span class="nc" id="L3380">		loadRef.set(CoreUtility.capitalizeFirstLetter(load.toString()));</span>
+
+<span class="nc" id="L3382">		Float mult = SettingsHandler.getGameAsProperty().get().getLoadInfo().getLoadMultiplier(load.toString());</span>
+<span class="nc" id="L3383">		double limit = 0.0f;</span>
+<span class="nc bnc" id="L3384" title="All 2 branches missed.">		if (mult != null)</span>
+		{
+<span class="nc" id="L3386">			limit = charDisplay.getLoadToken(load.toString());</span>
+		}
+<span class="nc" id="L3388">		double lowerLimit = 0.0f;</span>
+<span class="nc bnc" id="L3389" title="All 2 branches missed.">		for (Load testLoad : Load.values())</span>
+		{
+<span class="nc" id="L3391">			double testLimit = charDisplay.getLoadToken(testLoad.toString());</span>
+<span class="nc bnc" id="L3392" title="All 4 branches missed.">			if (testLoad.compareTo(load) &lt; 0 &amp;&amp; testLimit &gt; lowerLimit)</span>
+			{
+<span class="nc" id="L3394">				lowerLimit = testLimit;</span>
+			}
+		}
+<span class="nc" id="L3397">		StringBuilder loadLimit = new StringBuilder(Globals.getGameModeUnitSet().displayWeightInUnitSet(lowerLimit));</span>
+<span class="nc bnc" id="L3398" title="All 2 branches missed.">		if (limit &gt; 0)</span>
+		{
+<span class="nc" id="L3400">			loadLimit.append(&quot; - &quot;);</span>
+<span class="nc" id="L3401">			loadLimit.append(Globals.getGameModeUnitSet().displayWeightInUnitSet(limit));</span>
+		}
+		else
+		{
+<span class="nc" id="L3405">			loadLimit.append(&quot;+ &quot;);</span>
+		}
+<span class="nc" id="L3407">		loadLimit.append(Globals.getGameModeUnitSet().getWeightUnit());</span>
+<span class="nc" id="L3408">		weightLimitRef.set(loadLimit.toString());</span>
+<span class="nc" id="L3409">	}</span>
+
+	@Override
+	public void hitPointsChanged(CharacterLevelEvent e)
+	{
+<span class="nc" id="L3414">		hpRef.set(theCharacter.hitPoints());</span>
+<span class="nc" id="L3415">	}</span>
+
+	@Override
+	public InfoFactory getInfoFactory()
+	{
+<span class="nc" id="L3420">		return infoFactory;</span>
+	}
+
+	@Override
+	public boolean isQualifiedFor(InfoFacade infoFacade)
+	{
+<span class="nc bnc" id="L3426" title="All 2 branches missed.">		if (!(infoFacade instanceof PObject pObj))</span>
+		{
+<span class="nc" id="L3428">			return false;</span>
+		}
+
+<span class="nc" id="L3431">		return theCharacter.isQualified(pObj);</span>
+    }
+
+	@Override
+	public boolean isQualifiedFor(Deity aDeity)
+	{
+<span class="nc bnc" id="L3437" title="All 2 branches missed.">		if (aDeity == null)</span>
+		{
+<span class="nc" id="L3439">			return false;</span>
+		}
+<span class="nc bnc" id="L3441" title="All 4 branches missed.">		return PrereqHandler.passesAll(aDeity, theCharacter, aDeity) &amp;&amp; theCharacter.isQualified(aDeity);</span>
+	}
+
+	@Override
+	public boolean isQualifiedFor(QualifiedObject&lt;Domain&gt; wrappedDomain)
+	{
+<span class="nc" id="L3447">		Domain domain = wrappedDomain.getRawObject();</span>
+<span class="nc bnc" id="L3448" title="All 4 branches missed.">        return PrereqHandler.passesAll(wrappedDomain, theCharacter, domain) &amp;&amp; theCharacter.isQualified(domain);</span>
+    }
+
+	@Override
+	public boolean isQualifiedFor(TempBonusFacade tempBonusFacade)
+	{
+<span class="nc bnc" id="L3454" title="All 2 branches missed.">		if (!(tempBonusFacade instanceof TempBonusFacadeImpl tempBonus))</span>
+		{
+<span class="nc" id="L3456">			return false;</span>
+		}
+
+<span class="nc" id="L3459">		CDOMObject originObj = tempBonus.getOriginObj();</span>
+<span class="nc" id="L3460">        return theCharacter.isQualified(originObj);</span>
+    }
+
+	@Override
+	public boolean isQualifiedFor(SpellFacade spellFacade, PCClass pcClass)
+	{
+<span class="nc bnc" id="L3466" title="All 4 branches missed.">		if (!(spellFacade instanceof SpellFacadeImplem spellFI) || (pcClass == null))</span>
+		{
+<span class="nc" id="L3468">			return false;</span>
+		}
+
+<span class="nc bnc" id="L3471" title="All 2 branches missed.">		if (!theCharacter.isQualified(spellFI.getSpell()))</span>
+		{
+<span class="nc" id="L3473">			return false;</span>
+		}
+<span class="nc bnc" id="L3475" title="All 2 branches missed.">        return spellFI.getCharSpell().isSpecialtySpell(theCharacter)</span>
+<span class="nc bnc" id="L3476" title="All 2 branches missed.">                || !SpellCountCalc.isProhibited(spellFI.getSpell(), pcClass, theCharacter);</span>
+    }
+
+	@Override
+	public boolean isQualifiedFor(EquipmentFacade equipFacade, EquipmentModifier eqMod)
+	{
+<span class="nc bnc" id="L3482" title="All 2 branches missed.">		if (!(equipFacade instanceof Equipment equip))</span>
+		{
+<span class="nc" id="L3484">			return false;</span>
+		}
+
+		//TODO: Handle second head
+<span class="nc" id="L3488">		return equip.canAddModifier(theCharacter, eqMod, true);</span>
+	}
+
+	@Override
+	public void addTemplate(PCTemplate template)
+	{
+<span class="nc bnc" id="L3494" title="All 2 branches missed.">		if (template == null)</span>
+		{
+<span class="nc" id="L3496">			return;</span>
+		}
+
+<span class="nc bnc" id="L3499" title="All 2 branches missed.">		if (!PrereqHandler.passesAll(template, theCharacter, template))</span>
+		{
+<span class="nc" id="L3501">			return;</span>
+		}
+
+<span class="nc bnc" id="L3504" title="All 2 branches missed.">		if (!charDisplay.hasTemplate(template))</span>
+		{
+<span class="nc" id="L3506">			Logging.log(Logging.INFO, charDisplay.getName() + &quot;: Adding template &quot; + template); //$NON-NLS-1$</span>
+<span class="nc" id="L3507">			int oldLevel = charLevelsFacade.getSize();</span>
+<span class="nc bnc" id="L3508" title="All 2 branches missed.">			if (theCharacter.addTemplate(template))</span>
+			{
+<span class="nc" id="L3510">				Logging.log(</span>
+<span class="nc" id="L3511">					Logging.INFO, charDisplay.getName() + &quot;: Successful add of template &quot; + template); //$NON-NLS-1$</span>
+<span class="nc" id="L3512">				templates.addElement(template);</span>
+<span class="nc" id="L3513">				refreshRaceRelatedFields();</span>
+
+<span class="nc bnc" id="L3515" title="All 2 branches missed.">				if (oldLevel != charLevelsFacade.getSize())</span>
+				{
+<span class="nc" id="L3517">					delegate.showLevelUpInfo(this, oldLevel);</span>
+				}
+			}
+			else
+			{
+<span class="nc" id="L3522">				Logging.log(Logging.INFO, charDisplay.getName() + &quot;: Nope: Add template &quot; + template</span>
+					+ &quot; failed because no selection was made&quot;);
+			}
+<span class="nc" id="L3525">		}</span>
+		else
+		{
+<span class="nc" id="L3528">			delegate.showErrorMessage(Constants.APPLICATION_NAME, LanguageBundle.getString(&quot;in_irHaveTemplate&quot;));</span>
+		}
+<span class="nc" id="L3530">	}</span>
+
+	@Override
+	public void removeTemplate(PCTemplate template)
+	{
+<span class="nc bnc" id="L3535" title="All 2 branches missed.">		if (template == null)</span>
+		{
+<span class="nc" id="L3537">			return;</span>
+		}
+
+<span class="nc bnc" id="L3540" title="All 4 branches missed.">		if (charDisplay.hasTemplate(template) &amp;&amp; template.isRemovable())</span>
+		{
+<span class="nc" id="L3542">			theCharacter.removeTemplate(template);</span>
+<span class="nc" id="L3543">			theCharacter.calcActiveBonuses();</span>
+<span class="nc" id="L3544">			templates.removeElement(template);</span>
+		}
+		else
+		{
+<span class="nc" id="L3548">			delegate.showErrorMessage(Constants.APPLICATION_NAME, LanguageBundle.getString(&quot;in_irNotRemovable&quot;));</span>
+		}
+<span class="nc" id="L3550">	}</span>
+
+	private void refreshTemplates()
+	{
+<span class="nc" id="L3554">		Collection&lt;PCTemplate&gt; pcTemplates = charDisplay.getDisplayVisibleTemplateList();</span>
+<span class="nc bnc" id="L3555" title="All 2 branches missed.">		for (PCTemplate template : pcTemplates)</span>
+		{
+<span class="nc bnc" id="L3557" title="All 2 branches missed.">			if (!templates.containsElement(template))</span>
+			{
+<span class="nc" id="L3559">				templates.addElement(template);</span>
+			}
+<span class="nc" id="L3561">		}</span>
+<span class="nc bnc" id="L3562" title="All 2 branches missed.">		for (Iterator&lt;PCTemplate&gt; iterator = templates.iterator(); iterator.hasNext();)</span>
+		{
+<span class="nc" id="L3564">			PCTemplate pcTemplate = iterator.next();</span>
+<span class="nc bnc" id="L3565" title="All 2 branches missed.">			if (!pcTemplates.contains(pcTemplate))</span>
+			{
+<span class="nc" id="L3567">				iterator.remove();</span>
+			}
+<span class="nc" id="L3569">		}</span>
+<span class="nc" id="L3570">	}</span>
+
+	@Override
+	public ListFacade&lt;PCTemplate&gt; getTemplates()
+	{
+<span class="nc" id="L3575">		return templates;</span>
+	}
+
+	@Override
+	public SpellSupportFacade getSpellSupport()
+	{
+<span class="nc" id="L3581">		return spellSupportFacade;</span>
+	}
+
+	@Override
+	public ReferenceFacade&lt;File&gt; getPortraitRef()
+	{
+<span class="nc" id="L3587">		return portrait;</span>
+	}
+
+	@Override
+	public void setPortrait(File file)
+	{
+<span class="nc" id="L3593">		portrait.set(file);</span>
+<span class="nc bnc" id="L3594" title="All 2 branches missed.">		theCharacter.setPortraitPath(file == null ? null : file.getAbsolutePath());</span>
+<span class="nc" id="L3595">	}</span>
+
+	@Override
+	public ReferenceFacade&lt;Rectangle&gt; getThumbnailCropRef()
+	{
+<span class="nc" id="L3600">		return cropRect;</span>
+	}
+
+	@Override
+	public void setThumbnailCrop(Rectangle rect)
+	{
+<span class="nc" id="L3606">		cropRect.set(rect);</span>
+<span class="nc" id="L3607">		theCharacter.setPortraitThumbnailRect(rect);</span>
+<span class="nc" id="L3608">	}</span>
+
+	@Override
+	public boolean isDirty()
+	{
+<span class="nc" id="L3613">		return theCharacter.isDirty();</span>
+	}
+
+	@Override
+	public CompanionSupportFacade getCompanionSupport()
+	{
+<span class="nc" id="L3619">		return companionSupportFacade;</span>
+	}
+
+	@Override
+	public String getCompanionType()
+	{
+<span class="nc" id="L3625">		Follower master = charDisplay.getMaster();</span>
+<span class="nc bnc" id="L3626" title="All 2 branches missed.">		if (master != null)</span>
+		{
+<span class="nc" id="L3628">			return master.getType().getKeyName();</span>
+		}
+<span class="nc" id="L3630">		return null;</span>
+	}
+
+	@Override
+	public CharacterStubFacade getMaster()
+	{
+<span class="nc" id="L3636">		Follower master = charDisplay.getMaster();</span>
+<span class="nc bnc" id="L3637" title="All 2 branches missed.">		if (master == null)</span>
+		{
+<span class="nc" id="L3639">			return null;</span>
+		}
+<span class="nc" id="L3641">		CompanionNotLoaded stub = new CompanionNotLoaded(master.getName(), new File(master.getFileName()),</span>
+<span class="nc" id="L3642">			master.getRace(), master.getType().getKeyName());</span>
+<span class="nc" id="L3643">		CharacterFacade masterFacade = CharacterManager.getCharacterMatching(stub);</span>
+<span class="nc bnc" id="L3644" title="All 2 branches missed.">		if (masterFacade != null)</span>
+		{
+<span class="nc" id="L3646">			return masterFacade;</span>
+		}
+<span class="nc" id="L3648">		return stub;</span>
+	}
+
+	/**
+	 * Since Rectangles are modifiable we make sure that no references of the reference
+	 * object are leaked to the outside world. This guarantees that the underlying reference
+	 * object will not changed after it is set.
+	 */
+	private static class RectangleReference extends DefaultReferenceFacade&lt;Rectangle&gt;
+	{
+
+		/**
+		 * Create a new reference based on the supplied rectangle.
+		 * @param rect
+		 */
+		public RectangleReference(Rectangle rect)
+		{
+<span class="nc bnc" id="L3665" title="All 2 branches missed.">			super(rect == null ? null : (Rectangle) rect.clone());</span>
+<span class="nc" id="L3666">		}</span>
+
+		@Override
+		public Rectangle get()
+		{
+<span class="nc" id="L3671">			Rectangle rect = super.get();</span>
+<span class="nc bnc" id="L3672" title="All 2 branches missed.">			if (rect != null)</span>
+			{
+<span class="nc" id="L3674">				rect = (Rectangle) rect.clone();</span>
+			}
+<span class="nc" id="L3676">			return rect;</span>
+		}
+
+		@Override
+		public void set(Rectangle rect)
+		{
+<span class="nc" id="L3682">			Rectangle old = get();</span>
+<span class="nc bnc" id="L3683" title="All 2 branches missed.">			if (Objects.equals(old, rect))</span>
+			{
+<span class="nc" id="L3685">				return;</span>
+			}
+<span class="nc bnc" id="L3687" title="All 2 branches missed.">			if (rect != null)</span>
+			{
+<span class="nc" id="L3689">				rect = (Rectangle) rect.clone();</span>
+			}
+<span class="nc" id="L3691">			this.object = rect;</span>
+<span class="nc bnc" id="L3692" title="All 2 branches missed.">			if (rect != null)</span>
+			{
+<span class="nc" id="L3694">				rect = (Rectangle) rect.clone();</span>
+			}
+<span class="nc" id="L3696">			fireReferenceChangedEvent(this, old, rect);</span>
+<span class="nc" id="L3697">		}</span>
+
+	}
+
+	@Override
+	public DefaultListFacade&lt;Kit&gt; getKits()
+	{
+<span class="nc" id="L3704">		return kitList;</span>
+	}
+
+	@Override
+	public void addKit(Kit kit)
+	{
+<span class="nc bnc" id="L3710" title="All 2 branches missed.">		if (kit == null)</span>
+		{
+<span class="nc" id="L3712">			return;</span>
+		}
+
+<span class="nc bnc" id="L3715" title="All 2 branches missed.">		if (!theCharacter.isQualified(kit))</span>
+		{
+<span class="nc" id="L3717">			return;</span>
+		}
+
+<span class="nc" id="L3720">		Logging.log(Logging.INFO, charDisplay.getName() + &quot;: Testing kit &quot; + kit); //$NON-NLS-1$</span>
+<span class="nc" id="L3721">		List&lt;BaseKit&gt; thingsToAdd = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L3722">		List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L3723">		kit.testApplyKit(theCharacter, thingsToAdd, warnings);</span>
+
+		//
+		// See if user wants to apply the kit even though there were errors
+		//
+
+<span class="nc bnc" id="L3729" title="All 2 branches missed.">		if (!showKitWarnings(kit, warnings))</span>
+		{
+<span class="nc" id="L3731">			return;</span>
+		}
+
+		// The user is applying the kit so use the real PC now.
+<span class="nc" id="L3735">		Logging.log(Logging.INFO, charDisplay.getName() + &quot;: Adding kit &quot; + kit); //$NON-NLS-1$</span>
+<span class="nc" id="L3736">		kit.processKit(theCharacter, thingsToAdd);</span>
+<span class="nc" id="L3737">		kitList.addElement(kit);</span>
+
+		// Kits can upate most things so do a thorough refresh
+<span class="nc" id="L3740">		race.set(charDisplay.getRace());</span>
+<span class="nc" id="L3741">		refreshRaceRelatedFields();</span>
+<span class="nc" id="L3742">		name.set(charDisplay.getName());</span>
+
+		// Deity and domains
+<span class="nc" id="L3745">		buildAvailableDomainsList();</span>
+
+<span class="nc" id="L3747">		refreshStatScores();</span>
+<span class="nc" id="L3748">	}</span>
+
+	private void refreshEquipment()
+	{
+<span class="nc" id="L3752">		wealthRef.set(theCharacter.totalValue());</span>
+
+<span class="nc" id="L3754">		purchasedEquip.refresh(theCharacter.getEquipmentMasterList());</span>
+<span class="nc" id="L3755">		initEquipSet();</span>
+<span class="nc" id="L3756">	}</span>
+
+	/**
+	 * Show the user any warnings from thekit application and get
+	 * their approval to continue.
+	 *
+	 * @param kit The kit being applied.
+	 * @param warnings The warnings generated in the test application.
+	 * @return true if the kit should be applied, false if not.
+	 */
+	private boolean showKitWarnings(Kit kit, List&lt;String&gt; warnings)
+	{
+<span class="nc bnc" id="L3768" title="All 2 branches missed.">		if (warnings.isEmpty())</span>
+		{
+<span class="nc" id="L3770">			return true;</span>
+		}
+
+<span class="nc" id="L3773">		StringBuilder warningMsg = new StringBuilder();</span>
+
+<span class="nc" id="L3775">		warningMsg.append(LanguageBundle.getString(&quot;in_kitWarnStart&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L3776">		warningMsg.append('\n');</span>
+<span class="nc bnc" id="L3777" title="All 2 branches missed.">		for (String string : warnings)</span>
+		{
+<span class="nc" id="L3779">			warningMsg.append('\n');</span>
+<span class="nc" id="L3780">			warningMsg.append(string);</span>
+<span class="nc" id="L3781">		}</span>
+<span class="nc" id="L3782">		warningMsg.append('\n');</span>
+<span class="nc" id="L3783">		warningMsg.append(LanguageBundle.getString(&quot;in_kitWarnEnd&quot;)); //$NON-NLS-1$</span>
+
+<span class="nc" id="L3785">		return delegate.showWarningConfirm(kit.getDisplayName(), warningMsg.toString());</span>
+	}
+
+	@Override
+	public List&lt;Kit&gt; getAvailableKits()
+	{
+<span class="nc" id="L3791">		List&lt;Kit&gt; kits = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L3792" title="All 2 branches missed.">		for (Kit kit : dataSet.getKits())</span>
+		{
+<span class="nc bnc" id="L3794" title="All 2 branches missed.">			if (kit == null)</span>
+			{
+<span class="nc" id="L3796">				continue;</span>
+			}
+
+<span class="nc bnc" id="L3799" title="All 2 branches missed.">			if (kit.isVisible(theCharacter, View.VISIBLE_DISPLAY))</span>
+			{
+<span class="nc" id="L3801">				kits.add(kit);</span>
+			}
+
+<span class="nc" id="L3804">		}</span>
+
+<span class="nc" id="L3806">		return kits;</span>
+	}
+
+	@Override
+	public VariableProcessor getVariableProcessor()
+	{
+<span class="nc" id="L3812">		return theCharacter.getVariableProcessor();</span>
+	}
+
+	@Override
+	public Float getVariable(String variableString, boolean isMax)
+	{
+<span class="nc" id="L3818">		return theCharacter.getVariable(variableString, isMax);</span>
+	}
+
+	@Override
+	public boolean matchesCharacter(PlayerCharacter pc)
+	{
+<span class="nc bnc" id="L3824" title="All 4 branches missed.">		return theCharacter != null &amp;&amp; theCharacter.equals(pc);</span>
+	}
+
+	@Override
+	public void modifyCharges(List&lt;EquipmentFacade&gt; targets)
+	{
+<span class="nc" id="L3830">		List&lt;Equipment&gt; chargedEquip = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L3831" title="All 2 branches missed.">		for (EquipmentFacade equipmentFacade : targets)</span>
+		{
+<span class="nc bnc" id="L3833" title="All 4 branches missed.">			if (equipmentFacade instanceof Equipment equipment &amp;&amp; equipment.getMaxCharges() &gt; 0)</span>
+			{
+<span class="nc" id="L3835">				chargedEquip.add(equipment);</span>
+			}
+<span class="nc" id="L3837">		}</span>
+
+<span class="nc bnc" id="L3839" title="All 2 branches missed.">		if (chargedEquip.isEmpty())</span>
+		{
+<span class="nc" id="L3841">			return;</span>
+		}
+
+<span class="nc bnc" id="L3844" title="All 2 branches missed.">		for (Equipment equip : chargedEquip)</span>
+		{
+<span class="nc" id="L3846">			int selectedCharges = getSelectedCharges(equip);</span>
+<span class="nc bnc" id="L3847" title="All 2 branches missed.">			if (selectedCharges &lt; 0)</span>
+			{
+<span class="nc" id="L3849">				return;</span>
+			}
+<span class="nc" id="L3851">			equip.setRemainingCharges(selectedCharges);</span>
+<span class="nc" id="L3852">			purchasedEquip.modifyElement(equip);</span>
+<span class="nc" id="L3853">		}</span>
+<span class="nc" id="L3854">	}</span>
+
+	private int getSelectedCharges(Equipment equip)
+	{
+<span class="nc" id="L3858">		int minCharges = equip.getMinCharges();</span>
+<span class="nc" id="L3859">		int maxCharges = equip.getMaxCharges();</span>
+
+<span class="nc" id="L3861">		Optional&lt;String&gt; selectedValue = delegate.showInputDialog(equip.toString(),</span>
+<span class="nc" id="L3862">			LanguageBundle.getFormattedString(&quot;in_igNumCharges&quot;, //$NON-NLS-1$</span>
+<span class="nc" id="L3863">				Integer.toString(minCharges), Integer.toString(maxCharges)),</span>
+<span class="nc" id="L3864">			Integer.toString(equip.getRemainingCharges()));</span>
+
+<span class="nc bnc" id="L3866" title="All 2 branches missed.">		if (selectedValue.isEmpty())</span>
+		{
+<span class="nc" id="L3868">			return -1;</span>
+		}
+
+		int charges;
+		try
+		{
+<span class="nc" id="L3874">			charges = Integer.parseInt(selectedValue.get().trim());</span>
+		}
+<span class="nc" id="L3876">		catch (NumberFormatException e)</span>
+		{
+<span class="nc" id="L3878">			charges = minCharges - 1;</span>
+<span class="nc" id="L3879">		}</span>
+<span class="nc bnc" id="L3880" title="All 4 branches missed.">		if ((charges &lt; minCharges) || (charges &gt; maxCharges))</span>
+		{
+<span class="nc" id="L3882">			ShowMessageDelegate.showMessageDialog(LanguageBundle.getString(&quot;in_igValueOutOfRange&quot;),</span>
+				Constants.APPLICATION_NAME, MessageType.ERROR);
+<span class="nc" id="L3884">			return getSelectedCharges(equip);</span>
+		}
+
+<span class="nc" id="L3887">		return charges;</span>
+	}
+
+	@Override
+	public void addNote(List&lt;EquipmentFacade&gt; targets)
+	{
+<span class="nc" id="L3893">		List&lt;Equipment&gt; notedEquip = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L3894" title="All 2 branches missed.">		for (EquipmentFacade equipmentFacade : targets)</span>
+		{
+<span class="nc bnc" id="L3896" title="All 2 branches missed.">			if (equipmentFacade instanceof Equipment equipment)</span>
+			{
+<span class="nc" id="L3898">				notedEquip.add(equipment);</span>
+			}
+<span class="nc" id="L3900">		}</span>
+
+<span class="nc bnc" id="L3902" title="All 2 branches missed.">		if (notedEquip.isEmpty())</span>
+		{
+<span class="nc" id="L3904">			return;</span>
+		}
+
+<span class="nc bnc" id="L3907" title="All 2 branches missed.">		for (Equipment equip : notedEquip)</span>
+		{
+<span class="nc" id="L3909">			Optional&lt;String&gt; note = getNote(equip);</span>
+<span class="nc bnc" id="L3910" title="All 2 branches missed.">			if (note.isEmpty())</span>
+			{
+<span class="nc" id="L3912">				return;</span>
+			}
+<span class="nc" id="L3914">			equip.setNote(note.get());</span>
+<span class="nc" id="L3915">			purchasedEquip.modifyElement(equip);</span>
+<span class="nc" id="L3916">		}</span>
+<span class="nc" id="L3917">	}</span>
+
+	private Optional&lt;String&gt; getNote(Equipment equip)
+	{
+
+<span class="nc" id="L3922">		return delegate.showInputDialog(equip.toString(),</span>
+<span class="nc" id="L3923">			LanguageBundle.getFormattedString(&quot;in_igEnterNote&quot;), //$NON-NLS-1$</span>
+<span class="nc" id="L3924">			equip.getNote());</span>
+	}
+
+	/**
+	 * The Class {@code LanguageListener} tracks adding and removal of
+	 * languages to the character.
+	 */
+<span class="nc" id="L3931">	public class LanguageListener implements DataFacetChangeListener&lt;CharID, Language&gt;</span>
+	{
+		@Override
+		public void dataAdded(DataFacetChangeEvent&lt;CharID, Language&gt; dfce)
+		{
+<span class="nc bnc" id="L3936" title="All 2 branches missed.">			if (dfce.getCharID() != theCharacter.getCharID())</span>
+			{
+<span class="nc" id="L3938">				return;</span>
+			}
+<span class="nc" id="L3940">			refreshLanguageList();</span>
+<span class="nc" id="L3941">		}</span>
+
+		@Override
+		public void dataRemoved(DataFacetChangeEvent&lt;CharID, Language&gt; dfce)
+		{
+<span class="nc bnc" id="L3946" title="All 2 branches missed.">			if (dfce.getCharID() != theCharacter.getCharID())</span>
+			{
+<span class="nc" id="L3948">				return;</span>
+			}
+<span class="nc" id="L3950">			refreshLanguageList();</span>
+<span class="nc" id="L3951">		}</span>
+
+	}
+
+	/**
+	 * The Class {@code TemplateListener} tracks adding and removal of
+	 * templates to the character.
+	 */
+<span class="nc" id="L3959">	public class TemplateListener implements DataFacetChangeListener&lt;CharID, PCTemplate&gt;</span>
+	{
+		@Override
+		public void dataAdded(DataFacetChangeEvent&lt;CharID, PCTemplate&gt; dfce)
+		{
+<span class="nc bnc" id="L3964" title="All 2 branches missed.">			if (dfce.getCharID() != theCharacter.getCharID())</span>
+			{
+<span class="nc" id="L3966">				return;</span>
+			}
+<span class="nc" id="L3968">			refreshTemplates();</span>
+<span class="nc" id="L3969">		}</span>
+
+		@Override
+		public void dataRemoved(DataFacetChangeEvent&lt;CharID, PCTemplate&gt; dfce)
+		{
+<span class="nc bnc" id="L3974" title="All 2 branches missed.">			if (dfce.getCharID() != theCharacter.getCharID())</span>
+			{
+<span class="nc" id="L3976">				return;</span>
+			}
+<span class="nc" id="L3978">			refreshTemplates();</span>
+<span class="nc" id="L3979">		}</span>
+
+	}
+
+	/**
+	 * The Class {@code XPListener} tracks changes to the character's experience value.
+	 */
+<span class="nc" id="L3986">	public class XPListener implements DataFacetChangeListener&lt;CharID, Integer&gt;</span>
+	{
+		@Override
+		public void dataAdded(DataFacetChangeEvent&lt;CharID, Integer&gt; dfce)
+		{
+<span class="nc bnc" id="L3991" title="All 2 branches missed.">			if (dfce.getCharID() != theCharacter.getCharID())</span>
+			{
+<span class="nc" id="L3993">				return;</span>
+			}
+<span class="nc" id="L3995">			checkForNewLevel();</span>
+<span class="nc" id="L3996">		}</span>
+
+		@Override
+		public void dataRemoved(DataFacetChangeEvent&lt;CharID, Integer&gt; dfce)
+		{
+			// Ignored - we will always get the added message.
+<span class="nc" id="L4002">		}</span>
+
+	}
+
+	/**
+	 * The Class {@code AutoEquipListener} tracks changes to the character's
+	 * automatically granted equipment.
+	 */
+<span class="nc" id="L4010">	public class AutoEquipListener implements DataFacetChangeListener&lt;CharID, QualifiedObject&lt;CDOMReference&lt;Equipment&gt;&gt;&gt;</span>
+	{
+		@Override
+		public void dataAdded(DataFacetChangeEvent&lt;CharID, QualifiedObject&lt;CDOMReference&lt;Equipment&gt;&gt;&gt; dfce)
+		{
+<span class="nc bnc" id="L4015" title="All 2 branches missed.">			if (dfce.getCharID() != theCharacter.getCharID())</span>
+			{
+<span class="nc" id="L4017">				return;</span>
+			}
+<span class="nc" id="L4019">			refreshEquipment();</span>
+<span class="nc" id="L4020">		}</span>
+
+		@Override
+		public void dataRemoved(DataFacetChangeEvent&lt;CharID, QualifiedObject&lt;CDOMReference&lt;Equipment&gt;&gt;&gt; dfce)
+		{
+<span class="nc bnc" id="L4025" title="All 2 branches missed.">			if (dfce.getCharID() != theCharacter.getCharID())</span>
+			{
+<span class="nc" id="L4027">				return;</span>
+			}
+<span class="nc" id="L4029">			refreshEquipment();</span>
+<span class="nc" id="L4030">		}</span>
+
+	}
+
+	@Override
+	public List&lt;CoreViewNodeFacade&gt; getCoreViewTree(CorePerspective pers)
+	{
+<span class="nc" id="L4037">		return CoreUtils.buildCoreDebugList(theCharacter, pers);</span>
+	}
+
+	@Override
+	public CharID getCharID()
+	{
+<span class="nc" id="L4043">		return theCharacter.getCharID();</span>
+	}
+
+	@Override
+	public boolean isQualifiedFor(PCTemplate template)
+	{
+<span class="nc bnc" id="L4049" title="All 2 branches missed.">		if (template == null)</span>
+		{
+<span class="nc" id="L4051">			return false;</span>
+		}
+<span class="nc bnc" id="L4053" title="All 2 branches missed.">		return PrereqHandler.passesAll(template, theCharacter, template)</span>
+<span class="nc bnc" id="L4054" title="All 2 branches missed.">			&amp;&amp; theCharacter.isQualified(template);</span>
+	}
+
+	@Override
+	public boolean isQualifiedFor(Race qRace)
+	{
+<span class="nc" id="L4060">		return theCharacter.isQualified(qRace);</span>
+	}
+
+	@Override
+	public boolean isQualifiedFor(Kit kit)
+	{
+<span class="nc" id="L4066">		BigDecimal totalCost = kit.getTotalCostToBeCharged(theCharacter);</span>
+<span class="nc bnc" id="L4067" title="All 2 branches missed.">		if (totalCost != null)</span>
+		{
+<span class="nc" id="L4069">			BigDecimal currentGold = new BigDecimal(ChannelUtilities</span>
+<span class="nc" id="L4070">				.readControlledChannel(theCharacter.getCharID(), CControl.GOLDINPUT).toString());</span>
+<span class="nc bnc" id="L4071" title="All 2 branches missed.">			return currentGold.compareTo(totalCost) &gt;= 0;</span>
+		}
+<span class="nc" id="L4073">		return true;</span>
+	}
+
+	@Override
+	public boolean isFeatureEnabled(String feature)
+	{
+<span class="nc" id="L4079">		return theCharacter.isFeatureEnabled(feature);</span>
+	}
+
+	@Override
+	public String getPreviewSheetVar(String key)
+	{
+<span class="nc" id="L4085">		return theCharacter.getPreviewSheetVar(key);</span>
+	}
+
+	@Override
+	public void addPreviewSheetVar(final String key, final String value)
+	{
+<span class="nc" id="L4091">		theCharacter.addPreviewSheetVar(key, value);</span>
+<span class="nc" id="L4092">	}</span>
+
+	@Override
+	public String toString()
+	{
+<span class="nc" id="L4097">		return this.name.toString();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LanguageChooserDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui2.dialog</a> &gt; <span class="el_source">LanguageChooserDialog.java</span></div><h1>LanguageChooserDialog.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2010 Connor Petty &lt;cpmeister@users.sourceforge.net&gt;
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * 
+ */
+package pcgen.gui2.dialog;
+
+import java.awt.BorderLayout;
+import java.awt.Container;
+import java.awt.Frame;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.ListSelectionModel;
+import javax.swing.WindowConstants;
+
+import pcgen.core.Language;
+import pcgen.facade.core.LanguageChooserFacade;
+import pcgen.facade.util.DefaultListFacade;
+import pcgen.facade.util.DelegatingListFacade;
+import pcgen.facade.util.ListFacade;
+import pcgen.facade.util.event.ReferenceEvent;
+import pcgen.facade.util.event.ReferenceListener;
+import pcgen.gui2.tools.Icons;
+import pcgen.gui2.tools.Utility;
+import pcgen.gui2.util.FacadeListModel;
+import pcgen.gui2.util.JListEx;
+import pcgen.gui2.util.JTreeViewTable;
+import pcgen.gui2.util.treeview.DataView;
+import pcgen.gui2.util.treeview.DataViewColumn;
+import pcgen.gui2.util.treeview.TreeView;
+import pcgen.gui2.util.treeview.TreeViewModel;
+import pcgen.gui2.util.treeview.TreeViewPath;
+import pcgen.gui3.GuiUtility;
+import pcgen.gui3.component.OKCloseButtonBar;
+import pcgen.system.LanguageBundle;
+
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.image.ImageView;
+
+public final class LanguageChooserDialog extends JDialog implements ReferenceListener&lt;Integer&gt;
+{
+
+	private final LanguageChooserFacade chooser;
+	private final JTreeViewTable&lt;Language&gt; availTable;
+	private final JLabel remainingLabel;
+	private final LangTreeViewModel treeViewModel;
+	private final FacadeListModel&lt;Language&gt; listModel;
+	private final JListEx&lt;Language&gt; list;
+
+	public LanguageChooserDialog(Frame frame, LanguageChooserFacade chooser)
+	{
+<span class="nc" id="L80">		super(frame, true);</span>
+<span class="nc" id="L81">		this.chooser = chooser;</span>
+<span class="nc" id="L82">		this.availTable = new JTreeViewTable&lt;&gt;();</span>
+<span class="nc" id="L83">		this.remainingLabel = new JLabel();</span>
+<span class="nc" id="L84">		this.treeViewModel = new LangTreeViewModel();</span>
+<span class="nc" id="L85">		this.list = new JListEx&lt;&gt;();</span>
+<span class="nc" id="L86">		this.listModel = new FacadeListModel&lt;&gt;();</span>
+
+<span class="nc" id="L88">		treeViewModel.setDelegate(chooser.getAvailableList());</span>
+<span class="nc" id="L89">		listModel.setListFacade(chooser.getSelectedList());</span>
+<span class="nc" id="L90">		chooser.getRemainingSelections().addReferenceListener(this);</span>
+<span class="nc" id="L91">		initComponents();</span>
+<span class="nc" id="L92">		pack();</span>
+<span class="nc" id="L93">		Utility.installEscapeCloseOperation(this);</span>
+<span class="nc" id="L94">	}</span>
+
+	private void initComponents()
+	{
+<span class="nc" id="L98">		setTitle(chooser.getName());</span>
+<span class="nc" id="L99">		setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);</span>
+<span class="nc" id="L100">		addWindowListener(new WindowAdapter()</span>
+<span class="nc" id="L101">		{</span>
+
+			@Override
+			public void windowClosed(WindowEvent e)
+			{
+				//detach listeners from the chooser
+<span class="nc" id="L107">				treeViewModel.setDelegate(null);</span>
+<span class="nc" id="L108">				listModel.setListFacade(null);</span>
+<span class="nc" id="L109">				chooser.getRemainingSelections().removeReferenceListener(LanguageChooserDialog.this);</span>
+<span class="nc" id="L110">			}</span>
+
+		});
+<span class="nc" id="L113">		Container pane = getContentPane();</span>
+<span class="nc" id="L114">		pane.setLayout(new BorderLayout());</span>
+
+<span class="nc" id="L116">		JSplitPane split = new JSplitPane();</span>
+<span class="nc" id="L117">		JPanel leftPane = new JPanel(new BorderLayout());</span>
+		//leftPane.add(new JLabel(&quot;Available Languages&quot;), BorderLayout.NORTH);
+<span class="nc" id="L119">		availTable.setAutoCreateRowSorter(true);</span>
+<span class="nc" id="L120">		availTable.setTreeViewModel(treeViewModel);</span>
+<span class="nc" id="L121">		availTable.getRowSorter().toggleSortOrder(0);</span>
+<span class="nc" id="L122">		availTable.addActionListener(new DoubleClickActionListener());</span>
+<span class="nc" id="L123">		leftPane.add(new JScrollPane(availTable), BorderLayout.CENTER);</span>
+
+<span class="nc" id="L125">		Button addButton = new Button(LanguageBundle.getString(&quot;in_sumLangAddLanguage&quot;));</span>
+<span class="nc" id="L126">		addButton.setOnAction(this::doAdd);</span>
+<span class="nc" id="L127">		addButton.setGraphic(new ImageView(Icons.Forward16.asJavaFX()));</span>
+<span class="nc" id="L128">		leftPane.add(GuiUtility.wrapParentAsJFXPanel(addButton), BorderLayout.PAGE_END);</span>
+
+<span class="nc" id="L130">		split.setLeftComponent(leftPane);</span>
+
+<span class="nc" id="L132">		JPanel rightPane = new JPanel(new BorderLayout());</span>
+<span class="nc" id="L133">		JPanel labelPane = new JPanel(new GridBagLayout());</span>
+
+<span class="nc" id="L135">		GridBagConstraints gbc = new GridBagConstraints();</span>
+<span class="nc" id="L136">		gbc.gridwidth = GridBagConstraints.REMAINDER;</span>
+<span class="nc" id="L137">		labelPane.add(new JLabel(LanguageBundle.getString(&quot;in_sumLangRemain&quot;)), //$NON-NLS-1$</span>
+			new GridBagConstraints());
+<span class="nc" id="L139">		remainingLabel.setText(chooser.getRemainingSelections().get().toString());</span>
+<span class="nc" id="L140">		labelPane.add(remainingLabel, gbc);</span>
+<span class="nc" id="L141">		labelPane.add(new JLabel(LanguageBundle.getString(&quot;in_sumSelectedLang&quot;)), gbc); //$NON-NLS-1$</span>
+<span class="nc" id="L142">		rightPane.add(labelPane, BorderLayout.PAGE_START);</span>
+
+<span class="nc" id="L144">		list.setModel(listModel);</span>
+<span class="nc" id="L145">		list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);</span>
+<span class="nc" id="L146">		list.addActionListener(new DoubleClickActionListener());</span>
+<span class="nc" id="L147">		rightPane.add(new JScrollPane(list), BorderLayout.CENTER);</span>
+
+<span class="nc" id="L149">		Button removeButton = new Button(LanguageBundle.getString(&quot;in_sumLangRemoveLanguage&quot;));</span>
+<span class="nc" id="L150">		removeButton.setOnAction(this::doRemove);</span>
+<span class="nc" id="L151">		removeButton.setGraphic(new ImageView(Icons.Back16.asJavaFX()));</span>
+<span class="nc" id="L152">		rightPane.add(GuiUtility.wrapParentAsJFXPanel(removeButton), BorderLayout.PAGE_END);</span>
+
+<span class="nc" id="L154">		split.setRightComponent(rightPane);</span>
+<span class="nc" id="L155">		pane.add(split, BorderLayout.CENTER);</span>
+<span class="nc" id="L156">		ButtonBar buttonBar = new OKCloseButtonBar(</span>
+				this::doOK,
+				this::doRollback
+		);
+<span class="nc" id="L160">		pane.add(GuiUtility.wrapParentAsJFXPanel(buttonBar), BorderLayout.PAGE_END);</span>
+<span class="nc" id="L161">	}</span>
+
+	@Override
+	public void referenceChanged(ReferenceEvent&lt;Integer&gt; e)
+	{
+<span class="nc" id="L166">		remainingLabel.setText(e.getNewReference().toString());</span>
+<span class="nc" id="L167">	}</span>
+
+	private void doAdd(final javafx.event.ActionEvent actionEvent)
+	{
+<span class="nc" id="L171">		List&lt;Object&gt; data = availTable.getSelectedData();</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">		if (!data.isEmpty())</span>
+		{
+<span class="nc" id="L174">			data.stream()</span>
+<span class="nc" id="L175">			    .filter(object -&gt; object instanceof Language)</span>
+<span class="nc" id="L176">			    .map(object -&gt; (Language) object)</span>
+<span class="nc" id="L177">			    .forEach(chooser::addSelected);</span>
+		}
+<span class="nc" id="L179">	}</span>
+
+	private void doRemove(final javafx.event.ActionEvent actionEvent)
+	{
+<span class="nc" id="L183">		Object value = list.getSelectedValue();</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">		if (value != null)</span>
+		{
+<span class="nc" id="L186">			chooser.removeSelected((Language) value);</span>
+		}
+<span class="nc" id="L188">	}</span>
+
+	private void doOK(final javafx.event.ActionEvent actionEvent)
+	{
+<span class="nc" id="L192">		chooser.commit();</span>
+<span class="nc" id="L193">		dispose();</span>
+<span class="nc" id="L194">	}</span>
+
+	private void doRollback(final javafx.event.ActionEvent actionEvent)
+	{
+<span class="nc" id="L198">		chooser.rollback();</span>
+<span class="nc" id="L199">		dispose();</span>
+<span class="nc" id="L200">	}</span>
+
+
+<span class="nc" id="L203">	private class DoubleClickActionListener implements ActionListener</span>
+	{
+		@Override
+		public void actionPerformed(ActionEvent e)
+		{
+<span class="nc bnc" id="L208" title="All 2 branches missed.">			if (e.getSource() == availTable)</span>
+			{
+<span class="nc" id="L210">				doAdd(null);</span>
+			}
+<span class="nc bnc" id="L212" title="All 2 branches missed.">			else if (e.getSource() == list)</span>
+			{
+<span class="nc" id="L214">				doRemove(null);</span>
+			}
+<span class="nc" id="L216">		}</span>
+	}
+
+	private static class LangTreeViewModel extends DelegatingListFacade&lt;Language&gt;
+			implements TreeViewModel&lt;Language&gt;, DataView&lt;Language&gt;//, TreeView&lt;LanguageFacade&gt;
+	{
+<span class="nc" id="L222">		private static final ListFacade&lt;TreeView&lt;Language&gt;&gt; VIEWS =</span>
+<span class="nc" id="L223">				new DefaultListFacade&lt;&gt;(Arrays.asList(LanguageTreeView.values()));</span>
+
+		@Override
+		public ListFacade&lt;? extends TreeView&lt;Language&gt;&gt; getTreeViews()
+		{
+<span class="nc" id="L228">			return VIEWS;</span>
+		}
+
+		@Override
+		public int getDefaultTreeViewIndex()
+		{
+<span class="nc" id="L234">			return 0;</span>
+		}
+
+		@Override
+		public DataView&lt;Language&gt; getDataView()
+		{
+<span class="nc" id="L240">			return this;</span>
+		}
+
+		@Override
+		public ListFacade&lt;Language&gt; getDataModel()
+		{
+<span class="nc" id="L246">			return this;</span>
+		}
+
+		@Override
+		public Object getData(Language element, int column)
+		{
+<span class="nc" id="L252">			return null;</span>
+		}
+
+		@Override
+		public void setData(Object value, Language element, int column)
+		{
+<span class="nc" id="L258">		}</span>
+
+		@Override
+		public List&lt;? extends DataViewColumn&gt; getDataColumns()
+		{
+<span class="nc" id="L263">			return Collections.emptyList();</span>
+		}
+
+		@Override
+		public String getPrefsKey()
+		{
+<span class="nc" id="L269">			return LanguageBundle.getString(&quot;in_sumLangAvailable&quot;); //$NON-NLS-1$;</span>
+		}
+
+	}
+
+<span class="nc" id="L274">	private enum LanguageTreeView implements TreeView&lt;Language&gt;</span>
+	{
+<span class="nc" id="L276">		NAME(&quot;in_nameLabel&quot;), //$NON-NLS-1$</span>
+<span class="nc" id="L277">		TYPE_NAME(&quot;in_typeName&quot;); //$NON-NLS-1$</span>
+
+		private final String name;
+
+		private LanguageTreeView(String name)
+<span class="nc" id="L282">		{</span>
+<span class="nc" id="L283">			this.name = LanguageBundle.getString(name);</span>
+<span class="nc" id="L284">		}</span>
+
+		@Override
+		public String getViewName()
+		{
+<span class="nc" id="L289">			return name;</span>
+		}
+
+		@Override
+		public List&lt;TreeViewPath&lt;Language&gt;&gt; getPaths(Language pobj)
+		{
+<span class="nc bnc" id="L295" title="All 3 branches missed.">			return switch (this)</span>
+					{
+<span class="nc" id="L297">						case NAME -&gt; Collections.singletonList(new TreeViewPath&lt;&gt;(pobj));</span>
+<span class="nc" id="L298">						case TYPE_NAME -&gt; pobj.getTrueTypeList(false)</span>
+<span class="nc" id="L299">						                      .stream()</span>
+<span class="nc" id="L300">						                      .map(pcgen.cdom.enumeration.Type::toString)</span>
+<span class="nc" id="L301">						                      .map(type -&gt; new TreeViewPath&lt;&gt;(pobj, type))</span>
+<span class="nc" id="L302">						                      .collect(Collectors.toUnmodifiableList());</span>
+<span class="nc" id="L303">						default -&gt; throw new InternalError();</span>
+					};
+		}
+
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

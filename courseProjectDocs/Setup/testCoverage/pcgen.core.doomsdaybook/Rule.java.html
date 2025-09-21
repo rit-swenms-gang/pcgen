@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Rule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.core.doomsdaybook</a> &gt; <span class="el_source">Rule.java</span></div><h1>Rule.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2003 (C) Devon Jones
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.core.doomsdaybook;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import pcgen.util.Logging;
+
+public class Rule extends ArrayList&lt;String&gt; implements DataElement
+{
+<span class="nc" id="L27">	private final List&lt;DataValue&gt; retList = new ArrayList&lt;&gt;();</span>
+	private String id;
+	private String title;
+	private final VariableHashMap allVars;
+	private int weight;
+
+	public Rule(VariableHashMap allVars, String title, String id, int weight)
+<span class="nc" id="L34">	{</span>
+<span class="nc" id="L35">		this.allVars = allVars;</span>
+<span class="nc" id="L36">		this.title = title;</span>
+<span class="nc" id="L37">		this.id = id;</span>
+<span class="nc" id="L38">		this.weight = weight;</span>
+<span class="nc" id="L39">	}</span>
+
+	@Override
+	public List&lt;DataValue&gt; getData() throws Exception
+	{
+<span class="nc" id="L44">		retList.clear();</span>
+
+<span class="nc bnc" id="L46" title="All 2 branches missed.">		for (String key : this)</span>
+		{
+<span class="nc" id="L48">			DataElement ele = allVars.getDataElement(key);</span>
+<span class="nc" id="L49">			retList.addAll(ele.getData());</span>
+<span class="nc" id="L50">		}</span>
+
+<span class="nc" id="L52">		return retList;</span>
+	}
+
+	public void setId(String id)
+	{
+<span class="nc" id="L57">		this.id = id;</span>
+<span class="nc" id="L58">	}</span>
+
+	@Override
+	public String getId()
+	{
+<span class="nc" id="L63">		return id;</span>
+	}
+
+	@Override
+	public List&lt;DataValue&gt; getLastData() throws Exception
+	{
+<span class="nc" id="L69">		retList.clear();</span>
+
+<span class="nc bnc" id="L71" title="All 2 branches missed.">		for (String key : this)</span>
+		{
+<span class="nc" id="L73">			DataElement ele = allVars.getDataElement(key);</span>
+<span class="nc" id="L74">			retList.addAll(ele.getLastData());</span>
+<span class="nc" id="L75">		}</span>
+
+<span class="nc" id="L77">		return retList;</span>
+	}
+
+	public void setTitle(String title)
+	{
+<span class="nc" id="L82">		this.title = title;</span>
+<span class="nc" id="L83">	}</span>
+
+	@Override
+	public String getTitle()
+	{
+<span class="nc" id="L88">		return title;</span>
+	}
+
+	public void setWeight(int weight)
+	{
+<span class="nc" id="L93">		this.weight = weight;</span>
+<span class="nc" id="L94">	}</span>
+
+	@Override
+	public int getWeight()
+	{
+<span class="nc" id="L99">		return weight;</span>
+	}
+
+	@Override
+	public String toString()
+	{
+<span class="nc" id="L105">		StringBuilder sb = new StringBuilder();</span>
+
+<span class="nc bnc" id="L107" title="All 2 branches missed.">		for (String key : this)</span>
+		{
+			try
+			{
+<span class="nc" id="L111">				DataElement ele = allVars.getDataElement(key);</span>
+
+<span class="nc bnc" id="L113" title="All 2 branches missed.">				if (ele.getTitle() != null)</span>
+				{
+<span class="nc" id="L115">					sb.append(&quot;[&quot;).append(ele.getTitle()).append(&quot;] &quot;);</span>
+				}
+			}
+<span class="nc" id="L118">			catch (Exception e)</span>
+			{
+<span class="nc" id="L120">				Logging.errorPrint(e.getMessage(), e);</span>
+<span class="nc" id="L121">			}</span>
+<span class="nc" id="L122">		}</span>
+
+<span class="nc" id="L124">		return sb.toString();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

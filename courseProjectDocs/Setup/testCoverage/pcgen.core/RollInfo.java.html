@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RollInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.core</a> &gt; <span class="el_source">RollInfo.java</span></div><h1>RollInfo.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2001 (C) Bryan McRoberts &lt;merton_monk@yahoo.com&gt;
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
+ *
+ */
+package pcgen.core;
+
+import java.util.StringTokenizer;
+
+import pcgen.util.Logging;
+
+import org.apache.commons.lang3.StringUtils;
+
+/**
+ * {@code RollInfo}.
+ *
+ * Structure representing dice rolls
+ *
+ */
+public final class RollInfo
+{
+	public int getSides()
+	{
+<span class="nc" id="L38">		return sides;</span>
+	}
+
+	public int getTimes()
+	{
+<span class="nc" id="L43">		return times;</span>
+	}
+
+	/** What shape dice to roll. */
+<span class="pc" id="L47">	protected int sides = 0;</span>
+
+	/** Number of dice to roll. */
+<span class="pc" id="L50">	protected int times = 0;</span>
+
+	/** Which specific rolls to keep after rolls have been sorted
+	 * in ascending order.  {@code null} means to keep all
+	 * rolls.  Example, [1,3] means to keep the first and third
+	 * lowest rolls, which would be {true, false true} for 3 dice.
+	 * keepTop and keepBottom are implemented as special kinds of
+	 * this array. */
+<span class="pc" id="L58">	private boolean[] keepList = null;</span>
+
+	/** Amount to add to the final roll. */
+<span class="pc" id="L61">	private int modifier = 0;</span>
+
+	/** Rerolls rolls above this amount. */
+<span class="pc" id="L64">	private int rerollAbove = Integer.MAX_VALUE;</span>
+
+	/** Rerolls rolls below this amount. */
+<span class="pc" id="L67">	private int rerollBelow = Integer.MIN_VALUE;</span>
+
+	/** Total result never greater than this. */
+<span class="pc" id="L70">	private int totalCeiling = Integer.MAX_VALUE;</span>
+
+	/** Total result never less than this. */
+<span class="pc" id="L73">	private int totalFloor = Integer.MIN_VALUE;</span>
+
+	/**
+	 * Check that the rollString is valid.
+	 * @param rollString The string to be checked
+	 * @return An empty string if the string is valid, an error message if not.
+	 */
+	public static String validateRollString(String rollString)
+	{
+<span class="fc" id="L82">		return parseRollInfo(new RollInfo(), rollString);</span>
+	}
+
+	private static String parseRollInfo(RollInfo rollInfo, String rollString)
+	{
+		// To really do this right, we change the token string
+		// as we go along so that we maintain parser state by
+		// means of the tokens rather than something more
+		// explicit.  In truth, this is an ideal application
+		// of flex and friends for a &quot;mini-language&quot; whose
+		// statements evaluate to dice rolls.  Too much LISP
+		// on the brain.  --bko
+
+		try
+		{
+<span class="fc" id="L97">			final StringTokenizer st = new StringTokenizer(rollString, &quot; &quot;, true);</span>
+<span class="fc" id="L98">			String tok = st.nextToken(&quot;d&quot;);</span>
+
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">			if (&quot;d&quot;.equals(tok))</span>
+			{
+<span class="nc" id="L102">				rollInfo.times = 1;</span>
+			}
+			else
+			{
+<span class="fc" id="L106">				rollInfo.times = Integer.parseInt(tok);</span>
+
+<span class="fc bfc" id="L108" title="All 2 branches covered.">				if (st.hasMoreTokens())</span>
+				{
+<span class="fc" id="L110">					tok = st.nextToken(&quot;d&quot;); // discard the 'd'</span>
+
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">					if (!&quot;d&quot;.equals(tok))</span>
+					{
+<span class="nc" id="L114">						return &quot;Bad roll parsing in '&quot; + rollString + &quot;': missing 'd'&quot;;</span>
+					}
+				}
+				else
+				{
+<span class="fc" id="L119">					rollInfo.sides = 1;</span>
+
+<span class="fc" id="L121">					return &quot;&quot;;</span>
+				}
+			}
+
+<span class="fc" id="L125">			String parseChars = &quot;/\\|mM+-tT&quot;;</span>
+<span class="fc" id="L126">			rollInfo.sides = Integer.parseInt(st.nextToken(parseChars));</span>
+
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">			if (rollInfo.sides &lt; 1)</span>
+			{
+<span class="nc" id="L130">				return &quot;Bad roll parsing in '&quot; + rollString + &quot;': sides &lt; 1: &quot; + rollInfo.sides;</span>
+			}
+
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">			while (st.hasMoreTokens())</span>
+			{
+<span class="nc" id="L135">				tok = st.nextToken(parseChars);</span>
+
+<span class="nc bnc" id="L137" title="All 10 branches missed.">				switch (tok.charAt(0))</span>
+				{
+					case '/' -&gt; {
+<span class="nc" id="L140">						parseChars = &quot;mM+-tT&quot;;</span>
+<span class="nc" id="L141">						final int keepTop = Integer.parseInt(st.nextToken(parseChars));</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">						if (keepTop &gt; rollInfo.times)</span>
+						{
+<span class="nc" id="L144">							return &quot;Bad keepTop in '&quot; + rollString + &quot;': times: &quot; + rollInfo.times + &quot;; keepTop: &quot;</span>
+									+ keepTop;
+						}
+<span class="nc" id="L147">						rollInfo.keepList = new boolean[rollInfo.times];</span>
+
+						// Rely on fact boolean is false by default.  --bko
+<span class="nc bnc" id="L150" title="All 2 branches missed.">						for (int i = rollInfo.times - keepTop; i &lt; rollInfo.times; ++i)</span>
+						{
+<span class="nc" id="L152">							rollInfo.keepList[i] = true;</span>
+						}
+<span class="nc" id="L154">					}</span>
+					case '\\' -&gt; {
+<span class="nc" id="L156">						parseChars = &quot;mM+-tT&quot;;</span>
+<span class="nc" id="L157">						final int keepBottom = Integer.parseInt(st.nextToken(parseChars));</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">						if (keepBottom &gt; rollInfo.times)</span>
+						{
+<span class="nc" id="L160">							return &quot;Bad keepBottom in '&quot; + rollString + &quot;': times: &quot; + rollInfo.times + &quot;; &quot;</span>
+									+ &quot;keepBottom: &quot;
+									+ keepBottom;
+						}
+<span class="nc" id="L164">						rollInfo.keepList = new boolean[rollInfo.times];</span>
+
+						// Rely on fact boolean is false by default.  --bko
+<span class="nc bnc" id="L167" title="All 2 branches missed.">						for (int i = 0; i &lt; keepBottom; ++i)</span>
+						{
+<span class="nc" id="L169">							rollInfo.keepList[i] = true;</span>
+						}
+<span class="nc" id="L171">					}</span>
+					case '|' -&gt; {
+<span class="nc" id="L173">						parseChars = &quot;mM+-tT&quot;;</span>
+<span class="nc" id="L174">						tok = st.nextToken(parseChars);</span>
+<span class="nc" id="L175">						rollInfo.keepList = new boolean[rollInfo.times];</span>
+<span class="nc" id="L176">						final StringTokenizer keepSt = new StringTokenizer(tok, &quot;,&quot;);</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">						while (keepSt.hasMoreTokens())</span>
+						{
+<span class="nc" id="L179">							rollInfo.keepList[Integer.parseInt(keepSt.nextToken(&quot;,&quot;)) - 1] = true;</span>
+						}
+<span class="nc" id="L181">					}</span>
+					case 'm' -&gt; {
+<span class="nc" id="L183">						parseChars = &quot;M+-tT&quot;;</span>
+<span class="nc" id="L184">						rollInfo.rerollBelow = Integer.parseInt(st.nextToken(parseChars));</span>
+<span class="nc" id="L185">					}</span>
+					case 'M' -&gt; {
+<span class="nc" id="L187">						parseChars = &quot;m+-tT&quot;;</span>
+<span class="nc" id="L188">						rollInfo.rerollAbove = Integer.parseInt(st.nextToken(parseChars));</span>
+<span class="nc" id="L189">					}</span>
+					case '+' -&gt; {
+<span class="nc" id="L191">						parseChars = &quot;tT&quot;;</span>
+<span class="nc" id="L192">						rollInfo.modifier = Integer.parseInt(st.nextToken(&quot; &quot;));</span>
+<span class="nc" id="L193">					}</span>
+					case '-' -&gt; {
+<span class="nc" id="L195">						parseChars = &quot;tT&quot;;</span>
+<span class="nc" id="L196">						rollInfo.modifier = -Integer.parseInt(st.nextToken(&quot; &quot;));</span>
+<span class="nc" id="L197">					}</span>
+					case 't' -&gt; {
+<span class="nc" id="L199">						parseChars = &quot;T&quot;;</span>
+<span class="nc" id="L200">						rollInfo.totalFloor = Integer.parseInt(st.nextToken(&quot; &quot;));</span>
+<span class="nc" id="L201">					}</span>
+					case 'T' -&gt; {
+<span class="nc" id="L203">						parseChars = &quot;t&quot;;</span>
+<span class="nc" id="L204">						rollInfo.totalCeiling = Integer.parseInt(st.nextToken(&quot; &quot;));</span>
+<span class="nc" id="L205">					}</span>
+					default -&gt; {
+<span class="nc" id="L207">						Logging.errorPrint(&quot;Bizarre dice parser error in '&quot; + rollString + &quot;': not a valid delimiter&quot;);</span>
+<span class="nc" id="L208">						return &quot;Bad roll parsing in '&quot; + rollString + &quot;': invalid delimiter '&quot; + tok.charAt(0) + &quot;'.&quot;;</span>
+					}
+				}
+			}
+		}
+
+<span class="nc" id="L214">		catch (NumberFormatException ex)</span>
+		{
+<span class="nc bnc" id="L216" title="All 2 branches missed.">			if (Logging.isDebugMode())</span>
+			{
+<span class="nc" id="L218">				Logging.debugPrint(&quot;Bad roll string in '&quot; + rollString + &quot;': &quot; + ex, ex);</span>
+			}
+<span class="nc" id="L220">			return &quot;Bad roll string in '&quot; + rollString + &quot;': &quot; + ex;</span>
+<span class="fc" id="L221">		}</span>
+<span class="fc" id="L222">		return &quot;&quot;;</span>
+	}
+
+	/**
+	 * Private constructor for use only when validating a roll string. 
+	 */
+	private RollInfo()
+<span class="fc" id="L229">	{</span>
+<span class="fc" id="L230">	}</span>
+
+	/**
+	 * Construct a {@code RollInfo} from a string.  The
+	 * rules:&lt;ol&gt;
+	 *
+	 * &lt;li&gt;Optional positive integer, &lt;var&gt;times&lt;/var&gt;.&lt;/li&gt;
+	 *
+	 * &lt;li&gt;Literal 'd' followed by positive integer,
+	 * &lt;var&gt;sides&lt;/var&gt;.&lt;/li&gt;
+	 *
+	 * &lt;li&gt;Optional literal '/' followed by positive integer,
+	 * &lt;var&gt;keepTop&lt;/var&gt;, or literal '\' followed by positive
+	 * integer, &lt;var&gt;keepBottom&lt;/var&gt;, or literal '|' followed by
+	 * comma-separated list of postitive integers,
+	 * &lt;var&gt;keepList&lt;/var&gt; (1-indexed after dice have been
+	 * sorted).&lt;/li&gt;
+	 *
+	 * &lt;li&gt;Optional literal 'm' (minimum) followed by positive
+	 * integer, &lt;var&gt;rerollAbove&lt;/var&gt;, or literal 'M' (maximum)
+	 * followed by postive integer, &lt;var&gt;rerollBelow&lt;/var&gt;.&lt;/li&gt;
+	 *
+	 * &lt;li&gt;Optional literal '+' or '-' followed by positive
+	 * integer, &lt;var&gt;modifier&lt;/var&gt;.&lt;/li&gt;
+	 *
+	 * &lt;li&gt;Optional literal 't' followed by positive integer,
+	 * &lt;var&gt;totalFloor&lt;/var&gt;, or literal 'T' followed by a
+	 * positive *integer, &lt;var&gt;totalCeiling&lt;/var&gt;.&lt;/li&gt;
+	 *
+	 * &lt;/ol&gt; Unlike previous versions of this method, it is
+	 * &lt;strong&gt;case-sensitive&lt;/strong&gt; with respect to the
+	 * alphabetic characters, e.g., only {@code d}
+	 * (lower-case) is now valid, not also {@code D}
+	 * (upper-case).  This is to accommodate the expanded ways to
+	 * roll.
+	 *
+	 * @param rollString String compact representation of dice rolls
+	 */
+	public RollInfo(final String rollString)
+<span class="nc" id="L269">	{</span>
+<span class="nc" id="L270">		String errMsg = RollInfo.parseRollInfo(this, rollString);</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">		if (!StringUtils.isBlank(errMsg))</span>
+		{
+<span class="nc" id="L273">			Logging.errorPrint(errMsg);</span>
+		}
+<span class="nc" id="L275">	}</span>
+
+	@Override
+	public String toString()
+	{
+<span class="nc" id="L280">		final StringBuilder buf = new StringBuilder(50);</span>
+
+<span class="nc bnc" id="L282" title="All 2 branches missed.">		if (times &gt; 0)</span>
+		{
+<span class="nc" id="L284">			buf.append(times);</span>
+		}
+
+<span class="nc" id="L287">		buf.append('d').append(sides);</span>
+
+<span class="nc bnc" id="L289" title="All 2 branches missed.">		while (keepList != null) // let break work</span>
+		{
+			int p;
+			int i;
+
+<span class="nc bnc" id="L294" title="All 2 branches missed.">			for (i = 0; i &lt; times; ++i)</span>
+			{
+<span class="nc bnc" id="L296" title="All 2 branches missed.">				if (keepList[i])</span>
+				{
+<span class="nc" id="L298">					break;</span>
+				}
+			}
+
+<span class="nc bnc" id="L302" title="All 2 branches missed.">			if (i == times) // all false</span>
+			{
+<span class="nc" id="L304">				Logging.errorPrint(&quot;Bad rolls: nothing to keep!&quot;);</span>
+
+<span class="nc" id="L306">				return &quot;&quot;;</span>
+			}
+
+			// Note the ordering: by testing for bottom
+			// first, we can also test if all the dice are
+			// all to be kept, and drop the
+			// top/bottom/list specification completely.
+			// First test for bottom
+<span class="nc bnc" id="L314" title="All 2 branches missed.">			for (i = 0; i &lt; times; ++i)</span>
+			{
+<span class="nc bnc" id="L316" title="All 2 branches missed.">				if (!keepList[i])</span>
+				{
+<span class="nc" id="L318">					break;</span>
+				}
+			}
+
+<span class="nc bnc" id="L322" title="All 2 branches missed.">			if (i == times)</span>
+			{
+<span class="nc" id="L324">				break; // all true</span>
+			}
+
+<span class="nc" id="L327">			p = i;</span>
+
+<span class="nc bnc" id="L329" title="All 2 branches missed.">			for (; i &lt; times; ++i)</span>
+			{
+<span class="nc bnc" id="L331" title="All 2 branches missed.">				if (keepList[i])</span>
+				{
+<span class="nc" id="L333">					break;</span>
+				}
+			}
+
+<span class="nc bnc" id="L337" title="All 4 branches missed.">			if ((p &gt; 0) &amp;&amp; (i == times))</span>
+			{
+<span class="nc" id="L339">				buf.append('\\').append(p);</span>
+
+<span class="nc" id="L341">				break;</span>
+			}
+
+			// Second test for top
+<span class="nc bnc" id="L345" title="All 2 branches missed.">			for (i = 0; i &lt; times; ++i)</span>
+			{
+<span class="nc bnc" id="L347" title="All 2 branches missed.">				if (keepList[i])</span>
+				{
+<span class="nc" id="L349">					break;</span>
+				}
+			}
+
+<span class="nc" id="L353">			p = i;</span>
+
+<span class="nc bnc" id="L355" title="All 2 branches missed.">			for (; i &lt; times; ++i)</span>
+			{
+<span class="nc bnc" id="L357" title="All 2 branches missed.">				if (!keepList[i])</span>
+				{
+<span class="nc" id="L359">					break;</span>
+				}
+			}
+
+<span class="nc bnc" id="L363" title="All 4 branches missed.">			if ((p &gt; 0) &amp;&amp; (i == times))</span>
+			{
+<span class="nc" id="L365">				buf.append('/').append((times - p));</span>
+
+<span class="nc" id="L367">				break;</span>
+			}
+
+			// Finally, we have a list
+<span class="nc" id="L371">			buf.append('|');</span>
+
+<span class="nc" id="L373">			boolean first = true;</span>
+
+<span class="nc bnc" id="L375" title="All 2 branches missed.">			for (i = 0; i &lt; times; ++i)</span>
+			{
+<span class="nc bnc" id="L377" title="All 2 branches missed.">				if (!keepList[i])</span>
+				{
+<span class="nc" id="L379">					continue;</span>
+				}
+
+<span class="nc bnc" id="L382" title="All 2 branches missed.">				if (first)</span>
+				{
+<span class="nc" id="L384">					first = false;</span>
+				}
+				else
+				{
+<span class="nc" id="L388">					buf.append(',');</span>
+				}
+
+<span class="nc" id="L391">				buf.append(i + 1);</span>
+			}
+<span class="nc" id="L393">		}</span>
+
+<span class="nc bnc" id="L395" title="All 2 branches missed.">		if (rerollBelow != Integer.MIN_VALUE)</span>
+		{
+<span class="nc" id="L397">			buf.append('m').append(rerollBelow);</span>
+		}
+
+<span class="nc bnc" id="L400" title="All 2 branches missed.">		if (rerollAbove != Integer.MAX_VALUE)</span>
+		{
+<span class="nc" id="L402">			buf.append('M').append(rerollAbove);</span>
+		}
+
+<span class="nc bnc" id="L405" title="All 2 branches missed.">		if (modifier &gt; 0)</span>
+		{
+<span class="nc" id="L407">			buf.append('+').append(modifier);</span>
+		}
+<span class="nc bnc" id="L409" title="All 2 branches missed.">		else if (modifier &lt; 0)</span>
+		{
+<span class="nc" id="L411">			buf.append('-').append(-modifier);</span>
+		}
+
+<span class="nc bnc" id="L414" title="All 2 branches missed.">		if (totalFloor != Integer.MIN_VALUE)</span>
+		{
+<span class="nc" id="L416">			buf.append('t').append(totalFloor);</span>
+		}
+
+<span class="nc bnc" id="L419" title="All 2 branches missed.">		if (totalCeiling != Integer.MAX_VALUE)</span>
+		{
+<span class="nc" id="L421">			buf.append('T').append(totalCeiling);</span>
+		}
+
+<span class="nc" id="L424">		return buf.toString();</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

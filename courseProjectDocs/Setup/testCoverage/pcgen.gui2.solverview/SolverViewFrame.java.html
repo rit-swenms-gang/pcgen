@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolverViewFrame.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui2.solverview</a> &gt; <span class="el_source">SolverViewFrame.java</span></div><h1>SolverViewFrame.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) Thomas Parker, 2013-14.
+ * 
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+package pcgen.gui2.solverview;
+
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.table.AbstractTableModel;
+
+import pcgen.base.formula.base.LegalScope;
+import pcgen.base.formula.base.ScopeInstance;
+import pcgen.base.formula.base.VarScoped;
+import pcgen.base.formula.base.VariableID;
+import pcgen.base.solver.ProcessStep;
+import pcgen.cdom.enumeration.CharID;
+import pcgen.cdom.facet.FacetLibrary;
+import pcgen.cdom.facet.LoadContextFacet;
+import pcgen.cdom.facet.ScopeFacet;
+import pcgen.cdom.facet.SolverManagerFacet;
+import pcgen.cdom.facet.model.VarScopedFacet;
+import pcgen.cdom.formula.PCGenScoped;
+import pcgen.facade.core.CharacterFacade;
+import pcgen.gui2.tools.Utility;
+import pcgen.rules.context.LoadContext;
+import pcgen.system.CharacterManager;
+import pcgen.system.LanguageBundle;
+
+public final class SolverViewFrame extends JFrame
+{
+
+<span class="nc" id="L62">	private final ScopeFacet scopeFacet = FacetLibrary.getFacet(ScopeFacet.class);</span>
+<span class="nc" id="L63">	private final SolverManagerFacet solverManagerFacet = FacetLibrary.getFacet(SolverManagerFacet.class);</span>
+<span class="nc" id="L64">	private final VarScopedFacet varScopedFacet = FacetLibrary.getFacet(VarScopedFacet.class);</span>
+<span class="nc" id="L65">	private final LoadContextFacet loadContextFacet = FacetLibrary.getFacet(LoadContextFacet.class);</span>
+
+	private final JComboBox&lt;LegalScopeWrapper&gt; scopeChooser;
+	private LegalScope selectedScope;
+
+	private final JTextField varName;
+<span class="nc" id="L71">	private String varNameText = &quot;                               &quot;;</span>
+
+	private final JComboBox&lt;ObjectNameDisplayer&gt; objectChooser;
+	private VarScoped activeObject;
+
+	private final JComboBox&lt;PCRef&gt; identifierChooser;
+	private CharID activeIdentifier;
+
+	private JTable viewTable;
+
+	private SolverTableModel tableModel;
+
+	public SolverViewFrame()
+<span class="nc" id="L84">	{</span>
+<span class="nc" id="L85">		identifierChooser = new JComboBox&lt;&gt;();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">		for (CharacterFacade pcf : CharacterManager.getCharacters())</span>
+		{
+<span class="nc" id="L88">			String pcname = pcf.getNameRef().get();</span>
+<span class="nc" id="L89">			CharID id = pcf.getCharID();</span>
+<span class="nc" id="L90">			identifierChooser.addItem(new PCRef(pcname, id));</span>
+<span class="nc" id="L91">		}</span>
+<span class="nc" id="L92">		identifierChooser.addActionListener(new IdentifierActionListener());</span>
+
+<span class="nc" id="L94">		objectChooser = new JComboBox&lt;&gt;();</span>
+<span class="nc" id="L95">		objectChooser.addActionListener(new ObjectActionListener());</span>
+
+<span class="nc" id="L97">		scopeChooser = new JComboBox&lt;&gt;();</span>
+<span class="nc" id="L98">		scopeChooser.addActionListener(new ScopeActionListener());</span>
+
+<span class="nc" id="L100">		varName = new JTextField();</span>
+<span class="nc" id="L101">		varName.setText(varNameText);</span>
+<span class="nc" id="L102">		varName.getDocument().addDocumentListener(new VarNameListener());</span>
+
+<span class="nc" id="L104">		initialize();</span>
+
+<span class="nc" id="L106">		identifierChooser.setSelectedItem(identifierChooser.getItemAt(0));</span>
+<span class="nc" id="L107">		scopeChooser.setSelectedItem(scopeChooser.getItemAt(0));</span>
+<span class="nc" id="L108">		objectChooser.setSelectedItem(objectChooser.getItemAt(0));</span>
+<span class="nc" id="L109">	}</span>
+
+	private void update()
+	{
+<span class="nc" id="L113">		updateObjects();</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">		if ((activeObject == null) &amp;&amp; (selectedScope.getParentScope().isPresent()))</span>
+		{
+			//scopeFacet will error if we continue...
+<span class="nc" id="L117">			tableModel.setSteps(Collections.emptyList());</span>
+<span class="nc" id="L118">			return;</span>
+		}
+		ScopeInstance scope;
+<span class="nc bnc" id="L121" title="All 2 branches missed.">		if (activeObject == null)</span>
+		{
+<span class="nc" id="L123">			scope = scopeFacet.getGlobalScope(activeIdentifier);</span>
+		}
+		else
+		{
+<span class="nc" id="L127">			scope = scopeFacet.get(activeIdentifier, LegalScope.getFullName(selectedScope), activeObject);</span>
+		}
+<span class="nc" id="L129">		if (loadContextFacet.get(activeIdentifier.getDatasetID()).get().getVariableContext()</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">			.isLegalVariableID(scope.getLegalScope(), varNameText))</span>
+		{
+<span class="nc" id="L132">			displayInfo(scope);</span>
+		}
+		else
+		{
+			//TODO Update a status bar
+<span class="nc" id="L137">			System.err.println(selectedScope.getName() + &quot; does not have a variable: &quot; + varNameText);</span>
+		}
+<span class="nc" id="L139">	}</span>
+
+	private void displayInfo(ScopeInstance scope)
+	{
+<span class="nc" id="L143">		VariableID&lt;?&gt; varID = loadContextFacet.get(activeIdentifier.getDatasetID()).get().getVariableContext()</span>
+<span class="nc" id="L144">			.getVariableID(scope, varNameText);</span>
+<span class="nc" id="L145">		setSteps(varID);</span>
+<span class="nc" id="L146">	}</span>
+
+	private &lt;T&gt; void setSteps(VariableID&lt;T&gt; varID)
+	{
+<span class="nc" id="L150">		List&lt;ProcessStep&lt;T&gt;&gt; steps = solverManagerFacet.diagnose(activeIdentifier, varID);</span>
+<span class="nc" id="L151">		tableModel.setSteps(steps);</span>
+<span class="nc" id="L152">	}</span>
+
+<span class="nc" id="L154">	private class ScopeActionListener implements ActionListener</span>
+	{
+
+		@Override
+		public void actionPerformed(ActionEvent e)
+		{
+<span class="nc" id="L160">			LegalScopeWrapper wrap = (LegalScopeWrapper) scopeChooser.getSelectedItem();</span>
+<span class="nc" id="L161">			selectedScope = wrap.getLegalScope();</span>
+<span class="nc" id="L162">			update();</span>
+<span class="nc" id="L163">		}</span>
+
+	}
+
+<span class="nc" id="L167">	private class ObjectActionListener implements ActionListener</span>
+	{
+
+		@Override
+		public void actionPerformed(ActionEvent e)
+		{
+<span class="nc" id="L173">			ObjectNameDisplayer displayer = (ObjectNameDisplayer) objectChooser.getSelectedItem();</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">			if (displayer == null)</span>
+			{
+<span class="nc" id="L176">				activeObject = null;</span>
+<span class="nc" id="L177">				tableModel.setSteps(Collections.emptyList());</span>
+			}
+			else
+			{
+<span class="nc" id="L181">				activeObject = displayer.getObject();</span>
+<span class="nc" id="L182">				update();</span>
+			}
+<span class="nc" id="L184">		}</span>
+
+	}
+
+<span class="nc" id="L188">	private class VarNameListener implements DocumentListener</span>
+	{
+
+		@Override
+		public void insertUpdate(DocumentEvent e)
+		{
+<span class="nc" id="L194">			varNameText = varName.getText().trim();</span>
+<span class="nc" id="L195">			update();</span>
+<span class="nc" id="L196">		}</span>
+
+		@Override
+		public void removeUpdate(DocumentEvent e)
+		{
+<span class="nc" id="L201">			varNameText = varName.getText().trim();</span>
+<span class="nc" id="L202">			update();</span>
+<span class="nc" id="L203">		}</span>
+
+		@Override
+		public void changedUpdate(DocumentEvent e)
+		{
+<span class="nc" id="L208">			varNameText = varName.getText().trim();</span>
+<span class="nc" id="L209">			update();</span>
+<span class="nc" id="L210">		}</span>
+
+	}
+
+<span class="nc" id="L214">	private class IdentifierActionListener implements ActionListener</span>
+	{
+
+		@Override
+		public void actionPerformed(ActionEvent e)
+		{
+<span class="nc" id="L220">			Object item = identifierChooser.getSelectedItem();</span>
+<span class="nc" id="L221">			activeIdentifier = ((PCRef) item).id;</span>
+<span class="nc" id="L222">			LoadContext loadContext = loadContextFacet.get(activeIdentifier.getDatasetID()).get();</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">			for (LegalScope lvs : loadContext.getVariableContext().getScopes())</span>
+			{
+<span class="nc" id="L225">				scopeChooser.addItem(new LegalScopeWrapper(lvs));</span>
+<span class="nc" id="L226">			}</span>
+<span class="nc" id="L227">			update();</span>
+<span class="nc" id="L228">		}</span>
+
+	}
+
+	private void updateObjects()
+	{
+<span class="nc bnc" id="L234" title="All 2 branches missed.">		if (activeIdentifier != null)</span>
+		{
+<span class="nc" id="L236">			Collection&lt;PCGenScoped&gt; objects = varScopedFacet.getSet(activeIdentifier);</span>
+<span class="nc" id="L237">			objectChooser.removeAllItems();</span>
+<span class="nc" id="L238">			String scopeName = LegalScope.getFullName(selectedScope);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">			for (VarScoped cdo : objects)</span>
+			{
+<span class="nc" id="L241">				Optional&lt;String&gt; localScopeName = cdo.getLocalScopeName();</span>
+<span class="nc bnc" id="L242" title="All 4 branches missed.">				if (localScopeName.isPresent() &amp;&amp; scopeName.equals(localScopeName.get()))</span>
+				{
+<span class="nc bnc" id="L244" title="All 2 branches missed.">					if (scopeFacet.get(activeIdentifier, scopeName, cdo) != null)</span>
+					{
+<span class="nc" id="L246">						objectChooser.addItem(new ObjectNameDisplayer(cdo));</span>
+					}
+				}
+<span class="nc" id="L249">			}</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">			if (objectChooser.getItemCount() != 0)</span>
+			{
+<span class="nc" id="L252">				objectChooser.setSelectedIndex(0);</span>
+			}
+		}
+<span class="nc" id="L255">	}</span>
+
+	public void initialize()
+	{
+<span class="nc" id="L259">		GridBagLayout gridbag = new GridBagLayout();</span>
+<span class="nc" id="L260">		GridBagConstraints c = new GridBagConstraints();</span>
+<span class="nc" id="L261">		getContentPane().setLayout(gridbag);</span>
+<span class="nc" id="L262">		c.fill = GridBagConstraints.HORIZONTAL;</span>
+<span class="nc" id="L263">		c.anchor = GridBagConstraints.NORTHWEST;</span>
+<span class="nc" id="L264">		c.insets = new Insets(2, 2, 2, 2);</span>
+
+<span class="nc" id="L266">		int col = 0;</span>
+<span class="nc" id="L267">		Utility.buildConstraints(c, col, 0, 1, 1, 100, 20);</span>
+<span class="nc" id="L268">		JLabel label = new JLabel(LanguageBundle.getFormattedString(&quot;in_SolverView_Perspective&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L269">		gridbag.setConstraints(label, c);</span>
+<span class="nc" id="L270">		getContentPane().add(label);</span>
+
+<span class="nc" id="L272">		Utility.buildConstraints(c, col++, 1, 1, 1, 0, 20);</span>
+<span class="nc" id="L273">		gridbag.setConstraints(identifierChooser, c);</span>
+<span class="nc" id="L274">		getContentPane().add(identifierChooser);</span>
+
+<span class="nc" id="L276">		Utility.buildConstraints(c, col++, 1, 1, 1, 0, 20);</span>
+<span class="nc" id="L277">		gridbag.setConstraints(scopeChooser, c);</span>
+<span class="nc" id="L278">		getContentPane().add(scopeChooser);</span>
+
+<span class="nc" id="L280">		Utility.buildConstraints(c, col++, 1, 1, 1, 0, 20);</span>
+<span class="nc" id="L281">		gridbag.setConstraints(objectChooser, c);</span>
+<span class="nc" id="L282">		getContentPane().add(objectChooser);</span>
+
+<span class="nc" id="L284">		Utility.buildConstraints(c, col++, 1, 1, 1, 0, 20);</span>
+<span class="nc" id="L285">		label = new JLabel(LanguageBundle.getFormattedString(&quot;in_SolverView_VarName&quot;) //$NON-NLS-1$</span>
+		);
+<span class="nc" id="L287">		gridbag.setConstraints(label, c);</span>
+<span class="nc" id="L288">		getContentPane().add(label);</span>
+
+<span class="nc" id="L290">		Utility.buildConstraints(c, col++, 1, 1, 1, 0, 20);</span>
+<span class="nc" id="L291">		gridbag.setConstraints(varName, c);</span>
+<span class="nc" id="L292">		getContentPane().add(varName);</span>
+
+<span class="nc" id="L294">		tableModel = new SolverTableModel&lt;&gt;();</span>
+<span class="nc" id="L295">		viewTable = new JTable(tableModel);</span>
+
+<span class="nc" id="L297">		viewTable.getColumnModel().getColumn(0).setPreferredWidth(25);</span>
+<span class="nc" id="L298">		viewTable.getColumnModel().getColumn(1).setPreferredWidth(50);</span>
+<span class="nc" id="L299">		viewTable.getColumnModel().getColumn(2).setPreferredWidth(25);</span>
+<span class="nc" id="L300">		viewTable.getColumnModel().getColumn(3).setPreferredWidth(50);</span>
+
+<span class="nc" id="L302">		Utility.buildConstraints(c, 0, 2, col, 1, 0, 1000);</span>
+<span class="nc" id="L303">		JScrollPane pane = new JScrollPane(viewTable);</span>
+<span class="nc" id="L304">		viewTable.setFillsViewportHeight(true);</span>
+<span class="nc" id="L305">		pane.setPreferredSize(new Dimension(500, 300));</span>
+<span class="nc" id="L306">		gridbag.setConstraints(pane, c);</span>
+<span class="nc" id="L307">		getContentPane().add(pane);</span>
+
+<span class="nc" id="L309">		setTitle(&quot;Core Variable Debug View&quot;);</span>
+<span class="nc" id="L310">		getContentPane().setSize(500, 400);</span>
+<span class="nc" id="L311">		pack();</span>
+<span class="nc" id="L312">		setLocationRelativeTo(null);</span>
+<span class="nc" id="L313">	}</span>
+
+<span class="nc" id="L315">	private static class SolverTableModel&lt;T&gt; extends AbstractTableModel</span>
+	{
+<span class="nc" id="L317">		private final String[] columnNames =</span>
+				{&quot;Modification Type&quot;, &quot;Modification&quot;, &quot;Resulting Value&quot;, &quot;Priority&quot;, &quot;Source&quot;};
+
+<span class="nc" id="L320">		private List&lt;ProcessStep&lt;T&gt;&gt; steps = Collections.emptyList();</span>
+
+		@Override
+		public String getColumnName(int column)
+		{
+<span class="nc" id="L325">			return columnNames[column];</span>
+		}
+
+		@Override
+		public int getRowCount()
+		{
+<span class="nc" id="L331">			return steps.size();</span>
+		}
+
+		@Override
+		public int getColumnCount()
+		{
+<span class="nc" id="L337">			return columnNames.length;</span>
+		}
+
+		@Override
+		public Object getValueAt(int rowIndex, int columnIndex)
+		{
+<span class="nc" id="L343">			ProcessStep&lt;T&gt; ps = steps.get(rowIndex);</span>
+<span class="nc bnc" id="L344" title="All 6 branches missed.">			return switch (columnIndex)</span>
+					{
+<span class="nc" id="L346">						case 0 -&gt; ps.getModifier().getIdentification();</span>
+<span class="nc" id="L347">						case 1 -&gt; ps.getModifier().getInstructions();</span>
+<span class="nc" id="L348">						case 2 -&gt; ps.getResult();</span>
+<span class="nc" id="L349">						case 3 -&gt; ps.getModifier().getPriority();</span>
+<span class="nc" id="L350">						case 4 -&gt; ps.getSourceInfo();</span>
+<span class="nc" id="L351">						default -&gt; &quot;&quot;;</span>
+					};
+		}
+
+		@Override
+		public boolean isCellEditable(int rowIndex, int columnIndex)
+		{
+<span class="nc" id="L358">			return false;</span>
+		}
+
+		public void setSteps(List&lt;ProcessStep&lt;T&gt;&gt; steps)
+		{
+<span class="nc" id="L363">			this.steps = steps;</span>
+<span class="nc" id="L364">			fireTableDataChanged();</span>
+<span class="nc" id="L365">		}</span>
+	}
+
+	private static final class PCRef
+	{
+		public String name;
+		public CharID id;
+
+		private PCRef(String pcname, CharID id)
+<span class="nc" id="L374">		{</span>
+<span class="nc" id="L375">			this.name = pcname;</span>
+<span class="nc" id="L376">			this.id = id;</span>
+<span class="nc" id="L377">		}</span>
+
+		@Override
+		public String toString()
+		{
+<span class="nc" id="L382">			return name;</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

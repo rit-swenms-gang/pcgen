@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AddingFormula.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.base.formula</a> &gt; <span class="el_source">AddingFormula.java</span></div><h1>AddingFormula.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2006 Tom Parker &lt;thpr@users.sourceforge.net&gt;
+ * 
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+package pcgen.base.formula;
+
+/**
+ * 
+ * An AddingFormula represents a 'deferred calculation' of sorts, designed to be
+ * stored and capable of adding a predetermined value to a given input number.
+ * 
+ * An AddingFormula will always return an Integer
+ */
+public class AddingFormula implements ReferenceFormula&lt;Integer&gt;
+{
+
+	/**
+	 * The value to be added to the value input into the resolve method
+	 */
+	private final int add;
+
+	/**
+	 * Creates a new AddingFormula with the given int as the value to be added
+	 * to the input to the resolve method
+	 * 
+	 * @param adder
+	 *            the int to be added when this AddingFormula is used
+	 */
+	public AddingFormula(int adder)
+<span class="fc" id="L43">	{</span>
+<span class="fc" id="L44">		add = adder;</span>
+<span class="fc" id="L45">	}</span>
+
+	/**
+	 * Executes this AddingFormula, adding the number provided in the
+	 * constructor of this AddingFormula to the given Number. Only one input
+	 * Number is permitted.
+	 * 
+	 * This method is value-semantic and will not modify or maintain a reference
+	 * to the given Array of Numbers.
+	 * 
+	 * @param numbers
+	 *            The array of Numbers used to resolve the value of this
+	 *            AddingFormula (array length must be 1 and the Number must be
+	 *            non-null)
+	 * @return the result of the addition
+	 * @throws IllegalArgumentException
+	 *             if more than one Number is provided as an argument
+	 * @throws NullPointerException
+	 *             if the Number provided is null
+	 */
+	@Override
+	public Integer resolve(Number... numbers)
+	{
+<span class="fc bfc" id="L68" title="All 4 branches covered.">		if (numbers == null || numbers.length != 1)</span>
+		{
+<span class="fc" id="L70">			throw new IllegalArgumentException(&quot;AddingFormula only has one back-reference&quot;);</span>
+		}
+<span class="fc" id="L72">		return numbers[0].intValue() + add;</span>
+	}
+
+	@Override
+	public String toString()
+	{
+<span class="fc bfc" id="L78" title="All 2 branches covered.">		if (add &gt;= 0)</span>
+		{
+<span class="fc" id="L80">			return &quot;+&quot; + add;</span>
+		}
+		else
+		{
+<span class="fc" id="L84">			return Integer.toString(add);</span>
+		}
+	}
+
+	@Override
+	public int hashCode()
+	{
+<span class="fc" id="L91">		return add;</span>
+	}
+
+	@Override
+	public boolean equals(Object obj)
+	{
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">		return obj instanceof AddingFormula &amp;&amp; ((AddingFormula) obj).add == add;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

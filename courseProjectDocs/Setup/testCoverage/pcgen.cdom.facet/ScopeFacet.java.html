@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScopeFacet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.cdom.facet</a> &gt; <span class="el_source">ScopeFacet.java</span></div><h1>ScopeFacet.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) Thomas Parker, 2015.
+ * 
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+package pcgen.cdom.facet;
+
+import java.util.Optional;
+
+import pcgen.base.formula.base.ScopeInstance;
+import pcgen.base.formula.base.ScopeInstanceFactory;
+import pcgen.base.formula.base.VarScoped;
+import pcgen.cdom.enumeration.CharID;
+import pcgen.cdom.facet.base.AbstractItemFacet;
+import pcgen.cdom.formula.scope.GlobalPCScope;
+
+/**
+ * ScopeFacet stores the relationship from a Character, LegalScope, and
+ * CDOMObject to the ScopeInstance for that object.
+ */
+<span class="fc" id="L33">public class ScopeFacet extends AbstractItemFacet&lt;CharID, ScopeInstanceFactory&gt;</span>
+{
+	/**
+	 * Returns the Global ScopeInstance for the PlayerCharacter represented by
+	 * the given CharID.
+	 * 
+	 * @param id
+	 *            The CharID representing the PlayerCharacter for which the
+	 *            Global ScopeInstance should be returned
+	 * @return The Global ScopeInstance for the PlayerCharacter represented by
+	 *         the given CharID
+	 */
+	public ScopeInstance getGlobalScope(CharID id)
+	{
+<span class="fc" id="L47">		return get(id).getGlobalInstance(GlobalPCScope.GLOBAL_SCOPE_NAME);</span>
+	}
+
+	/**
+	 * Returns the ScopeInstance (within the given LegalScope and
+	 * PlayerCharacter represented by the given CharID) for the given VarScoped
+	 * object.
+	 * 
+	 * @param id
+	 *            The CharID representing the PlayerCharacter within which the
+	 *            returned ScopeInstance exists
+	 * @param legalScopeName
+	 *            The LegalScope name within which the returned ScopeInstance
+	 *            exists
+	 * @param scopedObject
+	 *            The VarScoped object for which the ScopeInstance object should
+	 *            be returned
+	 * @return The ScopeInstance for the CharID representing the PlayerCharacter
+	 *         and the given LegalScope and VarScoped objects
+	 */
+	public ScopeInstance get(CharID id, String legalScopeName, VarScoped scopedObject)
+	{
+<span class="nc" id="L69">		return get(id).get(legalScopeName, Optional.of(scopedObject));</span>
+	}
+
+	public ScopeInstance get(CharID id, VarScoped vs)
+	{
+<span class="nc" id="L74">		Optional&lt;String&gt; localName = vs.getLocalScopeName();</span>
+<span class="nc" id="L75">		VarScoped active = vs;</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">		while (localName.isEmpty())</span>
+		{
+<span class="nc" id="L78">			Optional&lt;VarScoped&gt; parent = active.getVariableParent();</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">			if (parent.isEmpty())</span>
+			{
+<span class="nc" id="L81">				return getGlobalScope(id);</span>
+			}
+<span class="nc" id="L83">			active = parent.get();</span>
+<span class="nc" id="L84">			localName = active.getLocalScopeName();</span>
+<span class="nc" id="L85">		}</span>
+<span class="nc" id="L86">		return get(id, localName.get(), vs);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

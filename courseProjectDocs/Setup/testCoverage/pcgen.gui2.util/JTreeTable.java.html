@@ -1,0 +1,841 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JTreeTable.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui2.util</a> &gt; <span class="el_source">JTreeTable.java</span></div><h1>JTreeTable.java</h1><pre class="source lang-java linenums">/**
+ * (#)JTreeTable.java    1.2 98/10/27
+ *
+ * Copyright 1997, 1998 by Sun Microsystems, Inc.,
+ * 901 San Antonio Road, Palo Alto, California, 94303, U.S.A.
+ * All rights reserved.
+ *
+ * This software is the confidential and proprietary information
+ * of Sun Microsystems, Inc. (&quot;Confidential Information&quot;).  You
+ * shall not disclose such Confidential Information and shall use
+ * it only in accordance with the terms of the license agreement
+ * you entered into with Sun.
+ *
+ *
+ **/
+package pcgen.gui2.util;
+
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Rectangle;
+import java.awt.event.MouseEvent;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.EventObject;
+
+import javax.swing.CellRendererPane;
+import javax.swing.JComponent;
+import javax.swing.JTable;
+import javax.swing.JTree;
+import javax.swing.ListSelectionModel;
+import javax.swing.LookAndFeel;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import javax.swing.event.CellEditorListener;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+import javax.swing.event.TreeExpansionEvent;
+import javax.swing.event.TreeExpansionListener;
+import javax.swing.event.TreeModelEvent;
+import javax.swing.event.TreeModelListener;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.tree.DefaultTreeCellRenderer;
+import javax.swing.tree.DefaultTreeSelectionModel;
+import javax.swing.tree.TreeCellRenderer;
+import javax.swing.tree.TreePath;
+import javax.swing.tree.TreeSelectionModel;
+
+import pcgen.gui2.util.table.Row;
+import pcgen.gui2.util.table.SortableTableModel;
+import pcgen.gui2.util.treetable.SortableTreeTableModel;
+import pcgen.gui2.util.treetable.TreeTableModel;
+import pcgen.gui2.util.treetable.TreeTableNode;
+import pcgen.util.Logging;
+
+/**
+ * This example shows how to create a simple JTreeTable component,
+ * by using a JTree as a renderer (and editor) for the cells in a
+ * particular column in the JTable.
+ **/
+public class JTreeTable extends JTableEx
+{
+
+	private static final long serialVersionUID = -3571248405124682593L;
+	/** A subclass of JTree. */
+	private TreeTableCellRenderer tree;
+	private TreeTableModelAdapter adapter;
+
+	public JTreeTable()
+	{
+<span class="nc" id="L75">		this(null);</span>
+<span class="nc" id="L76">	}</span>
+
+	/**
+	 * Constructor
+	 * @param treeTableModel
+	 */
+	public JTreeTable(TreeTableModel treeTableModel)
+<span class="nc" id="L83">	{</span>
+<span class="nc" id="L84">		tree = new TreeTableCellRenderer();</span>
+<span class="nc" id="L85">		tree.setRootVisible(false);</span>
+<span class="nc" id="L86">		tree.setShowsRootHandles(true);</span>
+<span class="nc" id="L87">		adapter = new TreeTableModelAdapter(tree);</span>
+<span class="nc" id="L88">		setTreeTableModel(treeTableModel);</span>
+<span class="nc" id="L89">		super.setModel(adapter);</span>
+		// Force the JTable and JTree to share row selection models.
+<span class="nc" id="L91">		ListToTreeSelectionModelWrapper selectionWrapper = new ListToTreeSelectionModelWrapper();</span>
+<span class="nc" id="L92">		tree.setSelectionModel(selectionWrapper);</span>
+<span class="nc" id="L93">		setSelectionModel(selectionWrapper.getListSelectionModel());</span>
+
+		// Install the tree editor renderer and editor.
+<span class="nc" id="L96">		setDefaultRenderer(TreeTableNode.class, tree);</span>
+<span class="nc" id="L97">		setDefaultEditor(TreeTableNode.class, new TreeTableCellEditor());</span>
+
+		// No grid.
+<span class="nc" id="L100">		setShowGrid(false);</span>
+
+		// No intercell spacing
+<span class="nc" id="L103">		setIntercellSpacing(new Dimension(0, 0));</span>
+
+		// And update the height of the trees row to match the table
+<span class="nc bnc" id="L106" title="All 2 branches missed.">		if (tree.getRowHeight() &lt; 1)</span>
+		{
+			// Metal looks better like this.
+<span class="nc" id="L109">			setRowHeight(18);</span>
+		}
+		else
+		{
+			// If the UI has specified a rowHeight,
+			// we'd better all be using the same one!
+<span class="nc" id="L115">			setRowHeight(tree.getRowHeight());</span>
+		}
+
+<span class="nc" id="L118">	}</span>
+
+	public TreeTableModel getTreeTableModel()
+	{
+<span class="nc" id="L122">		return (TreeTableModel) tree.getModel();</span>
+	}
+
+	public void setTreeTableModel(TreeTableModel model)
+	{
+<span class="nc" id="L127">		tree.setModel(model);</span>
+<span class="nc" id="L128">		adapter.setTreeTableModel(model);</span>
+<span class="nc" id="L129">	}</span>
+
+	/**
+	 * Workaround for BasicTableUI anomaly. Make sure the UI never tries to
+	 * paint the editor. The UI currently uses different techniques to
+	 * paint the renderers and editors and overriding setBounds() below
+	 * is not the right thing to do for an editor. Returning -1 for the
+	 * editing row in this case, ensures the editor is never painted.
+	 * @return editing row
+	 **/
+	@Override
+	public int getEditingRow()
+	{
+<span class="nc bnc" id="L142" title="All 2 branches missed.">		return (getColumnClass(editingColumn) == TreeTableNode.class) ? (-1) : editingRow;</span>
+	}
+
+	/**
+	 * Overridden to pass the new rowHeight to the tree.
+	 * @param aRowHeight
+	 **/
+	@Override
+	public void setRowHeight(int aRowHeight)
+	{
+<span class="nc" id="L152">		super.setRowHeight(aRowHeight);</span>
+
+<span class="nc bnc" id="L154" title="All 4 branches missed.">		if ((tree != null) &amp;&amp; (tree.getRowHeight() != aRowHeight))</span>
+		{
+<span class="nc" id="L156">			tree.setRowHeight(getRowHeight());</span>
+		}
+<span class="nc" id="L158">	}</span>
+
+	/**
+	 * Returns the tree that is being shared between the model.
+	 * @return JTree
+	 **/
+	public JTree getTree()
+	{
+<span class="nc" id="L166">		return tree;</span>
+	}
+
+	public TreeCellRenderer getTreeCellRenderer()
+	{
+<span class="nc" id="L171">		return tree.getCellRenderer();</span>
+	}
+
+	public void setTreeCellRenderer(TreeColumnCellRenderer renderer)
+	{
+<span class="nc" id="L176">		tree.setCellRenderer(renderer);</span>
+<span class="nc" id="L177">	}</span>
+
+	/**
+	 * Forwards the {@code scrollRectToVisible()} message to the
+	 * {@code JComponent}'s parent. Components that can service
+	 * the request, such as {@code JViewport},
+	 * override this method and perform the scrolling.
+	 *
+	 * @param aRect the visible {@code Rectangle}
+	 * @see javax.swing.JViewport
+	 */
+	@Override
+	public void scrollRectToVisible(Rectangle aRect)
+	{
+		Container parent;
+<span class="nc" id="L192">		int dx = getX();</span>
+<span class="nc" id="L193">		int dy = getY();</span>
+
+<span class="nc" id="L195">		for (parent = getParent(); (parent != null) &amp;&amp; !(parent instanceof JComponent)</span>
+<span class="nc bnc" id="L196" title="All 6 branches missed.">			&amp;&amp; !(parent instanceof CellRendererPane); parent = parent.getParent())</span>
+		{
+<span class="nc" id="L198">			final Rectangle bounds = parent.getBounds();</span>
+
+<span class="nc" id="L200">			dx += bounds.x;</span>
+<span class="nc" id="L201">			dy += bounds.y;</span>
+		}
+
+<span class="nc bnc" id="L204" title="All 4 branches missed.">		if ((parent != null) &amp;&amp; !(parent instanceof CellRendererPane))</span>
+		{
+<span class="nc" id="L206">			aRect.x += dx;</span>
+<span class="nc" id="L207">			aRect.y += dy;</span>
+
+<span class="nc" id="L209">			((JComponent) parent).scrollRectToVisible(aRect);</span>
+<span class="nc" id="L210">			aRect.x -= dx;</span>
+<span class="nc" id="L211">			aRect.y -= dy;</span>
+		}
+<span class="nc" id="L213">	}</span>
+
+	/**
+	 * Overridden to message super and forward the method to the tree.
+	 * Since the tree is not actually in the component hieachy it will
+	 * never receive this unless we forward it in this manner.
+	 **/
+	@Override
+	public void updateUI()
+	{
+<span class="nc" id="L223">		super.updateUI();</span>
+
+<span class="nc bnc" id="L225" title="All 2 branches missed.">		if (tree != null)</span>
+		{
+<span class="nc" id="L227">			tree.updateUI();</span>
+		}
+
+		// Use the tree's default foreground and background
+		// colors in the table
+<span class="nc" id="L232">		LookAndFeel.installColorsAndFont(this, &quot;Tree.background&quot;, //$NON-NLS-1$</span>
+			&quot;Tree.foreground&quot;, //$NON-NLS-1$
+			&quot;Tree.font&quot;); //$NON-NLS-1$
+<span class="nc" id="L235">	}</span>
+
+	/**
+	 * This is a wrapper class takes a TreeTableModel and implements
+	 * the table model interface. The implementation is trivial, with
+	 * all of the event dispatching support provided by the superclass:
+	 * the AbstractTableModel.
+	 *
+	 */
+	private static class TreeTableModelAdapter extends AbstractTableModel
+			implements SortableTableModel, TreeModelListener, TreeExpansionListener
+	{
+
+		private JTree tree;
+		private TreeTableModel treeTableModel;
+
+		/**
+		 * Constructor
+		 * @param tree
+		 */
+		TreeTableModelAdapter(JTree tree)
+<span class="nc" id="L256">		{</span>
+<span class="nc" id="L257">			this.tree = tree;</span>
+<span class="nc" id="L258">			tree.addTreeExpansionListener(this);</span>
+<span class="nc" id="L259">		}</span>
+
+		/**
+		 * Install a TreeModelListener that can update the table when
+		 * tree changes. We use delayedFireTableDataChanged as we can
+		 * not be guaranteed the tree will have finished processing
+		 * the event before us.
+		 **/
+		public void setTreeTableModel(TreeTableModel model)
+		{
+<span class="nc bnc" id="L269" title="All 2 branches missed.">			if (treeTableModel != null)</span>
+			{
+<span class="nc" id="L271">				treeTableModel.removeTreeModelListener(this);</span>
+			}
+<span class="nc" id="L273">			treeTableModel = model;</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">			if (treeTableModel != null)</span>
+			{
+<span class="nc" id="L276">				treeTableModel.addTreeModelListener(this);</span>
+			}
+<span class="nc" id="L278">			fireTableStructureChanged();</span>
+<span class="nc" id="L279">		}</span>
+
+		@Override
+		public boolean isCellEditable(int row, int column)
+		{
+<span class="nc bnc" id="L284" title="All 2 branches missed.">			if (treeTableModel == null)</span>
+			{
+<span class="nc" id="L286">				return false;</span>
+			}
+<span class="nc" id="L288">			return treeTableModel.isCellEditable(nodeForRow(row), column);</span>
+		}
+
+		@Override
+		public Class&lt;?&gt; getColumnClass(int column)
+		{
+<span class="nc bnc" id="L294" title="All 2 branches missed.">			if (treeTableModel == null)</span>
+			{
+<span class="nc" id="L296">				return Object.class;</span>
+			}
+<span class="nc" id="L298">			return treeTableModel.getColumnClass(column);</span>
+		}
+
+		// Wrappers, implementing TableModel interface.
+		@Override
+		public int getColumnCount()
+		{
+<span class="nc bnc" id="L305" title="All 2 branches missed.">			if (treeTableModel == null)</span>
+			{
+<span class="nc" id="L307">				return 0;</span>
+			}
+<span class="nc" id="L309">			return treeTableModel.getColumnCount();</span>
+		}
+
+		@Override
+		public String getColumnName(int column)
+		{
+<span class="nc bnc" id="L315" title="All 2 branches missed.">			if (treeTableModel == null)</span>
+			{
+<span class="nc" id="L317">				return null;</span>
+			}
+<span class="nc" id="L319">			return treeTableModel.getColumnName(column);</span>
+		}
+
+		@Override
+		public int getRowCount()
+		{
+<span class="nc" id="L325">			return tree.getRowCount();</span>
+		}
+
+		@Override
+		public void setValueAt(Object value, int row, int column)
+		{
+<span class="nc bnc" id="L331" title="All 2 branches missed.">			if (treeTableModel == null)</span>
+			{
+<span class="nc" id="L333">				return;</span>
+			}
+<span class="nc" id="L335">			treeTableModel.setValueAt(value, nodeForRow(row), column);</span>
+<span class="nc" id="L336">		}</span>
+
+		@Override
+		public Object getValueAt(int row, int column)
+		{
+<span class="nc bnc" id="L341" title="All 2 branches missed.">			if (treeTableModel == null)</span>
+			{
+<span class="nc" id="L343">				return null;</span>
+			}
+<span class="nc" id="L345">			return treeTableModel.getValueAt(nodeForRow(row), column);</span>
+		}
+
+		private Object nodeForRow(int row)
+		{
+<span class="nc" id="L350">			TreePath treePath = tree.getPathForRow(row);</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">			if (treePath != null)</span>
+			{
+<span class="nc" id="L353">				return treePath.getLastPathComponent();</span>
+			}
+<span class="nc" id="L355">			return null;</span>
+		}
+
+		@Override
+		public void sortModel(Comparator&lt;Row&gt; comparator)
+		{
+<span class="nc bnc" id="L361" title="All 4 branches missed.">			if (treeTableModel == null || !(treeTableModel instanceof SortableTreeTableModel model))</span>
+			{
+<span class="nc" id="L363">				return;</span>
+			}
+<span class="nc" id="L365">			Enumeration&lt;TreePath&gt; paths = tree.getExpandedDescendants(new TreePath(model.getRoot()));</span>
+<span class="nc" id="L366">			TreePath[] selectionPaths = tree.getSelectionPaths();</span>
+<span class="nc" id="L367">			model.sortModel(comparator);</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">			if (paths != null)</span>
+			{
+<span class="nc bnc" id="L370" title="All 2 branches missed.">				while (paths.hasMoreElements())</span>
+				{
+<span class="nc" id="L372">					tree.expandPath(paths.nextElement());</span>
+				}
+			}
+<span class="nc" id="L375">			tree.setSelectionPaths(selectionPaths);</span>
+<span class="nc" id="L376">		}</span>
+
+		@Override
+		public void treeNodesChanged(TreeModelEvent e)
+		{
+<span class="nc" id="L381">			TreePath parentPath = e.getTreePath();</span>
+<span class="nc" id="L382">			int leadingRow = Integer.MAX_VALUE;</span>
+<span class="nc" id="L383">			int trailingRow = -1;</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">			if (e.getChildren() != null)</span>
+			{
+<span class="nc bnc" id="L386" title="All 2 branches missed.">				for (Object node : e.getChildren())</span>
+				{
+<span class="nc" id="L388">					TreePath childPath = parentPath.pathByAddingChild(node);</span>
+<span class="nc" id="L389">					int row = tree.getRowForPath(childPath);</span>
+<span class="nc" id="L390">					leadingRow = Math.min(leadingRow, row);</span>
+<span class="nc" id="L391">					trailingRow = Math.max(trailingRow, row);</span>
+				}
+			}
+<span class="nc" id="L394">			fireTableRowsUpdated(leadingRow, trailingRow);</span>
+<span class="nc" id="L395">		}</span>
+
+		/**
+		 * This is used to when handling event cascading to
+		 * prevent inconsistencies when updating the table.
+		 * It is necessary when responding to tree model events
+		 * that may have other listeners.
+		 * By firing a new event later we ensure that all listeners
+		 * have had a chance to update the tree's state.
+		 */
+		private void fireDelayedTableDataChanged()
+		{
+<span class="nc" id="L407">			SwingUtilities.invokeLater(this::fireTableDataChangedPreservingSelection);</span>
+<span class="nc" id="L408">		}</span>
+
+		@Override
+		public void treeNodesInserted(TreeModelEvent e)
+		{
+<span class="nc" id="L413">			fireDelayedTableDataChanged();</span>
+<span class="nc" id="L414">		}</span>
+
+		@Override
+		public void treeNodesRemoved(TreeModelEvent e)
+		{
+<span class="nc" id="L419">			fireDelayedTableDataChanged();</span>
+<span class="nc" id="L420">		}</span>
+
+		@Override
+		public void treeStructureChanged(TreeModelEvent e)
+		{
+			//			fireTableStructureChanged();
+<span class="nc" id="L426">			fireDelayedTableDataChanged();</span>
+<span class="nc" id="L427">		}</span>
+		// Don't use fireTableRowsInserted() here;
+		// the selection model would get updated twice.
+
+		@Override
+		public void treeExpanded(TreeExpansionEvent event)
+		{
+<span class="nc" id="L434">			fireTableDataChangedPreservingSelection();</span>
+<span class="nc" id="L435">		}</span>
+
+		@Override
+		public void treeCollapsed(TreeExpansionEvent event)
+		{
+<span class="nc" id="L440">			fireTableDataChangedPreservingSelection();</span>
+<span class="nc" id="L441">		}</span>
+
+		private void fireTableDataChangedPreservingSelection()
+		{
+<span class="nc" id="L445">			TreeSelectionModel selModel = tree.getSelectionModel();</span>
+<span class="nc" id="L446">			TreePath leadSelectionPath = selModel.getLeadSelectionPath();</span>
+<span class="nc" id="L447">			fireTableDataChanged();</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">			if (leadSelectionPath != null)</span>
+			{
+<span class="nc" id="L450">				selModel.setSelectionPath(leadSelectionPath);</span>
+			}
+<span class="nc" id="L452">		}</span>
+
+	}
+
+	/**
+	 * A TreeCellRenderer that displays a JTree.
+	 **/
+	final class TreeTableCellRenderer extends JTree implements TableCellRenderer
+	{
+		// Last table/tree row asked to render
+
+		private int visibleRow;
+		private DefaultTableCellRenderer tableCellRenderer;
+
+		public TreeTableCellRenderer()
+<span class="nc" id="L467">		{</span>
+<span class="nc" id="L468">			this.tableCellRenderer = new DefaultTableCellRenderer()</span>
+<span class="nc" id="L469">			{</span>
+
+				@Override
+				public void setBounds(int x, int y, int width, int height)
+				{
+<span class="nc" id="L474">					super.setBounds(x, y, width, height);</span>
+<span class="nc" id="L475">					TreeTableCellRenderer.this.setBounds(x, y, width, height);</span>
+<span class="nc" id="L476">				}</span>
+
+				@Override
+				public void paint(final Graphics g)
+				{
+<span class="nc" id="L481">					g.setColor(getBackground());</span>
+<span class="nc" id="L482">					g.fillRect(0, 0, getWidth(), getHeight());</span>
+<span class="nc" id="L483">					TreeTableCellRenderer.this.paint(g);</span>
+<span class="nc" id="L484">					paintBorder(g);</span>
+<span class="nc" id="L485">				}</span>
+
+				@Override
+				protected void setValue(Object value)
+				{
+<span class="nc" id="L490">					super.setValue(value);</span>
+<span class="nc" id="L491">					setToolTipText(getText());</span>
+<span class="nc" id="L492">				}</span>
+
+			};
+<span class="nc" id="L495">			this.setCellRenderer(new TreeColumnCellRenderer());</span>
+<span class="nc" id="L496">			this.setOpaque(false);</span>
+<span class="nc" id="L497">		}</span>
+
+		/**
+		 * This is overridden to set the height
+		 * to match that of the JTable.
+		 * @param x
+		 * @param y
+		 * @param w
+		 * @param h
+		 **/
+		@Override
+		public void setBounds(int x, @SuppressWarnings(&quot;unused&quot;) int y, int w, @SuppressWarnings(&quot;unused&quot;) int h)
+		{
+<span class="nc" id="L510">			super.setBounds(x, 0, w, JTreeTable.this.getHeight());</span>
+<span class="nc" id="L511">		}</span>
+
+		/**
+		 * Sets the row height of the tree and forwards
+		 * the row height to the table.
+		 * @param aRowHeight
+		 **/
+		@Override
+		public void setRowHeight(int aRowHeight)
+		{
+<span class="nc" id="L521">			super.setRowHeight(aRowHeight);</span>
+<span class="nc bnc" id="L522" title="All 4 branches missed.">			if ((aRowHeight &gt; 0) &amp;&amp; (JTreeTable.this.getRowHeight() != aRowHeight))</span>
+			{
+<span class="nc" id="L524">				JTreeTable.this.setRowHeight(aRowHeight);</span>
+			}
+<span class="nc" id="L526">		}</span>
+
+		/**
+		 * TreeCellRenderer method.
+		 * Overridden to update the visible row.
+		 * @param table
+		 * @param value
+		 * @param isSelected
+		 * @param hasFocus
+		 * @param row
+		 * @param column
+		 * @return Component
+		 **/
+		@Override
+		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
+			int row, int column)
+		{
+<span class="nc" id="L543">			visibleRow = row;</span>
+
+<span class="nc" id="L545">			Component comp =</span>
+<span class="nc" id="L546">					tableCellRenderer.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);</span>
+<span class="nc" id="L547">			this.setBackground(comp.getBackground());</span>
+<span class="nc" id="L548">			return comp;</span>
+		}
+
+		/**
+		 * Sublcassed to translate the graphics such
+		 * that the last visible row will be drawn at 0,0.
+		 * @param g
+		 **/
+		@Override
+		public void paint(final Graphics g)
+		{
+<span class="nc" id="L559">			Rectangle rect = JTreeTable.this.getCellRect(visibleRow, 0, true);</span>
+<span class="nc" id="L560">			int offset = -rect.y;</span>
+<span class="nc" id="L561">			g.translate(0, offset);</span>
+			try
+			{
+<span class="nc" id="L564">				super.paint(g);</span>
+			}
+<span class="nc" id="L566">			catch (Exception e)</span>
+			{
+<span class="nc" id="L568">				Logging.errorPrint(&quot;Paint Exception&quot;, e);</span>
+				// TODO Handle this?
+			}
+			finally
+			{
+<span class="nc" id="L573">				g.translate(0, -offset);</span>
+			}
+<span class="nc" id="L575">		}</span>
+
+		/**
+		 * updateUI is overridden to set the colors
+		 * of the Trees renderer to match that of the table.
+		 **/
+		@Override
+		public void updateUI()
+		{
+<span class="nc" id="L584">			super.updateUI();</span>
+
+			// Make the tree's cell renderer use the
+			// table's cell selection colors.
+<span class="nc" id="L588">			TreeCellRenderer tcr = getCellRenderer();</span>
+
+<span class="nc bnc" id="L590" title="All 2 branches missed.">			if (tcr instanceof DefaultTreeCellRenderer dtcr)</span>
+			{
+<span class="nc" id="L592">				dtcr.setTextSelectionColor(UIManager.getColor(&quot;Table.selectionForeground&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L593">				dtcr.setBackgroundSelectionColor(UIManager.getColor(&quot;Table.selectionBackground&quot;)); //$NON-NLS-1$</span>
+			}
+<span class="nc" id="L595">		}</span>
+
+	}
+
+	/**
+	 * ListToTreeSelectionModelWrapper extends DefaultTreeSelectionModel
+	 * to listen for changes in the ListSelectionModel it maintains. Once
+	 * a change in the ListSelectionModel happens, the paths are updated
+	 * in the DefaultTreeSelectionModel.
+	 **/
+	private final class ListToTreeSelectionModelWrapper extends DefaultTreeSelectionModel
+	{
+
+		static final long serialVersionUID = -3571248405124682593L;
+		// Set to true when we are updating the ListSelectionModel
+		private boolean updatingListSelectionModel;
+
+		private ListToTreeSelectionModelWrapper()
+<span class="nc" id="L613">		{</span>
+<span class="nc" id="L614">			super();</span>
+<span class="nc" id="L615">			getListSelectionModel().addListSelectionListener(createListSelectionListener());</span>
+<span class="nc" id="L616">		}</span>
+
+		/**
+		 * This is overridden to set updatingListSelectionModel
+		 * and message super. This is the only place
+		 * DefaultTreeSelectionModel alters the ListSelectionModel.
+		 **/
+		@Override
+		public void resetRowSelection()
+		{
+<span class="nc bnc" id="L626" title="All 2 branches missed.">			if (!updatingListSelectionModel)</span>
+			{
+<span class="nc" id="L628">				updatingListSelectionModel = true;</span>
+
+				try
+				{
+<span class="nc" id="L632">					super.resetRowSelection();</span>
+				}
+				finally
+				{
+<span class="nc" id="L636">					updatingListSelectionModel = false;</span>
+				}
+			}
+
+			// Notice how we don't message super if
+			// updatingListSelectionModel is true. If
+			// updatingListSelectionModel is true, it implies the
+			// ListSelectionModel has already been updated and the
+			// paths are the only thing that needs to be updated.
+<span class="nc" id="L645">		}</span>
+
+		/**
+		 * Returns the list selection model.
+		 * ListToTreeSelectionModelWrapper listens for changes
+		 * to this model and updates the selected paths accordingly.
+		 * @return ListSelectionModel
+		 **/
+		private ListSelectionModel getListSelectionModel()
+		{
+<span class="nc" id="L655">			return listSelectionModel;</span>
+		}
+
+		/**
+		 * Creates and returns an instance of ListSelectionHandler.
+		 * @return ListSelectionListener
+		 **/
+		private ListSelectionListener createListSelectionListener()
+		{
+<span class="nc" id="L664">			return new ListSelectionHandler();</span>
+		}
+
+		/**
+		 * If {@code updatingListSelectionModel} is false,
+		 * this will reset the selected paths from the selected
+		 * rows in the list selection model.
+		 **/
+		private void updateSelectedPathsFromSelectedRows()
+		{
+<span class="nc bnc" id="L674" title="All 2 branches missed.">			if (!updatingListSelectionModel)</span>
+			{
+<span class="nc" id="L676">				updatingListSelectionModel = true;</span>
+
+				try
+				{
+<span class="nc" id="L680">					int[] sRows = getSelectedRows();</span>
+
+<span class="nc bnc" id="L682" title="All 4 branches missed.">					if ((sRows == null) || (sRows.length == 0))</span>
+					{
+<span class="nc" id="L684">						return;</span>
+					}
+
+<span class="nc" id="L687">					int count = 0;</span>
+
+<span class="nc bnc" id="L689" title="All 2 branches missed.">                    for (int row : sRows)</span>
+                    {
+<span class="nc bnc" id="L691" title="All 2 branches missed.">                        if (tree.getPathForRow(row) != null)</span>
+                        {
+<span class="nc" id="L693">                            count++;</span>
+                        }
+                    }
+
+<span class="nc bnc" id="L697" title="All 2 branches missed.">					if (count == 0)</span>
+					{
+<span class="nc" id="L699">						return;</span>
+					}
+
+<span class="nc" id="L702">					TreePath[] tps = new TreePath[count];</span>
+<span class="nc" id="L703">					count = 0;</span>
+
+<span class="nc bnc" id="L705" title="All 2 branches missed.">                    for (int sRow : sRows)</span>
+                    {
+<span class="nc" id="L707">                        TreePath tp = tree.getPathForRow(sRow);</span>
+
+<span class="nc bnc" id="L709" title="All 2 branches missed.">                        if (tp != null)</span>
+                        {
+<span class="nc" id="L711">                            tps[count++] = tp;</span>
+                        }
+                    }
+
+					// don't ned a clear as we are
+					// using setSelectionPaths()
+					//clearSelection();
+<span class="nc" id="L718">					setSelectionPaths(tps);</span>
+				}
+				finally
+				{
+<span class="nc" id="L722">					updatingListSelectionModel = false;</span>
+				}
+			}
+<span class="nc" id="L725">		}</span>
+
+		/**
+		 * Class responsible for calling
+		 * updateSelectedPathsFromSelectedRows when the
+		 * selection of the list changse.
+		 **/
+<span class="nc" id="L732">		final class ListSelectionHandler implements ListSelectionListener</span>
+		{
+
+			@Override
+			public void valueChanged(@SuppressWarnings(&quot;unused&quot;) ListSelectionEvent e)
+			{
+<span class="nc" id="L738">				updateSelectedPathsFromSelectedRows();</span>
+<span class="nc" id="L739">			}</span>
+
+		}
+
+	}
+
+	/**
+	 * TreeTableCellEditor implementation.
+	 * Component returned is the JTree.
+	 **/
+<span class="nc" id="L749">	private final class TreeTableCellEditor implements TableCellEditor</span>
+	{
+
+		/**
+		 * Overridden to return false, and if the event is a mouse event
+		 * it is forwarded to the tree.&lt;p&gt;
+		 * The behavior for this is debatable, and should really be offered
+		 * as a property. By returning false, all keyboard actions are
+		 * implemented in terms of the table. By returning true, the
+		 * tree would get a chance to do something with the keyboard
+		 * events. For the most part this is ok. But for certain keys,
+		 * such as left/right, the tree will expand/collapse where as
+		 * the table focus should really move to a different column. Page
+		 * up/down should also be implemented in terms of the table.
+		 * By returning false this also has the added benefit that clicking
+		 * outside of the bounds of the tree node, but still in the tree
+		 * column will select the row, whereas if this returned true
+		 * that wouldn't be the case.
+		 * &lt;p&gt;By returning false we are also enforcing the policy that
+		 * the tree will never be editable (at least by a key sequence).
+		 * @param e
+		 * @return true if cell editable
+		 */
+		@Override
+		public boolean isCellEditable(EventObject e)
+		{
+<span class="nc bnc" id="L775" title="All 2 branches missed.">			if (e instanceof MouseEvent)</span>
+			{
+<span class="nc bnc" id="L777" title="All 2 branches missed.">				for (int counter = getColumnCount() - 1; counter &gt;= 0; counter--)</span>
+				{
+<span class="nc bnc" id="L779" title="All 2 branches missed.">					if (getColumnClass(counter) == TreeTableNode.class)</span>
+					{
+<span class="nc" id="L781">						MouseEvent me = (MouseEvent) e;</span>
+<span class="nc" id="L782">						int column = JTreeTable.this.columnAtPoint(me.getPoint());</span>
+<span class="nc" id="L783">						Rectangle cell = JTreeTable.this.getCellRect(0, column, true);</span>
+<span class="nc" id="L784">						MouseEvent newME = new MouseEvent(tree, me.getID(), me.getWhen(), me.getModifiers(), me.getX(),</span>
+<span class="nc" id="L785">							me.getY(), me.getClickCount(), me.isPopupTrigger());</span>
+						//we translate the event into the tree's coordinate system
+<span class="nc" id="L787">						newME.translatePoint(-cell.x, 0);</span>
+<span class="nc" id="L788">						tree.dispatchEvent(newME);</span>
+
+<span class="nc" id="L790">						break;</span>
+					}
+				}
+			}
+
+<span class="nc" id="L795">			return false;</span>
+		}
+
+		@Override
+		public Component getTableCellEditorComponent(@SuppressWarnings(&quot;unused&quot;) JTable table,
+			@SuppressWarnings(&quot;unused&quot;) Object value, @SuppressWarnings(&quot;unused&quot;) boolean isSelected,
+			@SuppressWarnings(&quot;unused&quot;) int r, @SuppressWarnings(&quot;unused&quot;) int c)
+		{
+<span class="nc" id="L803">			return tree;</span>
+		}
+
+		@Override
+		public Object getCellEditorValue()
+		{
+<span class="nc" id="L809">			return null;</span>
+		}
+
+		@Override
+		public boolean shouldSelectCell(EventObject anEvent)
+		{
+<span class="nc" id="L815">			return false;</span>
+		}
+
+		@Override
+		public boolean stopCellEditing()
+		{
+<span class="nc" id="L821">			return true;</span>
+		}
+
+		@Override
+		public void cancelCellEditing()
+		{
+<span class="nc" id="L827">		}</span>
+
+		@Override
+		public void addCellEditorListener(CellEditorListener l)
+		{
+<span class="nc" id="L832">		}</span>
+
+		@Override
+		public void removeCellEditorListener(CellEditorListener l)
+		{
+<span class="nc" id="L837">		}</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

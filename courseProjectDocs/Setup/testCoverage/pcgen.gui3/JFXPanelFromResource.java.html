@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JFXPanelFromResource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui3</a> &gt; <span class="el_source">JFXPanelFromResource.java</span></div><h1>JFXPanelFromResource.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2019 (C) Eitan Adler &lt;lists@eitanadler.com&gt;
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.     See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+
+package pcgen.gui3;
+
+import java.io.IOException;
+import java.net.URL;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+
+import pcgen.system.LanguageBundle;
+import pcgen.util.Logging;
+
+import javafx.application.Platform;
+import javafx.embed.swing.JFXPanel;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+
+/**
+ * Displays HTML content as a &quot;panel&quot;.
+ *
+ * @param &lt;T&gt; The class of the controller
+ */
+public final class JFXPanelFromResource&lt;T&gt; extends JFXPanel implements Controllable&lt;T&gt;
+{
+
+<span class="nc" id="L43">	private final FXMLLoader fxmlLoader = new FXMLLoader();</span>
+
+	/**
+	 * @param klass        the class that contains the resource load
+	 * @param resourceName the relative filename of the FXML file to load.
+	 */
+	public JFXPanelFromResource(Class&lt;? extends T&gt; klass, String resourceName)
+<span class="nc" id="L50">	{</span>
+<span class="nc" id="L51">		URL resource = klass.getResource(resourceName);</span>
+<span class="nc" id="L52">		Objects.requireNonNull(resource);</span>
+<span class="nc" id="L53">		Logging.debugPrint(String.format(&quot;location for %s (%s) is %s&quot;, resourceName, klass, resource));</span>
+<span class="nc" id="L54">		fxmlLoader.setLocation(resource);</span>
+<span class="nc" id="L55">		fxmlLoader.setResources(LanguageBundle.getBundle());</span>
+<span class="nc" id="L56">		Platform.runLater(() -&gt; {</span>
+			try
+			{
+<span class="nc" id="L59">				Scene scene = fxmlLoader.load();</span>
+<span class="nc" id="L60">				this.setScene(scene);</span>
+<span class="nc" id="L61">			} catch (IOException e)</span>
+			{
+<span class="nc" id="L63">				Logging.errorPrint(String.format(&quot;failed to load stream fxml (%s/%s/%s)&quot;,</span>
+						resourceName, klass, resource), e);
+<span class="nc" id="L65">			}</span>
+<span class="nc" id="L66">		});</span>
+<span class="nc" id="L67">	}</span>
+
+	@Override
+	public T getController()
+	{
+<span class="nc bnc" id="L72" title="All 2 branches missed.">		if (Platform.isFxApplicationThread())</span>
+		{
+<span class="nc" id="L74">			return fxmlLoader.getController();</span>
+		}
+		else
+		{
+<span class="nc" id="L78">			return GuiUtility.runOnJavaFXThreadNow(fxmlLoader::getController);</span>
+		}
+	}
+
+	public T getControllerFromJavaFXThread()
+	{
+<span class="nc" id="L84">		GuiAssertions.assertIsJavaFXThread();</span>
+<span class="nc" id="L85">		return fxmlLoader.getController();</span>
+	}
+
+	public void showAsStage(String title)
+	{
+<span class="nc" id="L90">		Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L91">			Stage stage = new Stage();</span>
+<span class="nc" id="L92">			stage.setTitle(title);</span>
+<span class="nc" id="L93">			stage.setScene(getScene());</span>
+<span class="nc" id="L94">			stage.sizeToScene();</span>
+<span class="nc" id="L95">			stage.show();</span>
+<span class="nc" id="L96">		});</span>
+<span class="nc" id="L97">	}</span>
+
+	public void showAndBlock(String title)
+	{
+<span class="nc" id="L101">		GuiAssertions.assertIsNotJavaFXThread();</span>
+<span class="nc" id="L102">		CompletableFuture&lt;Integer&gt; lock = new CompletableFuture&lt;&gt;();</span>
+<span class="nc" id="L103">		Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L104">			Stage stage = new Stage();</span>
+<span class="nc" id="L105">			stage.setTitle(title);</span>
+<span class="nc" id="L106">			stage.setScene(getScene());</span>
+<span class="nc" id="L107">			stage.sizeToScene();</span>
+<span class="nc" id="L108">			stage.showAndWait();</span>
+<span class="nc" id="L109">			Logging.errorPrint(&quot;passed wait&quot;);</span>
+<span class="nc" id="L110">			lock.completeAsync(() -&gt; 0);</span>
+
+<span class="nc" id="L112">		});</span>
+<span class="nc" id="L113">		lock.join();</span>
+<span class="nc" id="L114">	}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

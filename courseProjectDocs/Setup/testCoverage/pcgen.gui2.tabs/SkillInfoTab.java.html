@@ -1,0 +1,726 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SkillInfoTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui2.tabs</a> &gt; <span class="el_source">SkillInfoTab.java</span></div><h1>SkillInfoTab.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2008 Connor Petty &lt;cpmeister@users.sourceforge.net&gt;
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * 
+ */
+package pcgen.gui2.tabs;
+
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.text.DecimalFormat;
+import java.util.EventObject;
+import java.util.Objects;
+import java.util.stream.IntStream;
+
+import javax.swing.AbstractSpinnerModel;
+import javax.swing.ComboBoxModel;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.DefaultListSelectionModel;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JFormattedTextField;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSpinner;
+import javax.swing.JSpinner.DefaultEditor;
+import javax.swing.JSplitPane;
+import javax.swing.JTable;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ListDataEvent;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+import javax.swing.text.DefaultFormatterFactory;
+import javax.swing.text.NumberFormatter;
+
+import pcgen.cdom.enumeration.SkillCost;
+import pcgen.cdom.enumeration.SkillFilter;
+import pcgen.core.Skill;
+import pcgen.facade.core.CharacterFacade;
+import pcgen.facade.core.CharacterLevelFacade;
+import pcgen.facade.core.CharacterLevelsFacade;
+import pcgen.facade.core.CharacterLevelsFacade.CharacterLevelEvent;
+import pcgen.facade.core.CharacterLevelsFacade.SkillBonusListener;
+import pcgen.facade.core.CharacterLevelsFacade.SkillPointListener;
+import pcgen.facade.util.event.ListEvent;
+import pcgen.facade.util.event.ListListener;
+import pcgen.gui2.filter.Filter;
+import pcgen.gui2.filter.FilterBar;
+import pcgen.gui2.filter.FilterButton;
+import pcgen.gui2.filter.FilterUtilities;
+import pcgen.gui2.filter.FilteredTreeViewTable;
+import pcgen.gui2.filter.SearchFilterPanel;
+import pcgen.gui2.tabs.models.HtmlSheetSupport;
+import pcgen.gui2.tabs.skill.SkillPointTableModel;
+import pcgen.gui2.tabs.skill.SkillTreeViewModel;
+import pcgen.gui2.tools.FlippingSplitPane;
+import pcgen.gui2.tools.InfoPane;
+import pcgen.gui2.util.event.ListDataAdapter;
+import pcgen.gui2.util.table.TableCellUtilities;
+import pcgen.gui2.util.table.TableCellUtilities.SpinnerEditor;
+import pcgen.gui2.util.table.TableCellUtilities.SpinnerRenderer;
+import pcgen.gui3.JFXPanelFromResource;
+import pcgen.gui3.SimpleHtmlPanelController;
+import pcgen.system.LanguageBundle;
+import pcgen.util.enumeration.Tab;
+
+/**
+ * This component allows the user to manage a character's skills.
+ */
+@SuppressWarnings(&quot;serial&quot;)
+public class SkillInfoTab extends FlippingSplitPane implements CharacterInfoTab, TodoHandler
+{
+
+	private final FilteredTreeViewTable&lt;CharacterFacade, Skill&gt; skillTable;
+	private final JTable skillpointTable;
+	private final InfoPane infoPane;
+	private final TabTitle tabTitle;
+	private final FilterButton&lt;CharacterFacade, Skill&gt; cFilterButton;
+	private final FilterButton&lt;CharacterFacade, Skill&gt; trainedFilterButton;
+
+	private final JComboBox&lt;SkillFilter&gt; skillFilterBox;
+	private final JFXPanelFromResource&lt;SimpleHtmlPanelController&gt; htmlPane;
+	SkillInfoTab()
+	{
+<span class="nc" id="L106">		super();</span>
+<span class="nc" id="L107">		this.skillTable = new FilteredTreeViewTable&lt;&gt;();</span>
+<span class="nc" id="L108">		this.skillpointTable = new JTable();</span>
+<span class="nc" id="L109">		this.infoPane = new InfoPane();</span>
+<span class="nc" id="L110">		this.cFilterButton = new FilterButton&lt;&gt;(&quot;SkillQualified&quot;);</span>
+<span class="nc" id="L111">		this.trainedFilterButton = new FilterButton&lt;&gt;(&quot;SkillTrained&quot;);</span>
+<span class="nc" id="L112">		this.tabTitle = new TabTitle(Tab.SKILLS);</span>
+<span class="nc" id="L113">		this.htmlPane = new JFXPanelFromResource&lt;&gt;(</span>
+				SimpleHtmlPanelController.class,
+				&quot;SimpleHtmlPanel.fxml&quot;
+		);
+<span class="nc" id="L117">        this.skillFilterBox = new JComboBox&lt;&gt;();</span>
+<span class="nc" id="L118">		initComponents();</span>
+<span class="nc" id="L119">	}</span>
+
+	private void initComponents()
+	{
+<span class="nc" id="L123">		setOrientation(VERTICAL_SPLIT);</span>
+<span class="nc" id="L124">		setResizeWeight(0.70);</span>
+
+<span class="nc" id="L126">		skillTable.setDefaultRenderer(Integer.class, new TableCellUtilities.AlignRenderer(SwingConstants.CENTER));</span>
+<span class="nc" id="L127">		skillTable.setDefaultRenderer(String.class, new TableCellUtilities.AlignRenderer(SwingConstants.CENTER));</span>
+<span class="nc" id="L128">		skillTable.setRowHeight(26);</span>
+<span class="nc" id="L129">		FilterBar&lt;CharacterFacade, Skill&gt; filterBar = new FilterBar&lt;&gt;();</span>
+<span class="nc" id="L130">		filterBar.addDisplayableFilter(new SearchFilterPanel());</span>
+
+<span class="nc" id="L132">		cFilterButton.setText(LanguageBundle.getString(&quot;in_classString&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L133">		cFilterButton.setEnabled(false);</span>
+<span class="nc" id="L134">		filterBar.addDisplayableFilter(cFilterButton);</span>
+
+<span class="nc" id="L136">		trainedFilterButton.setText(LanguageBundle.getString(&quot;in_trained&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L137">		trainedFilterButton.setEnabled(false);</span>
+<span class="nc" id="L138">		filterBar.addDisplayableFilter(trainedFilterButton);</span>
+<span class="nc" id="L139">		JPanel availPanel = FilterUtilities.configureFilteredTreeViewPane(skillTable, filterBar);</span>
+<span class="nc" id="L140">		availPanel.setPreferredSize(new Dimension(650, 300));</span>
+		JScrollPane tableScrollPane;
+<span class="nc" id="L142">		JPanel tablePanel = new JPanel(new GridBagLayout());</span>
+<span class="nc" id="L143">		GridBagConstraints constraints = new GridBagConstraints();</span>
+
+<span class="nc" id="L145">		constraints.gridwidth = java.awt.GridBagConstraints.REMAINDER;</span>
+<span class="nc" id="L146">		constraints.fill = java.awt.GridBagConstraints.BOTH;</span>
+<span class="nc" id="L147">		constraints.weightx = 1.0;</span>
+
+<span class="nc" id="L149">		constraints.ipady = 0;</span>
+<span class="nc" id="L150">		constraints.weighty = 1.0;</span>
+
+<span class="nc" id="L152">		SkillPointTableModel.initializeTable(skillpointTable);</span>
+<span class="nc" id="L153">		tableScrollPane = new JScrollPane(skillpointTable);</span>
+<span class="nc" id="L154">		tablePanel.add(tableScrollPane, constraints);</span>
+
+<span class="nc" id="L156">		skillFilterBox.setRenderer(new DefaultListCellRenderer());</span>
+
+<span class="nc" id="L158">		JScrollPane selScrollPane = new JScrollPane(htmlPane);</span>
+<span class="nc" id="L159">		JPanel skillPanel = new JPanel(new BorderLayout());</span>
+<span class="nc" id="L160">		skillPanel.add(skillFilterBox, BorderLayout.NORTH);</span>
+<span class="nc" id="L161">		skillPanel.add(selScrollPane, BorderLayout.CENTER);</span>
+<span class="nc" id="L162">		selScrollPane.setPreferredSize(new Dimension(530, 300));</span>
+
+<span class="nc" id="L164">		FlippingSplitPane topPane =</span>
+				new FlippingSplitPane(JSplitPane.HORIZONTAL_SPLIT, true, availPanel, skillPanel);
+<span class="nc" id="L166">		setTopComponent(topPane);</span>
+
+<span class="nc" id="L168">		FlippingSplitPane bottomPane = new FlippingSplitPane(JSplitPane.HORIZONTAL_SPLIT);</span>
+<span class="nc" id="L169">		bottomPane.setLeftComponent(tablePanel);</span>
+<span class="nc" id="L170">		tablePanel.setPreferredSize(new Dimension(650, 100));</span>
+<span class="nc" id="L171">		bottomPane.setRightComponent(infoPane);</span>
+<span class="nc" id="L172">		infoPane.setPreferredSize(new Dimension(530, 100));</span>
+<span class="nc" id="L173">		setBottomComponent(bottomPane);</span>
+
+<span class="nc" id="L175">	}</span>
+
+	@Override
+	public ModelMap createModels(final CharacterFacade character)
+	{
+<span class="nc" id="L180">		Objects.requireNonNull(character);</span>
+<span class="nc" id="L181">		ModelMap models = new ModelMap();</span>
+
+<span class="nc" id="L183">		ListSelectionModel listModel = new DefaultListSelectionModel();</span>
+<span class="nc" id="L184">		listModel.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);</span>
+
+<span class="nc" id="L186">		models.put(ListSelectionModel.class, listModel);</span>
+<span class="nc" id="L187">		models.put(SkillPointTableModel.class, new SkillPointTableModel(character));</span>
+<span class="nc" id="L188">		models.put(SkillTreeViewModel.class, new SkillTreeViewModel(character, listModel));</span>
+<span class="nc" id="L189">		models.put(FilterHandler.class, new FilterHandler(character, listModel));</span>
+<span class="nc" id="L190">		models.put(InfoHandler.class, new InfoHandler(character));</span>
+<span class="nc" id="L191">		models.put(LevelSelectionHandler.class, new LevelSelectionHandler(character, listModel));</span>
+<span class="nc" id="L192">		models.put(SkillRankSpinnerEditor.class, new SkillRankSpinnerEditor(character, listModel));</span>
+
+<span class="nc" id="L194">		SkillSheetHandler skillSheetHandler = new SkillSheetHandler(character);</span>
+<span class="nc" id="L195">		models.put(SkillSheetHandler.class, skillSheetHandler);</span>
+<span class="nc" id="L196">		models.put(SkillFilterHandler.class, new SkillFilterHandler(character, skillSheetHandler));</span>
+<span class="nc" id="L197">		return models;</span>
+	}
+
+	@Override
+	public void storeModels(ModelMap models)
+	{
+<span class="nc" id="L203">		models.get(SkillTreeViewModel.class).uninstall();</span>
+<span class="nc" id="L204">		models.get(FilterHandler.class).uninstall();</span>
+<span class="nc" id="L205">		models.get(InfoHandler.class).uninstall();</span>
+<span class="nc" id="L206">		models.get(LevelSelectionHandler.class).uninstall();</span>
+<span class="nc" id="L207">		models.get(SkillSheetHandler.class).uninstall();</span>
+<span class="nc" id="L208">	}</span>
+
+	@Override
+	public void restoreModels(ModelMap models)
+	{
+<span class="nc" id="L213">		models.get(FilterHandler.class).install();</span>
+<span class="nc" id="L214">		models.get(SkillFilterHandler.class).install();</span>
+<span class="nc" id="L215">		skillpointTable.setModel(models.get(SkillPointTableModel.class));</span>
+<span class="nc" id="L216">		skillpointTable.setSelectionModel(models.get(ListSelectionModel.class));</span>
+<span class="nc" id="L217">		skillTable.setDefaultEditor(Float.class, models.get(SkillRankSpinnerEditor.class));</span>
+
+<span class="nc" id="L219">		models.get(SkillTreeViewModel.class).install(skillTable);</span>
+<span class="nc" id="L220">		models.get(InfoHandler.class).install();</span>
+<span class="nc" id="L221">		models.get(LevelSelectionHandler.class).install();</span>
+<span class="nc" id="L222">		models.get(SkillSheetHandler.class).install();</span>
+<span class="nc" id="L223">	}</span>
+
+	@Override
+	public TabTitle getTabTitle()
+	{
+<span class="nc" id="L228">		return tabTitle;</span>
+	}
+
+	@Override
+	public void adviseTodo(String fieldName)
+	{
+<span class="nc" id="L234">		skillTable.requestFocusInWindow();</span>
+<span class="nc" id="L235">	}</span>
+
+	private class SkillSheetHandler implements SkillBonusListener
+	{
+
+		private final HtmlSheetSupport support;
+
+		public SkillSheetHandler(CharacterFacade character)
+<span class="nc" id="L243">		{</span>
+<span class="nc" id="L244">			String sheet = character.getDataSet().getGameMode().getInfoSheetSkill();</span>
+<span class="nc" id="L245">			support = new HtmlSheetSupport(character, htmlPane, sheet);</span>
+<span class="nc" id="L246">			character.getCharacterLevelsFacade().addSkillBonusListener(this);</span>
+<span class="nc" id="L247">		}</span>
+
+		public void install()
+		{
+<span class="nc" id="L251">			support.install();</span>
+<span class="nc" id="L252">		}</span>
+
+		public void uninstall()
+		{
+<span class="nc" id="L256">			support.uninstall();</span>
+<span class="nc" id="L257">		}</span>
+
+		@Override
+		public void skillBonusChanged(CharacterLevelEvent e)
+		{
+<span class="nc" id="L262">			support.refresh();</span>
+<span class="nc" id="L263">		}</span>
+
+	}
+
+	private class LevelSelectionHandler
+			implements ListListener&lt;CharacterLevelFacade&gt;, SkillPointListener, Runnable, ListSelectionListener
+	{
+
+		private final CharacterLevelsFacade levels;
+		private final ListSelectionModel model;
+
+		public LevelSelectionHandler(CharacterFacade character, ListSelectionModel model)
+<span class="nc" id="L275">		{</span>
+<span class="nc" id="L276">			this.levels = character.getCharacterLevelsFacade();</span>
+<span class="nc" id="L277">			this.model = model;</span>
+<span class="nc" id="L278">		}</span>
+
+		public void install()
+		{
+<span class="nc" id="L282">			levels.addSkillPointListener(this);</span>
+<span class="nc" id="L283">			levels.addListListener(this);</span>
+<span class="nc" id="L284">			model.addListSelectionListener(this);</span>
+<span class="nc" id="L285">			updateSelectedIndex(false);</span>
+<span class="nc" id="L286">		}</span>
+
+		public void uninstall()
+		{
+<span class="nc" id="L290">			levels.removeSkillPointListener(this);</span>
+<span class="nc" id="L291">			levels.removeListListener(this);</span>
+<span class="nc" id="L292">			model.removeListSelectionListener(this);</span>
+<span class="nc" id="L293">		}</span>
+
+		@Override
+		public void run()
+		{
+<span class="nc bnc" id="L298" title="All 2 branches missed.">			for (int startIndex : new int[]{model.getMinSelectionIndex(), 0})</span>
+			{
+<span class="nc bnc" id="L300" title="All 2 branches missed.">				for (int i = startIndex; i &lt; levels.getSize(); i++)</span>
+				{
+<span class="nc" id="L302">					CharacterLevelFacade level = levels.getElementAt(i);</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">					if (levels.getSpentSkillPoints(level) &lt; levels.getGainedSkillPoints(level))</span>
+					{
+<span class="nc bnc" id="L305" title="All 2 branches missed.">						if (i != model.getMinSelectionIndex())</span>
+						{
+							//Logging.errorPrint(&quot;updateSelectedIndex got &quot; + level);
+<span class="nc" id="L308">							model.setSelectionInterval(i, i);</span>
+<span class="nc" id="L309">							skillpointTable.scrollRectToVisible(skillpointTable.getCellRect(i, 0, true));</span>
+						}
+<span class="nc" id="L311">						return;</span>
+					}
+				}
+			}
+			// Fall back for a non empty list of levels is to select the highest one.
+<span class="nc bnc" id="L316" title="All 2 branches missed.">			if (levels.getSize() &gt; 0)</span>
+			{
+<span class="nc" id="L318">				model.setSelectionInterval(levels.getSize() - 1, levels.getSize() - 1);</span>
+<span class="nc" id="L319">				skillpointTable.scrollRectToVisible(skillpointTable.getCellRect(levels.getSize() - 1, 0, true));</span>
+			}
+<span class="nc" id="L321">		}</span>
+
+		private void updateSelectedIndex(boolean forceChange)
+		{
+<span class="nc bnc" id="L325" title="All 2 branches missed.">			if (levels.isEmpty())</span>
+			{
+<span class="nc" id="L327">				return;</span>
+			}
+			//if a level is already selected, don't change it
+			//unless all the skill points have been spent
+<span class="nc bnc" id="L331" title="All 4 branches missed.">			if (!model.isSelectionEmpty() &amp;&amp; !forceChange)</span>
+			{
+<span class="nc" id="L333">				int index = model.getMinSelectionIndex();</span>
+<span class="nc" id="L334">				CharacterLevelFacade level = levels.getElementAt(index);</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">				if (levels.getSpentSkillPoints(level) &lt; levels.getGainedSkillPoints(level))</span>
+				{
+<span class="nc" id="L337">					return;</span>
+				}
+			}
+			/* Updating now would conflict with the JTable updating due to the same events.
+			 * So update the selection model after JTable has had its way with it.
+			 */
+<span class="nc" id="L343">			SwingUtilities.invokeLater(this);</span>
+<span class="nc" id="L344">		}</span>
+
+		@Override
+		public void skillPointsChanged(CharacterLevelEvent e)
+		{
+<span class="nc" id="L349">			int firstRow = e.getBaseLevelIndex();</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">			boolean force = firstRow &lt; model.getMinSelectionIndex();</span>
+<span class="nc" id="L351">			updateSelectedIndex(force);</span>
+<span class="nc" id="L352">		}</span>
+
+		@Override
+		public void elementAdded(ListEvent&lt;CharacterLevelFacade&gt; e)
+		{
+<span class="nc" id="L357">			updateSelectedIndex(false);</span>
+<span class="nc" id="L358">		}</span>
+
+		@Override
+		public void elementRemoved(ListEvent&lt;CharacterLevelFacade&gt; e)
+		{
+<span class="nc" id="L363">			updateSelectedIndex(false);</span>
+<span class="nc" id="L364">		}</span>
+
+		@Override
+		public void elementsChanged(ListEvent&lt;CharacterLevelFacade&gt; e)
+		{
+<span class="nc" id="L369">			updateSelectedIndex(false);</span>
+<span class="nc" id="L370">		}</span>
+
+		@Override
+		public void elementModified(ListEvent&lt;CharacterLevelFacade&gt; e)
+		{
+<span class="nc" id="L375">			updateSelectedIndex(false);</span>
+<span class="nc" id="L376">		}</span>
+
+		@Override
+		public void valueChanged(ListSelectionEvent e)
+		{
+<span class="nc" id="L381">			skillTable.refreshModelData();</span>
+<span class="nc" id="L382">		}</span>
+
+	}
+
+	private class FilterHandler implements ListSelectionListener
+	{
+
+<span class="nc" id="L389">		private final Filter&lt;CharacterFacade, Skill&gt; cFilter = new Filter&lt;&gt;()</span>
+<span class="nc" id="L390">		{</span>
+
+			@Override
+			public boolean accept(CharacterFacade context, Skill element)
+			{
+<span class="nc bnc" id="L395" title="All 2 branches missed.">				if (context == null)</span>
+				{
+<span class="nc" id="L397">					return false;</span>
+				}
+<span class="nc" id="L399">				CharacterLevelsFacade levels = context.getCharacterLevelsFacade();</span>
+<span class="nc" id="L400">				CharacterLevelFacade level = levels.getElementAt(model.getMinSelectionIndex());</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">				return levels.getSkillCost(level, element) == SkillCost.CLASS;</span>
+			}
+
+		};
+
+<span class="nc" id="L406">		private final Filter&lt;CharacterFacade, Skill&gt; gainedFilter = (context, element) -&gt; {</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">            if (context == null)</span>
+            {
+<span class="nc" id="L409">                return false;</span>
+            }
+<span class="nc" id="L411">            CharacterLevelsFacade levels = context.getCharacterLevelsFacade();</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            return levels.getSkillRanks(null, element) &gt; 0.0f;</span>
+        };
+		private final ListSelectionModel model;
+		private final CharacterFacade character;
+<span class="nc" id="L416">		private boolean installed = false;</span>
+
+		public FilterHandler(CharacterFacade character, ListSelectionModel model)
+<span class="nc" id="L419">		{</span>
+<span class="nc" id="L420">			this.character = character;</span>
+<span class="nc" id="L421">			this.model = model;</span>
+<span class="nc" id="L422">			model.addListSelectionListener(this);</span>
+<span class="nc" id="L423">		}</span>
+
+		public void install()
+		{
+<span class="nc" id="L427">			installed = true;</span>
+<span class="nc" id="L428">			cFilterButton.setFilter(cFilter);</span>
+<span class="nc" id="L429">			trainedFilterButton.setFilter(gainedFilter);</span>
+<span class="nc" id="L430">			skillTable.setContext(character);</span>
+<span class="nc" id="L431">		}</span>
+
+		public void uninstall()
+		{
+<span class="nc" id="L435">			installed = false;</span>
+<span class="nc" id="L436">		}</span>
+
+		@Override
+		public void valueChanged(ListSelectionEvent e)
+		{
+<span class="nc bnc" id="L441" title="All 4 branches missed.">			if (installed &amp;&amp; !e.getValueIsAdjusting())</span>
+			{
+<span class="nc bnc" id="L443" title="All 2 branches missed.">				cFilterButton.setEnabled(model.getMinSelectionIndex() != -1);</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">				trainedFilterButton.setEnabled(model.getMinSelectionIndex() != -1);</span>
+			}
+<span class="nc" id="L446">		}</span>
+
+	}
+
+	private class SkillRankSpinnerEditor extends SpinnerEditor
+	{
+
+		private final SkillRankSpinnerModel model;
+		private ListSelectionModel listModel;
+		private CharacterFacade character;
+
+		public SkillRankSpinnerEditor(CharacterFacade character, ListSelectionModel listModel)
+		{
+<span class="nc" id="L459">			this(new SkillRankSpinnerModel(character));</span>
+<span class="nc" id="L460">			this.listModel = listModel;</span>
+<span class="nc" id="L461">			this.character = character;</span>
+<span class="nc" id="L462">		}</span>
+
+		private SkillRankSpinnerEditor(SkillRankSpinnerModel model)
+<span class="nc" id="L465">		{</span>
+<span class="nc" id="L466">			super(model);</span>
+<span class="nc" id="L467">			this.model = model;</span>
+
+<span class="nc" id="L469">			DefaultEditor editor = new DefaultEditor(spinner);</span>
+<span class="nc" id="L470">			NumberFormatter formatter = new NumberFormatter(new DecimalFormat(&quot;#0.#&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L471">			formatter.setValueClass(Float.class);</span>
+<span class="nc" id="L472">			DefaultFormatterFactory factory = new DefaultFormatterFactory(formatter);</span>
+
+<span class="nc" id="L474">			JFormattedTextField ftf = editor.getTextField();</span>
+<span class="nc" id="L475">			ftf.setEditable(true);</span>
+<span class="nc" id="L476">			ftf.setFormatterFactory(factory);</span>
+<span class="nc" id="L477">			ftf.setHorizontalAlignment(SwingConstants.RIGHT);</span>
+
+<span class="nc" id="L479">			spinner.setEditor(editor);</span>
+<span class="nc" id="L480">		}</span>
+
+		@Override
+		public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row,
+			int column)
+		{
+<span class="nc" id="L486">			Skill skill = (Skill) table.getModel().getValueAt(row, 0);</span>
+<span class="nc" id="L487">			int index = listModel.getMinSelectionIndex();</span>
+<span class="nc" id="L488">			model.configureModel(skill, character.getCharacterLevelsFacade().getElementAt(index));</span>
+<span class="nc" id="L489">			return spinner;</span>
+		}
+
+		@Override
+		public boolean isCellEditable(EventObject e)
+		{
+<span class="nc bnc" id="L495" title="All 2 branches missed.">			return listModel.getMinSelectionIndex() != -1;</span>
+		}
+
+		@Override
+		public void stateChanged(ChangeEvent e)
+		{
+<span class="nc" id="L501">			releaseMouse(spinner);</span>
+<span class="nc" id="L502">			super.stateChanged(e);</span>
+<span class="nc" id="L503">		}</span>
+
+		private void releaseMouse(JSpinner jSpinner)
+		{
+<span class="nc" id="L507">			IntStream.range(0, jSpinner.getComponentCount())</span>
+<span class="nc" id="L508">			         .mapToObj(jSpinner::getComponent)</span>
+<span class="nc" id="L509">			         .filter(comp -&gt; comp instanceof JButton)</span>
+<span class="nc" id="L510">			         .forEach(this::releaseMouse);</span>
+<span class="nc" id="L511">		}</span>
+
+		private void releaseMouse(Component component)
+		{
+<span class="nc" id="L515">			MouseListener[] listeners = component.getMouseListeners();</span>
+<span class="nc bnc" id="L516" title="All 2 branches missed.">			for (MouseListener listener : listeners)</span>
+			{
+<span class="nc" id="L518">				listener.mouseReleased(new MouseEvent(component, MouseEvent.MOUSE_RELEASED, System.currentTimeMillis(),</span>
+						0, 0, 0, 1, false
+				));
+			}
+<span class="nc" id="L522">		}</span>
+
+	}
+
+	private class SkillRankSpinnerModel extends AbstractSpinnerModel
+	{
+
+		private final CharacterFacade character;
+		private CharacterLevelFacade level;
+		private Skill skill;
+
+		public SkillRankSpinnerModel(CharacterFacade character)
+<span class="nc" id="L534">		{</span>
+<span class="nc" id="L535">			this.character = character;</span>
+<span class="nc" id="L536">		}</span>
+
+		@Override
+		public Float getValue()
+		{
+<span class="nc" id="L541">			return character.getCharacterLevelsFacade().getSkillRanks(level, skill);</span>
+		}
+
+		public void configureModel(Skill sk, CharacterLevelFacade charLevel)
+		{
+<span class="nc" id="L546">			this.skill = sk;</span>
+<span class="nc" id="L547">			this.level = charLevel;</span>
+<span class="nc" id="L548">			fireStateChanged();</span>
+<span class="nc" id="L549">		}</span>
+
+		@Override
+		public void setValue(Object value)
+		{
+<span class="nc bnc" id="L554" title="All 2 branches missed.">			if (value instanceof Float)</span>
+			{
+<span class="nc" id="L556">				setValue((Float) value);</span>
+			}
+<span class="nc" id="L558">		}</span>
+
+		public void setValue(Float value)
+		{
+<span class="nc bnc" id="L562" title="All 2 branches missed.">			if (value == null)</span>
+			{
+<span class="nc" id="L564">				return;</span>
+			}
+
+<span class="nc" id="L567">			CharacterLevelsFacade levels = character.getCharacterLevelsFacade();</span>
+<span class="nc" id="L568">			CharacterLevelFacade targetLevel = levels.findNextLevelForSkill(skill, level, value);</span>
+<span class="nc bnc" id="L569" title="All 2 branches missed.">			if (targetLevel == null)</span>
+			{
+				// No level where it can be raised.
+<span class="nc" id="L572">				return;</span>
+			}
+<span class="nc" id="L574">			SkillCost cost = levels.getSkillCost(targetLevel, skill);</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">			if (value &lt; 0)</span>
+			{
+<span class="nc" id="L577">				value = 0.0f;</span>
+			}
+<span class="nc" id="L579">			float max = levels.getMaxRanks(targetLevel, cost, levels.isClassSkillForMaxRanks(targetLevel, skill));</span>
+<span class="nc bnc" id="L580" title="All 2 branches missed.">			if (value &gt; max)</span>
+			{
+<span class="nc" id="L582">				value = max;</span>
+			}
+
+<span class="nc" id="L585">			int points = (int) ((value - getValue()) * levels.getSkillCost(targetLevel, skill).getCost());</span>
+<span class="nc bnc" id="L586" title="All 2 branches missed.">			if (points == 0)</span>
+			{
+				// No change, ignore
+<span class="nc" id="L589">				return;</span>
+			}
+
+<span class="nc bnc" id="L592" title="All 2 branches missed.">			if (levels.investSkillPoints(targetLevel, skill, points))</span>
+			{
+<span class="nc" id="L594">				fireStateChanged();</span>
+				//TODO: Remove this method when CharacterFacade's event system is created.
+				//skillpointTable.repaint();
+<span class="nc" id="L597">				skillTable.refreshModelData();</span>
+			}
+			else
+			{
+<span class="nc" id="L601">				skillTable.getCellEditor().cancelCellEditing();</span>
+			}
+<span class="nc" id="L603">		}</span>
+
+		@Override
+		public Float getNextValue()
+		{
+<span class="nc" id="L608">			float value = getValue();</span>
+<span class="nc bnc" id="L609" title="All 2 branches missed.">			if (level == null)</span>
+			{
+<span class="nc" id="L611">				return null;</span>
+			}
+<span class="nc" id="L613">			CharacterLevelsFacade levels = character.getCharacterLevelsFacade();</span>
+<span class="nc" id="L614">			CharacterLevelFacade targetLevel = levels.findNextLevelForSkill(skill, level, value);</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">			if (targetLevel == null)</span>
+			{
+				// No level where it can be raised.
+<span class="nc" id="L618">				return null;</span>
+			}
+
+<span class="nc" id="L621">			SkillCost cost = levels.getSkillCost(targetLevel, skill);</span>
+<span class="nc" id="L622">			CharacterLevelFacade highestLevel = levels.getElementAt(levels.getSize() - 1);</span>
+<span class="nc bnc" id="L623" title="All 2 branches missed.">			if (value == levels.getMaxRanks(highestLevel, cost, levels.isClassSkillForMaxRanks(highestLevel, skill)))</span>
+			{
+<span class="nc" id="L625">				return null;</span>
+			}
+<span class="nc" id="L627">			return value + 1.0f / cost.getCost();</span>
+		}
+
+		@Override
+		public Float getPreviousValue()
+		{
+<span class="nc" id="L633">			float value = getValue();</span>
+<span class="nc bnc" id="L634" title="All 4 branches missed.">			if (level == null || value == 0)</span>
+			{
+<span class="nc" id="L636">				return null;</span>
+			}
+<span class="nc" id="L638">			CharacterLevelsFacade levels = character.getCharacterLevelsFacade();</span>
+<span class="nc" id="L639">			SkillCost cost = levels.getSkillCost(level, skill);</span>
+<span class="nc" id="L640">			return value - 1.0f / cost.getCost();</span>
+		}
+
+	}
+
+	private class InfoHandler implements ListSelectionListener
+	{
+
+		private final CharacterFacade character;
+		private String text;
+
+		public InfoHandler(CharacterFacade character)
+<span class="nc" id="L652">		{</span>
+<span class="nc" id="L653">			this.character = character;</span>
+<span class="nc" id="L654">			this.text = &quot;&quot;; //$NON-NLS-1$</span>
+<span class="nc" id="L655">		}</span>
+
+		public void install()
+		{
+<span class="nc" id="L659">			skillTable.getSelectionModel().addListSelectionListener(this);</span>
+<span class="nc" id="L660">			infoPane.setText(text);</span>
+<span class="nc" id="L661">		}</span>
+
+		public void uninstall()
+		{
+<span class="nc" id="L665">			skillTable.getSelectionModel().removeListSelectionListener(this);</span>
+<span class="nc" id="L666">		}</span>
+
+		@Override
+		public void valueChanged(ListSelectionEvent e)
+		{
+<span class="nc bnc" id="L671" title="All 2 branches missed.">			if (!e.getValueIsAdjusting())</span>
+			{
+<span class="nc" id="L673">				Object data = skillTable.getSelectedObject();</span>
+<span class="nc bnc" id="L674" title="All 4 branches missed.">				if (data != null &amp;&amp; data instanceof Skill)</span>
+				{
+<span class="nc" id="L676">					text = character.getInfoFactory().getHTMLInfo((Skill) data);</span>
+				}
+				else
+				{
+<span class="nc" id="L680">					text = &quot;&quot;; //$NON-NLS-1$</span>
+				}
+<span class="nc" id="L682">				infoPane.setText(text);</span>
+			}
+<span class="nc" id="L684">		}</span>
+
+	}
+
+	private class SkillFilterHandler extends ListDataAdapter
+	{
+
+		private final CharacterFacade character;
+		private final SkillSheetHandler skillSheetHandler;
+		private final ComboBoxModel model;
+
+		public SkillFilterHandler(CharacterFacade character, SkillSheetHandler skillSheetHandler)
+<span class="nc" id="L696">		{</span>
+<span class="nc" id="L697">			this.character = character;</span>
+<span class="nc" id="L698">			this.skillSheetHandler = skillSheetHandler;</span>
+
+<span class="nc" id="L700">			model = new DefaultComboBoxModel&lt;&gt;(</span>
+				new SkillFilter[]{SkillFilter.Ranks, SkillFilter.NonDefault, SkillFilter.Usable, SkillFilter.All});
+
+<span class="nc" id="L703">			SkillFilter filter = character.getSkillFilterRef().get();</span>
+<span class="nc" id="L704">			model.setSelectedItem(filter);</span>
+<span class="nc" id="L705">			model.addListDataListener(this);</span>
+<span class="nc" id="L706">		}</span>
+
+		public void install()
+		{
+<span class="nc" id="L710">			skillFilterBox.setModel(model);</span>
+<span class="nc" id="L711">		}</span>
+
+		@Override
+		public void listDataChanged(ListDataEvent e)
+		{
+<span class="nc bnc" id="L716" title="All 4 branches missed.">			if (e.getIndex0() == -1 &amp;&amp; e.getIndex1() == -1)</span>
+			{
+<span class="nc" id="L718">				SkillFilter filter = (SkillFilter) skillFilterBox.getSelectedItem();</span>
+<span class="nc" id="L719">				character.setSkillFilter(filter);</span>
+<span class="nc" id="L720">				skillSheetHandler.support.refresh();</span>
+			}
+<span class="nc" id="L722">		}</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

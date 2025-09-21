@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChallengeRatingFacet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.cdom.facet.analysis</a> &gt; <span class="el_source">ChallengeRatingFacet.java</span></div><h1>ChallengeRatingFacet.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) Thomas Parker, 2009.
+ * 
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+package pcgen.cdom.facet.analysis;
+
+import java.util.List;
+import java.util.Map;
+
+import pcgen.base.formula.Formula;
+import pcgen.cdom.base.FormulaFactory;
+import pcgen.cdom.content.ChallengeRating;
+import pcgen.cdom.content.LevelCommandFactory;
+import pcgen.cdom.enumeration.CharID;
+import pcgen.cdom.enumeration.FormulaKey;
+import pcgen.cdom.enumeration.ListKey;
+import pcgen.cdom.enumeration.MapKey;
+import pcgen.cdom.enumeration.ObjectKey;
+import pcgen.cdom.enumeration.Type;
+import pcgen.cdom.facet.BonusCheckingFacet;
+import pcgen.cdom.facet.FormulaResolvingFacet;
+import pcgen.cdom.facet.model.ClassFacet;
+import pcgen.cdom.facet.model.RaceFacet;
+import pcgen.cdom.facet.model.TemplateFacet;
+import pcgen.core.ClassType;
+import pcgen.core.PCClass;
+import pcgen.core.SettingsHandler;
+
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * ChallengeRatingFacet is a Facet that calculates the Challenge Rating of a
+ * Player Character
+ * 
+ */
+<span class="fc" id="L49">public class ChallengeRatingFacet</span>
+{
+	private TemplateFacet templateFacet;
+	private RaceFacet raceFacet;
+	private ClassFacet classFacet;
+	private FormulaResolvingFacet formulaResolvingFacet;
+	private BonusCheckingFacet bonusCheckingFacet;
+	private LevelFacet levelFacet;
+
+	/**
+	 * Returns the Challenge Rating of the Player Character represented by the
+	 * given CharID
+	 * 
+	 * @param id
+	 *            The CharID representing the Player Character for which the
+	 *            Challenge Rating should be returned
+	 * @return The Challenge Rating of the Player Character represented by the
+	 *         given CharID
+	 */
+	@Nullable
+	public Integer getCR(CharID id)
+	{
+<span class="nc" id="L71">		int cr = 0;</span>
+
+<span class="nc bnc" id="L73" title="All 2 branches missed.">		if (levelFacet.getMonsterLevelCount(id) == 0)</span>
+		{
+<span class="nc bnc" id="L75" title="All 2 branches missed.">			if (levelFacet.getNonMonsterLevelCount(id) == 0)</span>
+			{
+<span class="nc" id="L77">				return null;</span>
+			}
+			// calculate and add class CR for 0-HD races
+<span class="nc" id="L80">			cr += calcClassesCR(id);</span>
+		}
+		else
+		{
+			// calculate and add race CR and classes CR for 
+			// races with racial hit dice
+<span class="nc" id="L86">			Integer classRaceCR = calcClassesForRaceCR(id);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">			if (classRaceCR == null)</span>
+			{
+<span class="nc" id="L89">				return null;</span>
+			}
+<span class="nc" id="L91">			Integer raceCR = calcRaceCR(id);</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">			if (raceCR != null)</span>
+			{
+<span class="nc" id="L94">				cr += raceCR;</span>
+			}
+<span class="nc" id="L96">			cr += classRaceCR;</span>
+		}
+
+		// calculate and add CR bonus from templates
+<span class="nc" id="L100">		cr += getTemplateCR(id);</span>
+
+		// calculate and add in the MISC bonus to CR
+<span class="nc" id="L103">		cr += (int) bonusCheckingFacet.getBonus(id, &quot;MISC&quot;, &quot;CR&quot;);</span>
+
+<span class="nc" id="L105">		return cr;</span>
+	}
+
+	/**
+	 * Returns the ChallengeRating provided solely by the Race of the Player
+	 * Character identified by the given CharID.
+	 * 
+	 * @param id
+	 *            The CharID representing the Player Character
+	 * @return the Challenge Rating provided by the Race of the Player Character
+	 *         identified by the given CharID
+	 */
+	public Integer calcRaceCR(CharID id)
+	{
+		// Calculate and add the CR from race
+<span class="nc" id="L120">		ChallengeRating cr = raceFacet.get(id).getSafe(ObjectKey.CHALLENGE_RATING);</span>
+<span class="nc" id="L121">		return cr.toInteger();</span>
+	}
+
+	/**
+	 * Returns the racial hit dice provided solely by the race of the
+	 * character identified by the given CharID.
+	 * 
+	 * @param id  The CharID representing the character
+	 * 
+	 * @return the racial hit dice provided by the race of the character
+	 *         identified by the given CharID
+	 */
+	public int getBaseHD(CharID id)
+	{
+<span class="nc" id="L135">		final LevelCommandFactory lcf = raceFacet.get(id).getSafe(ObjectKey.MONSTER_CLASS);</span>
+		/*
+		 * BUG This converts a formula to a String?  What if it's a formula, NFE?
+		 */
+<span class="nc" id="L139">		return Integer.parseInt(lcf.getLevelCount().toString());</span>
+	}
+
+	/**
+	 * Returns the ChallengeRating provided solely by PCTemplate objects granted
+	 * to the Player Character identified by the given CharID.
+	 * 
+	 * @param id
+	 *            The CharID representing the Player Character
+	 * @return the Challenge Rating provided by the PCTemplate objects granted
+	 *         to the Player Character identified by the given CharID
+	 */
+	private int getTemplateCR(CharID id)
+	{
+		// Calculate and add the CR from the templates
+<span class="nc" id="L154">		return templateFacet.getSet(id)</span>
+<span class="nc" id="L155">		                    .stream()</span>
+<span class="nc" id="L156">		                    .mapToInt(template -&gt; template.getCR(</span>
+<span class="nc" id="L157">				                      levelFacet.getTotalLevels(id),</span>
+<span class="nc" id="L158">				                      levelFacet.getMonsterLevelCount(id)</span>
+		                      ))
+<span class="nc" id="L160">		                    .sum();</span>
+	}
+
+	/**
+	 * Returns the ChallengeRating provided solely by PCClass objects granted to
+	 * the Player Character identified by the given CharID.
+	 * 
+	 * @param id
+	 *            The CharID representing the Player Character
+	 * @return the Challenge Rating provided by the PCClass objects granted to
+	 *         the Player Character identified by the given CharID
+	 */
+	private int calcClassesCR(CharID id)
+	{
+<span class="nc" id="L174">		int cr = 0;</span>
+<span class="nc" id="L175">		int crMod = 0;</span>
+<span class="nc" id="L176">		int crModPriority = 0;</span>
+
+<span class="nc bnc" id="L178" title="All 2 branches missed.">		for (PCClass pcClass : classFacet.getSet(id))</span>
+		{
+<span class="nc" id="L180">			cr += calcClassCR(id, pcClass);</span>
+<span class="nc" id="L181">			int crmp = getClassCRModPriority(pcClass);</span>
+<span class="nc bnc" id="L182" title="All 6 branches missed.">			if (crmp != 0 &amp;&amp; (crmp &lt; crModPriority || crModPriority == 0))</span>
+			{
+<span class="nc" id="L184">				Integer raceMod = getClassRaceCRMod(id, pcClass);</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">				if (raceMod != null)</span>
+				{
+<span class="nc" id="L187">					crMod = raceMod;</span>
+				}
+				else
+				{
+<span class="nc" id="L191">					crMod = getClassCRMod(id, pcClass);</span>
+				}
+<span class="nc" id="L193">				crModPriority = crmp;</span>
+			}
+<span class="nc" id="L195">		}</span>
+<span class="nc" id="L196">		cr += crMod;</span>
+
+<span class="nc" id="L198">		return cr;</span>
+	}
+
+	private Integer calcClassesForRaceCR(CharID id)
+	{
+<span class="nc" id="L203">		int cr = 0;</span>
+<span class="nc" id="L204">		int levelsKey = 0;</span>
+<span class="nc" id="L205">		int levelsNonKey = 0;</span>
+<span class="nc" id="L206">		int levelsConverted = 0;</span>
+<span class="nc" id="L207">		int threshold = 0;</span>
+
+<span class="nc" id="L209">		List&lt;String&gt; raceRoleList = raceFacet.get(id).getListFor(ListKey.MONSTER_ROLES);</span>
+<span class="nc bnc" id="L210" title="All 4 branches missed.">		if ((raceRoleList == null) || raceRoleList.isEmpty())</span>
+		{
+<span class="nc" id="L212">			raceRoleList = SettingsHandler.getGameAsProperty().get().getMonsterRoleDefaultList();</span>
+		}
+
+		// Calculate and add the CR from the PC Classes
+<span class="nc bnc" id="L216" title="All 2 branches missed.">		for (PCClass pcClass : classFacet.getSet(id))</span>
+		{
+<span class="nc" id="L218">			Integer levels = calcClassCR(id, pcClass);</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">			if (levels == null)</span>
+			{
+<span class="nc" id="L221">				return null;</span>
+			}
+
+<span class="nc" id="L224">			List&lt;String&gt; classRoleList = pcClass.getListFor(ListKey.MONSTER_ROLES);</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">			if (classRoleList != null)</span>
+			{
+<span class="nc" id="L227">				classRoleList.retainAll(raceRoleList);</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">				if (classRoleList.isEmpty())</span>
+				{
+<span class="nc" id="L230">					levelsNonKey += levels;</span>
+				}
+				else
+				{
+<span class="nc" id="L234">					levelsKey += levels;</span>
+				}
+			}
+			else
+			{
+<span class="nc" id="L239">				levelsNonKey += levels;</span>
+			}
+
+<span class="nc" id="L242">		}</span>
+<span class="nc" id="L243">		String sThreshold = SettingsHandler.getGameAsProperty().get().getCRThreshold();</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">		if (sThreshold != null)</span>
+		{
+<span class="nc" id="L246">			threshold = formulaResolvingFacet.resolve(id, FormulaFactory.getFormulaFor(sThreshold), &quot;&quot;).intValue();</span>
+		}
+
+<span class="nc bnc" id="L249" title="All 2 branches missed.">		while (levelsNonKey &gt; 1)</span>
+		{
+<span class="nc" id="L251">			cr++;</span>
+			// TODO: maybe the divisor 2 should be made configurable, 
+			// or the whole calculation put into a formula
+<span class="nc" id="L254">			levelsNonKey -= 2;</span>
+<span class="nc" id="L255">			levelsConverted += 2;</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">			if (levelsConverted &gt;= threshold)</span>
+			{
+<span class="nc" id="L258">				break;</span>
+			}
+		}
+<span class="nc bnc" id="L261" title="All 2 branches missed.">		if (levelsConverted &gt; 0)</span>
+		{
+<span class="nc" id="L263">			cr += levelsNonKey;</span>
+		}
+<span class="nc" id="L265">		cr += levelsKey;</span>
+
+<span class="nc" id="L267">		return cr;</span>
+	}
+
+	private Integer getClassRaceCRMod(CharID id, PCClass cl)
+	{
+<span class="nc" id="L272">		String classType = cl.getClassType();</span>
+
+<span class="nc bnc" id="L274" title="All 2 branches missed.">		if (classType != null)</span>
+		{
+<span class="nc bnc" id="L276" title="All 2 branches missed.">			if (SettingsHandler.getGameAsProperty().get().getClassTypeByName(classType) != null)</span>
+			{
+<span class="nc" id="L278">				Integer crMod = raceFacet.get(id).get(MapKey.CRMOD, classType);</span>
+<span class="nc" id="L279">                return crMod;</span>
+			}
+		}
+		else
+		{
+			// For migration purposes, if CLASSTYPE is not set, 
+			// use old method to determine the class type from TYPE. 
+<span class="nc bnc" id="L286" title="All 2 branches missed.">			for (Type type : cl.getTrueTypeList(false))</span>
+			{
+<span class="nc" id="L288">				classType = type.toString();</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">				if (SettingsHandler.getGameAsProperty().get().getClassTypeByName(classType) != null)</span>
+				{
+<span class="nc" id="L291">					Integer crMod = raceFacet.get(id).get(MapKey.CRMOD, classType);</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">					if (crMod != null)</span>
+					{
+<span class="nc" id="L294">						return crMod;</span>
+					}
+				}
+<span class="nc" id="L297">			}</span>
+		}
+<span class="nc" id="L299">		return null;</span>
+	}
+
+	/**
+	 * Returns the ChallengeRating provided solely by the given Class of the
+	 * Player Character identified by the given CharID.
+	 * 
+	 * @param id
+	 *            The CharID representing the Player Character
+	 * @param cl
+	 *            The PCClass for which the class Challenge Rating should be
+	 *            calculated
+	 * @return the Challenge Rating provided solely by the given Class of the
+	 *         Player Character identified by the given CharID
+	 */
+	private Integer calcClassCR(CharID id, PCClass cl)
+	{
+<span class="nc" id="L316">		Formula cr = cl.get(FormulaKey.CR);</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">		if (cr == null)</span>
+		{
+<span class="nc" id="L319">			ClassType aClassType = SettingsHandler.getGameAsProperty().get().getClassTypeByName(cl.getClassType());</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">			if (aClassType != null)</span>
+			{
+<span class="nc" id="L322">				String crf = aClassType.getCRFormula();</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">				if (&quot;NONE&quot;.equalsIgnoreCase(crf))</span>
+				{
+<span class="nc" id="L325">					return null;</span>
+				}
+<span class="nc bnc" id="L327" title="All 2 branches missed.">				else if (!&quot;0&quot;.equals(crf))</span>
+				{
+<span class="nc" id="L329">					cr = FormulaFactory.getFormulaFor(crf);</span>
+				}
+<span class="nc" id="L331">			}</span>
+			else
+			{
+				// For migration purposes, if CLASSTYPE is not set, 
+				// use old method to determine the class type from TYPE. 
+<span class="nc bnc" id="L336" title="All 2 branches missed.">				for (Type type : cl.getTrueTypeList(false))</span>
+				{
+<span class="nc" id="L338">					aClassType = SettingsHandler.getGameAsProperty().get().getClassTypeByName(type.toString());</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">					if (aClassType != null)</span>
+					{
+<span class="nc" id="L341">						String crf = aClassType.getCRFormula();</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">						if (&quot;NONE&quot;.equalsIgnoreCase(crf))</span>
+						{
+<span class="nc" id="L344">							return null;</span>
+						}
+<span class="nc bnc" id="L346" title="All 2 branches missed.">						else if (!&quot;0&quot;.equals(crf))</span>
+						{
+<span class="nc" id="L348">							cr = FormulaFactory.getFormulaFor(crf);</span>
+						}
+					}
+<span class="nc" id="L351">				}</span>
+			}
+		}
+
+<span class="nc bnc" id="L355" title="All 2 branches missed.">		return cr == null ? 0 : formulaResolvingFacet.resolve(id, cr, cl.getQualifiedKey()).intValue();</span>
+	}
+
+	private int getClassCRMod(CharID id, PCClass cl)
+	{
+<span class="nc" id="L360">		int crMod = 0;</span>
+
+<span class="nc" id="L362">		ClassType aClassType = SettingsHandler.getGameAsProperty().get().getClassTypeByName(cl.getClassType());</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">		if (aClassType != null)</span>
+		{
+<span class="nc" id="L365">			String crmf = aClassType.getCRMod();</span>
+<span class="nc" id="L366">			Formula crm = FormulaFactory.getFormulaFor(crmf);</span>
+<span class="nc" id="L367">			crMod = Math.min(crMod, formulaResolvingFacet.resolve(id, crm, cl.getQualifiedKey()).intValue());</span>
+<span class="nc" id="L368">		}</span>
+		else
+		{
+			// For migration purposes, if CLASSTYPE is not set, 
+			// use old method to determine the class type from TYPE. 
+<span class="nc bnc" id="L373" title="All 2 branches missed.">			for (Type type : cl.getTrueTypeList(false))</span>
+			{
+<span class="nc" id="L375">				aClassType = SettingsHandler.getGameAsProperty().get().getClassTypeByName(type.toString());</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">				if (aClassType != null)</span>
+				{
+<span class="nc" id="L378">					String crmf = aClassType.getCRMod();</span>
+<span class="nc" id="L379">					Formula crm = FormulaFactory.getFormulaFor(crmf);</span>
+<span class="nc" id="L380">					crMod = Math.min(crMod, formulaResolvingFacet.resolve(id, crm, cl.getQualifiedKey()).intValue());</span>
+				}
+<span class="nc" id="L382">			}</span>
+		}
+
+<span class="nc" id="L385">		return crMod;</span>
+	}
+
+	private static int getClassCRModPriority(PCClass cl)
+	{
+<span class="nc" id="L390">		int crModPriority = 0;</span>
+
+<span class="nc" id="L392">		ClassType aClassType = SettingsHandler.getGameAsProperty().get().getClassTypeByName(cl.getClassType());</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">		if (aClassType != null)</span>
+		{
+<span class="nc" id="L395">			int crmp = aClassType.getCRModPriority();</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">			if (crmp != 0)</span>
+			{
+<span class="nc" id="L398">				crModPriority = crmp;</span>
+			}
+<span class="nc" id="L400">		}</span>
+		else
+		{
+			// For migration purposes, if CLASSTYPE is not set, 
+			// use old method to determine the class type from TYPE. 
+<span class="nc bnc" id="L405" title="All 2 branches missed.">			for (Type type : cl.getTrueTypeList(false))</span>
+			{
+<span class="nc" id="L407">				aClassType = SettingsHandler.getGameAsProperty().get().getClassTypeByName(type.toString());</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">				if (aClassType != null)</span>
+				{
+<span class="nc" id="L410">					int crmp = aClassType.getCRModPriority();</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">					if (crmp != 0)</span>
+					{
+<span class="nc" id="L413">						crModPriority = aClassType.getCRModPriority();</span>
+					}
+				}
+<span class="nc" id="L416">			}</span>
+		}
+
+<span class="nc" id="L419">		return crModPriority;</span>
+	}
+
+	public int getXPAward(CharID id)
+	{
+<span class="nc" id="L424">		Map&lt;Integer, Integer&gt; xpAwardsMap = SettingsHandler.getGameAsProperty().get().getXPAwards();</span>
+
+<span class="nc bnc" id="L426" title="All 2 branches missed.">		if (!xpAwardsMap.isEmpty())</span>
+		{
+<span class="nc" id="L428">			Integer cr = getCR(id);</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">			if (cr == null)</span>
+			{
+<span class="nc" id="L431">				return 0;</span>
+			}
+<span class="nc" id="L433">			Integer xp = xpAwardsMap.get(cr);</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">			return xp == null ? 0 : xp;</span>
+		}
+<span class="nc" id="L436">		return 0;</span>
+	}
+
+	public void setTemplateFacet(TemplateFacet templateFacet)
+	{
+<span class="fc" id="L441">		this.templateFacet = templateFacet;</span>
+<span class="fc" id="L442">	}</span>
+
+	public void setRaceFacet(RaceFacet raceFacet)
+	{
+<span class="fc" id="L446">		this.raceFacet = raceFacet;</span>
+<span class="fc" id="L447">	}</span>
+
+	public void setClassFacet(ClassFacet classFacet)
+	{
+<span class="fc" id="L451">		this.classFacet = classFacet;</span>
+<span class="fc" id="L452">	}</span>
+
+	public void setFormulaResolvingFacet(FormulaResolvingFacet formulaResolvingFacet)
+	{
+<span class="fc" id="L456">		this.formulaResolvingFacet = formulaResolvingFacet;</span>
+<span class="fc" id="L457">	}</span>
+
+	public void setBonusCheckingFacet(BonusCheckingFacet bonusCheckingFacet)
+	{
+<span class="fc" id="L461">		this.bonusCheckingFacet = bonusCheckingFacet;</span>
+<span class="fc" id="L462">	}</span>
+
+	public void setLevelFacet(LevelFacet levelFacet)
+	{
+<span class="fc" id="L466">		this.levelFacet = levelFacet;</span>
+<span class="fc" id="L467">	}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

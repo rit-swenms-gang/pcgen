@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GameModeFileLoader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.persistence</a> &gt; <span class="el_source">GameModeFileLoader.java</span></div><h1>GameModeFileLoader.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2010 Connor Petty &lt;cpmeister@users.sourceforge.net&gt;
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.persistence;
+
+import java.io.File;
+import java.io.FilenameFilter;
+import java.net.URI;
+
+import pcgen.cdom.base.Constants;
+import pcgen.cdom.content.TabInfo;
+import pcgen.core.AbilityCategory;
+import pcgen.core.CustomData;
+import pcgen.core.GameMode;
+import pcgen.core.PaperInfo;
+import pcgen.core.PointBuyCost;
+import pcgen.core.RuleCheck;
+import pcgen.core.SystemCollections;
+import pcgen.core.UnitSet;
+import pcgen.persistence.lst.BioSetLoader;
+import pcgen.persistence.lst.EquipIconLoader;
+import pcgen.persistence.lst.EquipSlotLoader;
+import pcgen.persistence.lst.GameModeLoader;
+import pcgen.persistence.lst.LevelLoader;
+import pcgen.persistence.lst.LoadInfoLoader;
+import pcgen.persistence.lst.LocationLoader;
+import pcgen.persistence.lst.LstFileLoader;
+import pcgen.persistence.lst.LstLineFileLoader;
+import pcgen.persistence.lst.MigrationLoader;
+import pcgen.persistence.lst.PointBuyLoader;
+import pcgen.persistence.lst.SimpleLoader;
+import pcgen.persistence.lst.SimplePrefixLoader;
+import pcgen.persistence.lst.SizeAdjustmentLoader;
+import pcgen.persistence.lst.StatsAndChecksLoader;
+import pcgen.persistence.lst.TraitLoader;
+import pcgen.rules.context.LoadContext;
+import pcgen.rules.persistence.CodeControlLoader;
+import pcgen.system.ConfigurationSettings;
+import pcgen.system.LanguageBundle;
+import pcgen.system.PCGenTask;
+import pcgen.util.Logging;
+import pcgen.util.enumeration.Tab;
+
+<span class="nc" id="L58">public class GameModeFileLoader extends PCGenTask</span>
+{
+
+<span class="nc" id="L61">	private static final FilenameFilter GAME_MODE_FILE_FILTER = (aFile, aString) -&gt; {</span>
+		try
+		{
+<span class="nc" id="L64">			final File d = new File(aFile, aString);</span>
+
+<span class="nc bnc" id="L66" title="All 2 branches missed.">			if (d.isDirectory())</span>
+			{
+				// the directory must contain a &quot;miscinfo.lst&quot; file and a &quot;statsandchecks.lst&quot; file to be
+				// a complete gameMode
+<span class="nc bnc" id="L70" title="All 4 branches missed.">				return new File(d, &quot;statsandchecks.lst&quot;).exists() &amp;&amp; new File(d, &quot;miscinfo.lst&quot;).exists();</span>
+			}
+		}
+<span class="nc" id="L73">		catch (SecurityException e)</span>
+		{
+<span class="nc" id="L75">			Logging.errorPrint(&quot;GameModes.listGameFiles&quot;, e);</span>
+<span class="nc" id="L76">		}</span>
+
+<span class="nc" id="L78">		return false;</span>
+	};
+
+	@Override
+	public String getMessage()
+	{
+<span class="nc" id="L84">		return LanguageBundle.getString(&quot;in_taskLoadGameModes&quot;); //$NON-NLS-1$</span>
+	}
+
+	@Override
+	public void run()
+	{
+<span class="nc" id="L90">		String[] gameFiles = GameModeFileLoader.getGameFilesList();</span>
+<span class="nc bnc" id="L91" title="All 4 branches missed.">		if ((gameFiles != null) &amp;&amp; (gameFiles.length &gt; 0))</span>
+		{
+<span class="nc" id="L93">			setMaximum(gameFiles.length + 1);</span>
+<span class="nc" id="L94">			loadGameModes(gameFiles);</span>
+		}
+<span class="nc" id="L96">	}</span>
+
+	/**
+	 * Get a list of all the directories in system/gameModes/
+	 * that contain a file named statsandchecks.lst and miscinfo.lst
+	 * @return game files list
+	 */
+	private static String[] getGameFilesList()
+	{
+<span class="nc" id="L105">		final String aDirectory = ConfigurationSettings.getSystemsDir() + File.separator + &quot;gameModes&quot; + File.separator;</span>
+
+<span class="nc" id="L107">		return new File(aDirectory).list(GAME_MODE_FILE_FILTER);</span>
+	}
+
+	private static UnitSet DEFAULT_UNIT_SET;
+<span class="nc" id="L111">	private final LstLineFileLoader ruleCheckLoader = new SimpleLoader&lt;&gt;(RuleCheck.class);</span>
+<span class="nc" id="L112">	private final LstLineFileLoader loadInfoLoader = new LoadInfoLoader();</span>
+<span class="nc" id="L113">	private final LstLineFileLoader eqSlotLoader = new EquipSlotLoader();</span>
+<span class="nc" id="L114">	private final LstLineFileLoader paperLoader = new SimplePrefixLoader&lt;&gt;(PaperInfo.class, &quot;NAME&quot;);</span>
+<span class="nc" id="L115">	private final LstLineFileLoader pointBuyLoader = new PointBuyLoader();</span>
+<span class="nc" id="L116">	private final LstLineFileLoader traitLoader = new TraitLoader();</span>
+<span class="nc" id="L117">	private final LstLineFileLoader locationLoader = new LocationLoader();</span>
+<span class="nc" id="L118">	private final LstLineFileLoader sizeLoader = new SizeAdjustmentLoader();</span>
+<span class="nc" id="L119">	private final LstLineFileLoader statCheckLoader = new StatsAndChecksLoader();</span>
+<span class="nc" id="L120">	private final LstLineFileLoader migrationLoader = new MigrationLoader();</span>
+<span class="nc" id="L121">	private final LstLineFileLoader bioLoader = new BioSetLoader();</span>
+<span class="nc" id="L122">	private final LstLineFileLoader equipIconLoader = new EquipIconLoader();</span>
+<span class="nc" id="L123">	private final LstLineFileLoader codeControlLoader = new CodeControlLoader();</span>
+
+	private void loadGameModes(String[] gameFiles)
+	{
+<span class="nc" id="L127">		SystemCollections.clearGameModeList();</span>
+<span class="nc" id="L128">		File gameModeDir = new File(ConfigurationSettings.getSystemsDir(), &quot;gameModes&quot;);</span>
+<span class="nc" id="L129">		int progress = 0;</span>
+
+<span class="nc bnc" id="L131" title="All 2 branches missed.">		for (final String gameFile : gameFiles)</span>
+		{
+<span class="nc" id="L133">			File specGameModeDir = new File(gameModeDir, gameFile);</span>
+<span class="nc" id="L134">			File miscInfoFile = new File(specGameModeDir, &quot;miscinfo.lst&quot;);</span>
+<span class="nc" id="L135">			final GameMode gm = GameModeFileLoader.loadGameModeMiscInfo(gameFile, miscInfoFile.toURI());</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">			if (gm != null)</span>
+			{
+<span class="nc" id="L138">				String gmName = gm.getName();</span>
+				//SettingsHandler.setGame(gmName);
+<span class="nc" id="L140">				LoadContext context = gm.getModeContext();</span>
+<span class="nc" id="L141">				loadGameModeInfoFile(gm, new File(specGameModeDir, &quot;level.lst&quot;).toURI(), &quot;level&quot;);</span>
+<span class="nc" id="L142">				loadGameModeInfoFile(gm, new File(specGameModeDir, &quot;rules.lst&quot;).toURI(), &quot;rules&quot;);</span>
+
+				// Load equipmentslot.lst
+<span class="nc" id="L145">				GameModeFileLoader.loadGameModeLstFile(context, eqSlotLoader, gmName, gameFile, &quot;equipmentslots.lst&quot;);</span>
+
+				// Load paperInfo.lst
+<span class="nc" id="L148">				GameModeFileLoader.loadGameModeLstFile(context, paperLoader, gmName, gameFile, &quot;paperInfo.lst&quot;);</span>
+
+				// Load bio files
+<span class="nc" id="L151">				GameModeFileLoader.loadGameModeLstFile(context, traitLoader, gmName, gameFile,</span>
+					&quot;bio&quot; + File.separator + &quot;traits.lst&quot;);
+<span class="nc" id="L153">				GameModeFileLoader.loadGameModeLstFile(context, locationLoader, gmName, gameFile,</span>
+					&quot;bio&quot; + File.separator + &quot;locations.lst&quot;);
+
+				// Load load.lst and check for completeness
+<span class="nc" id="L157">				GameModeFileLoader.loadGameModeLstFile(context, loadInfoLoader, gmName, gameFile, &quot;load.lst&quot;);</span>
+
+				// Load sizeAdjustment.lst
+<span class="nc" id="L160">				GameModeFileLoader.loadGameModeLstFile(context, sizeLoader, gmName, gameFile, &quot;sizeAdjustment.lst&quot;,</span>
+					false);
+
+				// Load statsandchecks.lst
+<span class="nc" id="L164">				GameModeFileLoader.loadGameModeLstFile(context, statCheckLoader, gmName, gameFile, &quot;statsandchecks.lst&quot;,</span>
+					false);
+
+				// Load equipIcons.lst
+<span class="nc" id="L168">				GameModeFileLoader.loadGameModeLstFile(context, equipIconLoader, gmName, gameFile, &quot;equipIcons.lst&quot;);</span>
+
+<span class="nc" id="L170">				GameModeFileLoader.loadGameModeLstFile(context, codeControlLoader, gmName, gameFile, &quot;codeControl.lst&quot;);</span>
+
+				// Load pointbuymethods.lst
+<span class="nc" id="L173">				loadPointBuyFile(context, gameFile, gmName);</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">				for (final PointBuyCost pbc : context.getReferenceContext()</span>
+<span class="nc" id="L175">					.getConstructedCDOMObjects(PointBuyCost.class))</span>
+				{
+<span class="nc" id="L177">					gm.addPointBuyStatCost(pbc);</span>
+<span class="nc" id="L178">				}</span>
+
+				// Load migration.lst
+<span class="nc" id="L181">				GameModeFileLoader.loadGameModeLstFile(context, migrationLoader, gmName, gameFile, &quot;migration.lst&quot;);</span>
+
+<span class="nc" id="L183">				GameModeFileLoader.loadGameModeLstFile(context, bioLoader, gmName, gameFile,</span>
+					&quot;bio&quot; + File.separator + &quot;biosettings.lst&quot;);
+			}
+
+<span class="nc" id="L187">			progress++;</span>
+<span class="nc" id="L188">			setProgress(progress);</span>
+		}
+
+<span class="nc" id="L191">		SystemCollections.sortGameModeList();</span>
+<span class="nc" id="L192">	}</span>
+
+	/**
+	 * Load a game mode file.
+	 * First try the game mode directory. If that fails, try
+	 * reading the file from the default game mode directory.
+	 * @param lstFileLoader the Loader object for the type of file.
+	 * @param gameModeName the game mode
+	 * @param gameModeFolderName the name of the folder that the game mode is located in
+	 * @param lstFileName the lst file to load
+	 */
+	private static void loadGameModeLstFile(LoadContext context, LstLineFileLoader lstFileLoader, String gameModeName,
+		String gameModeFolderName, String lstFileName)
+	{
+<span class="nc" id="L206">		loadGameModeLstFile(context, lstFileLoader, gameModeName, gameModeFolderName, lstFileName, true);</span>
+<span class="nc" id="L207">	}</span>
+
+	/**
+	 * Load a game mode file.
+	 * First try the game mode directory. If that fails, try
+	 * reading the file from the default game mode directory.
+	 * @param lstFileLoader the Loader object for the type of file.
+	 * @param gameModeName the game mode
+	 * @param gameModeFolderName the name of the folder that the game mode is located in
+	 * @param lstFileName the lst file to load
+	 * @param showMissing show the missing file as a warning. Some files are optional and shouldn't generate a warning
+	 * @return true if the file was loaded, false if it was missing.
+	 */
+	private static boolean loadGameModeLstFile(LoadContext context, LstLineFileLoader lstFileLoader,
+		String gameModeName, String gameModeFolderName, String lstFileName, final boolean showMissing)
+	{
+<span class="nc" id="L223">		File gameModeDir = new File(ConfigurationSettings.getSystemsDir(), &quot;gameModes&quot;);</span>
+
+		try
+		{
+<span class="nc" id="L227">			File specGameModeDir = new File(gameModeDir, gameModeFolderName);</span>
+<span class="nc" id="L228">			File gameModeFile = new File(specGameModeDir, lstFileName);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">			if (gameModeFile.exists())</span>
+			{
+<span class="nc" id="L231">				lstFileLoader.loadLstFile(context, gameModeFile.toURI(), gameModeName);</span>
+<span class="nc" id="L232">				return true;</span>
+			}
+		}
+<span class="nc" id="L235">		catch (final PersistenceLayerException ple)</span>
+		{
+			//This is OK, grab the default
+<span class="nc" id="L238">		}</span>
+
+		try
+		{
+<span class="nc" id="L242">			File specGameModeDir = new File(gameModeDir, &quot;default&quot;);</span>
+<span class="nc" id="L243">			File gameModeFile = new File(specGameModeDir, lstFileName);</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">			if (gameModeFile.exists())</span>
+			{
+<span class="nc" id="L246">				lstFileLoader.loadLstFile(context, gameModeFile.toURI(), gameModeName);</span>
+<span class="nc" id="L247">				return true;</span>
+			}
+		}
+<span class="nc" id="L250">		catch (final PersistenceLayerException ple2)</span>
+		{
+<span class="nc bnc" id="L252" title="All 2 branches missed.">			if (showMissing)</span>
+			{
+<span class="nc" id="L254">				Logging.errorPrint(&quot;Warning: game mode &quot; + gameModeName + &quot; is missing file &quot; + lstFileName);</span>
+			}
+<span class="nc" id="L256">		}</span>
+<span class="nc" id="L257">		return false;</span>
+	}
+
+	private void loadGameModeInfoFile(GameMode gameMode, URI uri, String aType)
+	{
+		String data;
+		try
+		{
+<span class="nc" id="L265">			data = LstFileLoader.readFromURI(uri);</span>
+		}
+<span class="nc" id="L267">		catch (final PersistenceLayerException ple)</span>
+		{
+<span class="nc" id="L269">			Logging.errorPrint(</span>
+<span class="nc" id="L270">				LanguageBundle.getFormattedString(</span>
+					&quot;Errors.LstSystemLoader.loadGameModeInfoFile&quot;, //$NON-NLS-1$
+<span class="nc" id="L272">				uri, ple.getMessage()));</span>
+<span class="nc" id="L273">			return;</span>
+<span class="nc" id="L274">		}</span>
+
+<span class="nc" id="L276">		String[] fileLines = data.split(LstFileLoader.LINE_SEPARATOR_REGEXP);</span>
+<span class="nc" id="L277">		String xpTable = &quot;&quot;;</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">		for (int i = 0; i &lt; fileLines.length; i++)</span>
+		{
+<span class="nc" id="L280">			String aLine = fileLines[i];</span>
+
+			// Ignore commented-out and empty lines
+<span class="nc bnc" id="L283" title="All 4 branches missed.">			if (aLine.isEmpty() || (aLine.charAt(0) == '#'))</span>
+			{
+<span class="nc" id="L285">				continue;</span>
+			}
+
+<span class="nc bnc" id="L288" title="All 2 branches missed.">			if (aType.equals(&quot;level&quot;))</span>
+			{
+<span class="nc" id="L290">				xpTable = LevelLoader.parseLine(gameMode, aLine, i + 1, uri, xpTable);</span>
+			}
+<span class="nc bnc" id="L292" title="All 2 branches missed.">			else if (aType.equals(&quot;rules&quot;))</span>
+			{
+				try
+				{
+<span class="nc" id="L296">					ruleCheckLoader.parseLine(gameMode.getModeContext(), aLine, uri);</span>
+				}
+<span class="nc" id="L298">				catch (final PersistenceLayerException e)</span>
+				{
+<span class="nc" id="L300">					Logging.errorPrint(</span>
+<span class="nc" id="L301">						LanguageBundle.getFormattedString(</span>
+							&quot;Errors.LstSystemLoader.loadGameModeInfoFile&quot;, //$NON-NLS-1$
+<span class="nc" id="L303">						uri, e.getMessage()));</span>
+<span class="nc" id="L304">				}</span>
+			}
+		}
+<span class="nc" id="L307">	}</span>
+
+	private static GameMode loadGameModeMiscInfo(String aName, URI uri)
+	{
+		String data;
+		try
+		{
+<span class="nc" id="L314">			data = LstFileLoader.readFromURI(uri);</span>
+		}
+<span class="nc" id="L316">		catch (final PersistenceLayerException ple)</span>
+		{
+<span class="nc" id="L318">			Logging.errorPrint(</span>
+<span class="nc" id="L319">				LanguageBundle.getFormattedString(</span>
+					&quot;Errors.LstSystemLoader.loadGameModeInfoFile&quot;, //$NON-NLS-1$
+<span class="nc" id="L321">				uri, ple.getMessage()));</span>
+<span class="nc" id="L322">			return null;</span>
+<span class="nc" id="L323">		}</span>
+
+<span class="nc" id="L325">		String[] fileLines = data.split(LstFileLoader.LINE_SEPARATOR_REGEXP);</span>
+
+<span class="nc" id="L327">		GameMode gameMode = new GameMode(aName);</span>
+<span class="nc" id="L328">		SystemCollections.addToGameModeList(gameMode);</span>
+<span class="nc" id="L329">		gameMode.getModeContext().getReferenceContext().importObject(AbilityCategory.FEAT);</span>
+
+<span class="nc bnc" id="L331" title="All 2 branches missed.">		for (int i = 0; i &lt; fileLines.length; i++)</span>
+		{
+<span class="nc" id="L333">			String aLine = fileLines[i];</span>
+
+			// Ignore commented-out and empty lines
+<span class="nc bnc" id="L336" title="All 4 branches missed.">			if (aLine.isEmpty() || (aLine.charAt(0) == '#'))</span>
+			{
+<span class="nc" id="L338">				continue;</span>
+			}
+
+<span class="nc" id="L341">			GameModeLoader.parseMiscGameInfoLine(gameMode, aLine, uri, i + 1);</span>
+		}
+
+		// Record how the FEAT category was configured
+<span class="nc" id="L345">		AbilityCategory feat = new AbilityCategory();</span>
+<span class="nc" id="L346">		feat.copyFields(AbilityCategory.FEAT);</span>
+<span class="nc" id="L347">		gameMode.setFeatTemplate(feat);</span>
+
+<span class="nc" id="L349">		int[] dieSizes = gameMode.getDieSizes();</span>
+<span class="nc bnc" id="L350" title="All 4 branches missed.">		if (dieSizes == null || dieSizes.length == 0)</span>
+		{
+<span class="nc" id="L352">			final int[] defaultDieSizes = {1, 2, 3, 4, 6, 8, 10, 12, 20, 100, 1000};</span>
+<span class="nc" id="L353">			gameMode.setDieSizes(defaultDieSizes);</span>
+<span class="nc" id="L354">			Logging.log(Logging.LST_ERROR, &quot;GameMode (&quot; + gameMode.getName()</span>
+				+ &quot;) : MiscInfo.lst did not contain any valid DIESIZES. &quot; + &quot;Using the system default DIESIZES.&quot;);
+		}
+<span class="nc" id="L357">		addDefaultUnitSet(gameMode);</span>
+<span class="nc" id="L358">		addDefaultTabInfo(gameMode);</span>
+<span class="nc" id="L359">		gameMode.applyPreferences();</span>
+<span class="nc" id="L360">		return gameMode;</span>
+	}
+
+	/**
+	 * Load the purchase mode/point buy definitions from either the new location
+	 * under the custom sources folder, or in the old location with the game
+	 * mode.
+	 *
+	 * @param gameFile
+	 *            The location of the game mode directory.
+	 * @param gmName
+	 *            The name of the game mode being loaded.
+	 */
+	private void loadPointBuyFile(LoadContext context, String gameFile, String gmName)
+	{
+<span class="nc" id="L375">		File pointBuyFile = new File(CustomData.customPurchaseModeFilePath(true, gmName));</span>
+<span class="nc" id="L376">		boolean useGameModeFile = true;</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">		if (pointBuyFile.exists())</span>
+		{
+			try
+			{
+<span class="nc" id="L381">				pointBuyLoader.loadLstFile(context, pointBuyFile.toURI(), gmName);</span>
+<span class="nc" id="L382">				useGameModeFile = false;</span>
+			}
+<span class="nc" id="L384">			catch (final PersistenceLayerException e)</span>
+			{
+				// Ignore - its OK if the file cannot be loaded
+<span class="nc" id="L387">			}</span>
+		}
+<span class="nc bnc" id="L389" title="All 2 branches missed.">		if (useGameModeFile)</span>
+		{
+<span class="nc bnc" id="L391" title="All 2 branches missed.">			if (!GameModeFileLoader.loadGameModeLstFile(context, pointBuyLoader, gmName, gameFile,</span>
+				&quot;pointbuymethods.lst&quot;, false))
+			{
+<span class="nc" id="L394">				GameModeFileLoader.loadGameModeLstFile(context, pointBuyLoader, gmName, gameFile,</span>
+					&quot;pointbuymethods_system.lst&quot;, false);
+			}
+		}
+<span class="nc" id="L398">	}</span>
+
+	public static void addDefaultUnitSet(GameMode gameMode)
+	{
+<span class="nc" id="L402">		LoadContext context = gameMode.getModeContext();</span>
+<span class="nc" id="L403">		UnitSet us = context.getReferenceContext().silentlyGetConstructedCDOMObject(UnitSet.class,</span>
+			Constants.STANDARD_UNITSET_NAME);
+<span class="nc bnc" id="L405" title="All 2 branches missed.">		if (us == null)</span>
+		{
+<span class="nc" id="L407">			gameMode.getModeContext().getReferenceContext().importObject(getDefaultUnitSet());</span>
+		}
+<span class="nc" id="L409">	}</span>
+
+	private static synchronized UnitSet getDefaultUnitSet()
+	{
+<span class="nc bnc" id="L413" title="All 2 branches missed.">		if (DEFAULT_UNIT_SET == null)</span>
+		{
+			// create default Unit Set in case none is specified in the game mode
+<span class="nc" id="L416">			DEFAULT_UNIT_SET = new UnitSet();</span>
+<span class="nc" id="L417">			DEFAULT_UNIT_SET.setName(Constants.STANDARD_UNITSET_NAME);</span>
+<span class="nc" id="L418">			DEFAULT_UNIT_SET.setInternal(true);</span>
+<span class="nc" id="L419">			DEFAULT_UNIT_SET.setHeightUnit(Constants.STANDARD_UNITSET_HEIGHT_UNIT);</span>
+<span class="nc" id="L420">			DEFAULT_UNIT_SET.setHeightFactor(Constants.STANDARD_UNITSET_HEIGHT_FACTOR);</span>
+<span class="nc" id="L421">			DEFAULT_UNIT_SET.setHeightDisplayPattern(Constants.STANDARD_UNITSET_HEIGHT_DISPLAY_PATTERN);</span>
+<span class="nc" id="L422">			DEFAULT_UNIT_SET.setDistanceUnit(Constants.STANDARD_UNITSET_DISTANCE_UNIT);</span>
+<span class="nc" id="L423">			DEFAULT_UNIT_SET.setDistanceFactor(Constants.STANDARD_UNITSET_DISTANCE_FACTOR);</span>
+<span class="nc" id="L424">			DEFAULT_UNIT_SET.setDistanceDisplayPattern(Constants.STANDARD_UNITSET_DISTANCE_DISPLAY_PATTERN);</span>
+<span class="nc" id="L425">			DEFAULT_UNIT_SET.setWeightUnit(Constants.STANDARD_UNITSET_WEIGHT_UNIT);</span>
+<span class="nc" id="L426">			DEFAULT_UNIT_SET.setWeightFactor(Constants.STANDARD_UNITSET_WEIGHT_FACTOR);</span>
+<span class="nc" id="L427">			DEFAULT_UNIT_SET.setWeightDisplayPattern(Constants.STANDARD_UNITSET_WEIGHT_DISPLAY_PATTERN);</span>
+		}
+<span class="nc" id="L429">		return DEFAULT_UNIT_SET;</span>
+	}
+
+	public static void addDefaultTabInfo(GameMode gameMode)
+	{
+<span class="nc" id="L434">		LoadContext context = gameMode.getModeContext();</span>
+<span class="nc bnc" id="L435" title="All 2 branches missed.">		for (final Tab aTab : Tab.values())</span>
+		{
+<span class="nc" id="L437">			TabInfo ti = context.getReferenceContext().silentlyGetConstructedCDOMObject(TabInfo.class, aTab.toString());</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">			if (ti == null)</span>
+			{
+<span class="nc" id="L440">				ti = context.getReferenceContext().constructCDOMObject(TabInfo.class, aTab.toString());</span>
+<span class="nc" id="L441">				ti.setTabName(aTab.label());</span>
+			}
+		}
+<span class="nc" id="L444">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

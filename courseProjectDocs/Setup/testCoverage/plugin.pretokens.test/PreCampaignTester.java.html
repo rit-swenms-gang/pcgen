@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreCampaignTester.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">plugin.pretokens.test</a> &gt; <span class="el_source">PreCampaignTester.java</span></div><h1>PreCampaignTester.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2008 (C) James Dempsey
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package plugin.pretokens.test;
+
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import pcgen.cdom.base.CDOMObject;
+import pcgen.cdom.enumeration.ListKey;
+import pcgen.core.Campaign;
+import pcgen.core.Globals;
+import pcgen.core.display.CharacterDisplay;
+import pcgen.core.prereq.AbstractDisplayPrereqTest;
+import pcgen.core.prereq.Prerequisite;
+import pcgen.core.prereq.PrerequisiteException;
+import pcgen.core.prereq.PrerequisiteOperator;
+import pcgen.core.prereq.PrerequisiteTest;
+import pcgen.persistence.PersistenceManager;
+import pcgen.system.LanguageBundle;
+import pcgen.util.Logging;
+
+/**
+ * The Class {@code PreCampaignTester} is responsible for testing if the
+ * currently loaded sources satisfy the campaign prerequisite.
+ * 
+ * 
+ */
+<span class="nc" id="L46">public class PreCampaignTester extends AbstractDisplayPrereqTest implements PrerequisiteTest</span>
+{
+
+	@Override
+	public int passes(final Prerequisite prereq, final CharacterDisplay display, CDOMObject source)
+		throws PrerequisiteException
+	{
+		final int number;
+		try
+		{
+<span class="nc" id="L56">			number = Integer.parseInt(prereq.getOperand());</span>
+		}
+<span class="nc" id="L58">		catch (NumberFormatException exceptn)</span>
+		{
+<span class="nc" id="L60">			throw new PrerequisiteException(</span>
+<span class="nc" id="L61">				LanguageBundle.getFormattedString(&quot;PreFeat.error&quot;, prereq.toString()), exceptn); //$NON-NLS-1$</span>
+<span class="nc" id="L62">		}</span>
+
+<span class="nc" id="L64">		int runningTotal = 0;</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">		if (prereq.getKey().startsWith(&quot;BOOKTYPE=&quot;))</span>
+		{
+<span class="nc" id="L67">			runningTotal += countCampaignByBookType(prereq.getKey().substring(9), false);</span>
+		}
+<span class="nc bnc" id="L69" title="All 2 branches missed.">		else if (prereq.getKey().startsWith(&quot;INCLUDESBOOKTYPE=&quot;))</span>
+		{
+<span class="nc" id="L71">			runningTotal += countCampaignByBookType(prereq.getKey().substring(17), true);</span>
+		}
+<span class="nc bnc" id="L73" title="All 2 branches missed.">		else if (prereq.getKey().startsWith(&quot;INCLUDES=&quot;))</span>
+		{
+<span class="nc" id="L75">			runningTotal += countCampaignByName(prereq.getKey().substring(9), source, true);</span>
+		}
+		else
+		{
+<span class="nc" id="L79">			runningTotal += countCampaignByName(prereq.getKey(), source, false);</span>
+		}
+
+<span class="nc" id="L82">		runningTotal = prereq.getOperator().compare(runningTotal, number);</span>
+<span class="nc" id="L83">		return countedTotal(prereq, runningTotal);</span>
+	}
+
+	/**
+	 * Count the number of campaign currently loaded or selected that 
+	 * are of the book type.
+	 * 
+	 * @param bookType the book type
+	 * @param includeSubCampaigns Should we count included sub campaigns that match
+	 * 
+	 * @return the number of matching campaigns
+	 */
+	private int countCampaignByBookType(String bookType, boolean includeSubCampaigns)
+	{
+<span class="nc" id="L97">		Set&lt;Campaign&gt; matchingCampaigns = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L98">		PersistenceManager pMan = PersistenceManager.getInstance();</span>
+<span class="nc" id="L99">		List&lt;URI&gt; selCampaigns = pMan.getChosenCampaignSourcefiles();</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">		for (URI element : selCampaigns)</span>
+		{
+<span class="nc" id="L102">			final Campaign aCampaign = Globals.getCampaignByURI(element, false);</span>
+			List&lt;Campaign&gt; fullCampList;
+<span class="nc bnc" id="L104" title="All 2 branches missed.">			if (includeSubCampaigns)</span>
+			{
+<span class="nc" id="L106">				fullCampList = getFullCampaignList(aCampaign);</span>
+			}
+			else
+			{
+<span class="nc" id="L110">				fullCampList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L111">				fullCampList.add(aCampaign);</span>
+			}
+<span class="nc bnc" id="L113" title="All 2 branches missed.">			for (Campaign camp : fullCampList)</span>
+			{
+<span class="nc bnc" id="L115" title="All 2 branches missed.">				for (String listType : camp.getSafeListFor(ListKey.BOOK_TYPE))</span>
+				{
+<span class="nc bnc" id="L117" title="All 2 branches missed.">					if (bookType.equalsIgnoreCase(listType))</span>
+					{
+<span class="nc" id="L119">						matchingCampaigns.add(camp);</span>
+<span class="nc" id="L120">						break;</span>
+					}
+<span class="nc" id="L122">				}</span>
+<span class="nc" id="L123">			}</span>
+<span class="nc" id="L124">		}</span>
+<span class="nc" id="L125">		return matchingCampaigns.size();</span>
+	}
+
+	/**
+	 * Count the campaigns currently loaded or selected that match the 
+	 * supplied key name.
+	 * 
+	 * @param key The key to be checked for
+	 * @param includeSubCampaigns Should we count included sub campaigns that match
+	 * @return The number of matching campaigns
+	 */
+	private int countCampaignByName(final String key, CDOMObject source, boolean includeSubCampaigns)
+	{
+<span class="nc" id="L138">		int total = 0;</span>
+<span class="nc" id="L139">		Campaign campaignToFind = Globals.getCampaignKeyedSilently(key);</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">		if (campaignToFind != null)</span>
+		{
+<span class="nc" id="L142">			PersistenceManager pMan = PersistenceManager.getInstance();</span>
+<span class="nc" id="L143">			List&lt;URI&gt; selCampaigns = pMan.getChosenCampaignSourcefiles();</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">			for (URI element : selCampaigns)</span>
+			{
+<span class="nc" id="L146">				final Campaign aCampaign = Globals.getCampaignByURI(element, true);</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">				if (includeSubCampaigns)</span>
+				{
+<span class="nc" id="L149">					List&lt;Campaign&gt; campList = getFullCampaignList(aCampaign);</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">					for (Campaign camp : campList)</span>
+					{
+<span class="nc bnc" id="L152" title="All 2 branches missed.">						if (camp.equals(campaignToFind))</span>
+						{
+<span class="nc" id="L154">							++total;</span>
+						}
+<span class="nc" id="L156">					}</span>
+<span class="nc" id="L157">				}</span>
+				else
+				{
+<span class="nc bnc" id="L160" title="All 2 branches missed.">					if (aCampaign.equals(campaignToFind))</span>
+					{
+<span class="nc" id="L162">						++total;</span>
+					}
+				}
+<span class="nc" id="L165">			}</span>
+<span class="nc" id="L166">		}</span>
+		else
+		{
+<span class="nc bnc" id="L169" title="All 2 branches missed.">			String sourceUri = (source == null ? &quot;&quot; : String.valueOf(source.getSourceURI()));</span>
+<span class="nc" id="L170">			Logging.errorPrint(&quot;Unable to find campaign &quot; + key //$NON-NLS-1$</span>
+				+ &quot; used in prereq for source &quot; + source + &quot; at &quot; //$NON-NLS-1$ //$NON-NLS-2$
+				+ sourceUri);
+		}
+<span class="nc" id="L174">		return total;</span>
+	}
+
+	/**
+	 * Retrieve a list of the listed campaign and all campaigns it includes.
+	 * @param aCampaign The master campaign.
+	 * @return The list of included campaigns.
+	 */
+	private static List&lt;Campaign&gt; getFullCampaignList(Campaign aCampaign)
+	{
+<span class="nc" id="L184">		List&lt;Campaign&gt; campList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L185">		addChildrenRecursively(campList, aCampaign);</span>
+<span class="nc" id="L186">		return campList;</span>
+	}
+
+	/**
+	 * Add the campaign and its children to the supplied list. This will recurse 
+	 * through the children to include all descendants. 
+	 * @param campList The list being built up.
+	 * @param aCampaign The campaign to be added.
+	 */
+	private static void addChildrenRecursively(List&lt;Campaign&gt; campList, Campaign aCampaign)
+	{
+<span class="nc" id="L197">		campList.add(aCampaign);</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">		for (Campaign subCampaign : aCampaign.getSubCampaigns())</span>
+		{
+<span class="nc" id="L200">			addChildrenRecursively(campList, subCampaign);</span>
+<span class="nc" id="L201">		}</span>
+<span class="nc" id="L202">	}</span>
+
+	/**
+	 * Get the type of prerequisite handled by this token.
+	 * @return the type of prerequisite handled by this token.
+	 */
+	@Override
+	public String kindHandled()
+	{
+<span class="nc" id="L211">		return &quot;CAMPAIGN&quot;; //$NON-NLS-1$</span>
+	}
+
+	@Override
+	public String toHtmlString(final Prerequisite prereq)
+	{
+		// Simplify the output when requiring a single source
+<span class="nc bnc" id="L218" title="All 4 branches missed.">		if (prereq.getOperator() == PrerequisiteOperator.GTEQ &amp;&amp; (&quot;1&quot;.equals(prereq.getOperand())))</span>
+		{
+<span class="nc" id="L220">			return prereq.getKey();</span>
+		}
+
+<span class="nc" id="L223">        return LanguageBundle.getFormattedString(&quot;PreCampaign.toHtml&quot;, //$NON-NLS-1$</span>
+<span class="nc" id="L224">            prereq.getOperator().toDisplayString(), prereq.getOperand(), prereq.getKey());</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

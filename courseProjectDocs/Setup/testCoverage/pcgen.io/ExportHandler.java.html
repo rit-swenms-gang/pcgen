@@ -1,0 +1,3436 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExportHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.io</a> &gt; <span class="el_source">ExportHandler.java</span></div><h1>ExportHandler.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2002 (C) Thomas Behr &lt;ravenlock@gmx.de&gt;
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.     See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
+ *
+ *
+ */
+package pcgen.io;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Serializable;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.text.ParseException;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import pcgen.cdom.base.CDOMObject;
+import pcgen.cdom.base.Constants;
+import pcgen.cdom.enumeration.ListKey;
+import pcgen.cdom.enumeration.ObjectKey;
+import pcgen.cdom.enumeration.PCStringKey;
+import pcgen.cdom.enumeration.Region;
+import pcgen.core.AbilityCategory;
+import pcgen.core.Equipment;
+import pcgen.core.Globals;
+import pcgen.core.PCClass;
+import pcgen.core.PCTemplate;
+import pcgen.core.PObject;
+import pcgen.core.PlayerCharacter;
+import pcgen.core.SettingsHandler;
+import pcgen.core.Skill;
+import pcgen.core.character.CharacterSpell;
+import pcgen.core.character.Follower;
+import pcgen.core.display.CharacterDisplay;
+import pcgen.core.display.SkillDisplay;
+import pcgen.core.utils.CoreUtility;
+import pcgen.io.exporttoken.AbilityListToken;
+import pcgen.io.exporttoken.AbilityToken;
+import pcgen.io.exporttoken.BonusToken;
+import pcgen.io.exporttoken.EqToken;
+import pcgen.io.exporttoken.EqTypeToken;
+import pcgen.io.exporttoken.GameModeToken;
+import pcgen.io.exporttoken.MovementToken;
+import pcgen.io.exporttoken.SkillToken;
+import pcgen.io.exporttoken.SkillpointsToken;
+import pcgen.io.exporttoken.StatToken;
+import pcgen.io.exporttoken.Token;
+import pcgen.io.exporttoken.TotalToken;
+import pcgen.io.exporttoken.WeaponToken;
+import pcgen.io.exporttoken.WeaponhToken;
+import pcgen.system.PluginLoader;
+import pcgen.util.Delta;
+import pcgen.util.Logging;
+import pcgen.util.enumeration.View;
+
+/**
+ * This class deals with exporting a PC to various types of output sheets 
+ * including XML, HTML, PDF and Text.
+ * 
+ * Very basically it takes a PC (or PCs) and replaces tokens in a character 
+ * sheet template with the appropriate values from the PC (PCs).  Much of the 
+ * code in here deals with replacing tokens and dealing with the FOR and IIF 
+ * constructs that can be found in the character sheet templates. 
+ *
+ */
+public abstract class ExportHandler
+{
+	public static ExportHandler createExportHandler(File templateFile)
+	{
+<span class="nc bnc" id="L91" title="All 4 branches missed.">		if(templateFile != null &amp;&amp; templateFile.getName().toLowerCase().endsWith(&quot;.ftl&quot;))</span>
+		{
+<span class="nc" id="L93">			return new FreeMarkerExportHandler(templateFile);</span>
+		}
+		else
+		{
+<span class="nc" id="L97">			return new PCGenExportHandler(templateFile);</span>
+		}
+	}
+
+	/** A constant stating that we are using JEP parsing */
+<span class="fc" id="L102">	private static final Float JEP_TRUE = 1.0f;</span>
+
+	/** A map of output tokens to export */
+<span class="fc" id="L105">	private static final Map&lt;String, Token&gt; TOKEN_MAP = new HashMap&lt;&gt;();</span>
+
+	/** 
+	 * A variable to hold the state of whether or not the output token map to
+	 * be exported is populated or not. 
+	 */
+	private static boolean tokenMapPopulated;
+
+	// Processing state variables
+
+	/** TODO What is this used for? */
+	boolean existsOnly;
+
+	/** A state variable to indicate whether there are more items to process */
+	boolean noMoreItems;
+
+	/** A state variable to indicate whether the OS author controls whitespace */
+	private boolean manualWhitespace;
+
+	/** The template file to use for exporting (effectively the sheet to use) */
+	private final File templateFile;
+
+	/**
+	 * These maps hold the loop variables and parameters of FOR constructs that 
+	 * will be replaced by their actual values when evaluated.
+	 */
+<span class="nc" id="L131">	protected final Map&lt;Object, Object&gt; loopVariables = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L132">	private final Map&lt;Object, Object&gt; loopParameters = new HashMap&lt;&gt;();</span>
+
+	/** The delimiter used by embedded DFOR/FOR loops */
+<span class="nc" id="L135">	private String csheetTag2 = &quot;\\&quot;;</span>
+
+	/** A state variable to indicate whether we skip processing the math */
+	private boolean skipMath;
+
+	/**
+	 * A state variable to indicate whether we should write out what we are currently 
+	 * processing, would be set to false for example if we were filtering some output
+	 *  
+	 * defaults to true.
+	 */
+<span class="nc" id="L146">	private boolean canWrite = true;</span>
+
+	/** TODO What is this used for? */
+	private boolean checkBefore;
+
+
+	/**
+	 * Constructor.  Populates the token map (a list of possible output tokens) and 
+	 * sets the character sheet template we are using.
+	 *
+	 * @param templateFile the template to use while exporting.
+	 */
+	protected ExportHandler(File templateFile)
+<span class="nc" id="L159">	{</span>
+<span class="nc" id="L160">		populateTokenMap();</span>
+<span class="nc" id="L161">		this.templateFile = templateFile;</span>
+<span class="nc" id="L162">	}</span>
+
+	/**
+	 * Replace the token, but deliberately skip the math
+	 * 
+	 * @param aPC The PC being exported
+	 * @param aString the string which will have its tokens replaced 
+	 * @param output the object that represents the sheet we are exporting
+	 */
+	public void replaceTokenSkipMath(PlayerCharacter aPC, String aString, BufferedWriter output)
+	{
+<span class="nc" id="L173">		final boolean oldSkipMath = skipMath;</span>
+<span class="nc" id="L174">		skipMath = true;</span>
+<span class="nc" id="L175">		replaceToken(aString, output, aPC);</span>
+<span class="nc" id="L176">		skipMath = oldSkipMath;</span>
+<span class="nc" id="L177">	}</span>
+
+	/**
+	 * Exports the contents of the given PlayerCharacter to a Writer
+	 * according to the handler's template
+	 * 
+	 * &lt;br&gt;author: Thomas Behr 12-04-02
+	 *
+	 * @param aPC the PlayerCharacter to write
+	 * @param out the Writer to be written to
+	 * @throws ExportException If the export fails.
+	 */
+	public abstract void write(PlayerCharacter aPC, BufferedWriter out) throws ExportException;
+
+	/**
+	 * Exports a PlayerCharacter-Party to a Writer
+	 * according to the handler's template
+	 * 
+	 * &lt;br&gt;author: Thomas Behr 13-11-02
+	 *
+	 * @param PCs the Collection of PlayerCharacter instances which compromises the Party to write
+	 * @param out the Writer to be written to
+	 */
+	public void write(Collection&lt;PlayerCharacter&gt; PCs, BufferedWriter out)
+	{
+<span class="nc" id="L202">		write(PCs.toArray(new PlayerCharacter[0]), out);</span>
+<span class="nc" id="L203">	}</span>
+
+	/**
+	 * Returns the current templateFile being used
+	 * @return templateFile
+	 */
+	public File getTemplateFile()
+	{
+<span class="nc" id="L211">		return templateFile;</span>
+	}
+
+	/**
+	 * Get variable value from the variable string passed in, this might be 
+	 * an old style variable string (COUNT[EQ and STRLEN) or a new style 
+	 * (JEP formula)
+	 * 
+	 * @param varString Variable string that we want to calculate value from
+	 * @param aPC The PC that holds the data that we need to get the info from
+	 * @return The result
+	 */
+	private int getVarValue(String varString, PlayerCharacter aPC)
+	{
+		// While COUNT[EQ tokens exist, build up a string
+<span class="nc" id="L226">		String vString = processCountEquipmentTokens(varString, aPC);</span>
+
+		// While STRLEN[ tokens exist, build up a string
+<span class="nc" id="L229">		vString = processStringLengthTokens(vString, aPC);</span>
+
+		// If it is the new JEP style variable then deal with that
+<span class="nc" id="L232">		String valueString = vString;</span>
+<span class="nc bnc" id="L233" title="All 4 branches missed.">		if (varString.startsWith(&quot;${&quot;) &amp;&amp; varString.endsWith(&quot;}&quot;))</span>
+		{
+<span class="nc" id="L235">			String jepString = varString.substring(2, varString.length() - 1);</span>
+<span class="nc" id="L236">			valueString = jepString.replace(';', ',');</span>
+		}
+
+<span class="nc" id="L239">		return aPC.getVariableValue(valueString, &quot;&quot;).intValue();</span>
+	}
+
+	/**
+	 * Helper method for getting the variable value out of a variable string
+	 * 
+	 * @param vString The variable String
+	 * @param aPC The PC to get the token from
+	 * @return the altered variable string
+	 */
+	private String processCountEquipmentTokens(String vString, PlayerCharacter aPC)
+	{
+<span class="nc" id="L251">		int countIndex = vString.indexOf(&quot;COUNT[EQ&quot;);</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">		while (countIndex &gt;= 0)</span>
+		{
+<span class="nc" id="L254">			char chC = vString.charAt(countIndex + 8);</span>
+
+			// If the character after COUNT[EQ is . or [1-9]  
+<span class="nc bnc" id="L257" title="All 6 branches missed.">			if ((chC == '.') || ((chC &gt;= '0') &amp;&amp; (chC &lt;= '9')))</span>
+			{
+<span class="nc" id="L259">				final int i = vString.indexOf(']', countIndex + 8);</span>
+
+<span class="nc bnc" id="L261" title="All 2 branches missed.">				if (i &gt;= 0)</span>
+				{
+<span class="nc" id="L263">					String aString = vString.substring(countIndex + 6, i);</span>
+
+					// Either deal with an EQTYPE or a straight EQ token
+					EqToken token;
+<span class="nc bnc" id="L267" title="All 2 branches missed.">					if (aString.contains(&quot;EQTYPE&quot;))</span>
+					{
+<span class="nc" id="L269">						token = new EqTypeToken();</span>
+					}
+					else
+					{
+<span class="nc" id="L273">						token = new EqToken();</span>
+					}
+
+<span class="nc" id="L276">					String baString = token.getToken(aString, aPC, this);</span>
+
+<span class="nc" id="L278">					vString = vString.substring(0, countIndex) + baString + vString.substring(i + 1);</span>
+				}
+			}
+<span class="nc" id="L281">			countIndex = vString.indexOf(&quot;COUNT[EQ&quot;, countIndex + 1);</span>
+<span class="nc" id="L282">		}</span>
+
+<span class="nc" id="L284">		return vString;</span>
+	}
+
+	/**
+	 * Helper method for getting the variable value out of a variable string, 
+	 * deals with STRLEN tokens
+	 * 
+	 * @param vString The variable string to get the values out of
+	 * @param aPC The PC to get the token value out of
+	 * @return The altered variable string
+	 */
+	private String processStringLengthTokens(String vString, PlayerCharacter aPC)
+	{
+<span class="nc" id="L297">		int strlenIndex = vString.indexOf(&quot;STRLEN[&quot;);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">		while (strlenIndex &gt;= 0)</span>
+		{
+
+<span class="nc" id="L301">			final int i = vString.indexOf(']', strlenIndex + 7);</span>
+
+<span class="nc bnc" id="L303" title="All 2 branches missed.">			if (i &gt;= 0)</span>
+			{
+<span class="nc" id="L305">				String aString = vString.substring(strlenIndex + 7, i);</span>
+<span class="nc" id="L306">				StringWriter sWriter = new StringWriter();</span>
+<span class="nc" id="L307">				BufferedWriter aWriter = new BufferedWriter(sWriter);</span>
+<span class="nc" id="L308">				replaceToken(aString, aWriter, aPC);</span>
+<span class="nc" id="L309">				sWriter.flush();</span>
+
+				try
+				{
+<span class="nc" id="L313">					aWriter.flush();</span>
+				}
+<span class="nc" id="L315">				catch (IOException e)</span>
+				{
+<span class="nc" id="L317">					Logging.errorPrint(&quot;Error flushing outputstream in ExportHandler::getVarValue&quot;, e);</span>
+<span class="nc" id="L318">				}</span>
+
+<span class="nc" id="L320">				String result = sWriter.toString();</span>
+<span class="nc" id="L321">				vString = vString.substring(0, strlenIndex) + result.length() + vString.substring(i + 1);</span>
+			}
+<span class="nc" id="L323">			strlenIndex = vString.indexOf(&quot;STRLEN[&quot;, strlenIndex + 1);</span>
+<span class="nc" id="L324">		}</span>
+<span class="nc" id="L325">		return vString;</span>
+	}
+
+	/**
+	 * Add to the token map, called mainly by the plugin loader
+	 * 
+	 * @param newToken the token to add
+	 */
+	public static void addToTokenMap(Token newToken)
+	{
+<span class="nc" id="L335">		Token test = TOKEN_MAP.put(newToken.getTokenName(), newToken);</span>
+<span class="nc bnc" id="L336" title="All 2 branches missed.">		if (test != null)</span>
+		{
+<span class="nc" id="L338">			Logging.errorPrint(&quot;More than one Output Token has the same Token Name: '&quot; + newToken.getTokenName() + &quot;'&quot;);</span>
+		}
+<span class="nc" id="L340">	}</span>
+
+	public static PluginLoader getPluginLoader()
+	{
+<span class="nc" id="L344">		return new PluginLoader()</span>
+<span class="nc" id="L345">		{</span>
+
+			@Override
+			public void loadPlugin(Class&lt;?&gt; clazz) throws Exception
+			{
+<span class="nc" id="L350">				Token pl = (Token) clazz.newInstance();</span>
+<span class="nc" id="L351">				addToTokenMap(pl);</span>
+<span class="nc" id="L352">			}</span>
+
+			@Override
+			public Class[] getPluginClasses()
+			{
+<span class="nc" id="L357">				return new Class[]{Token.class};</span>
+			}
+		};
+	}
+
+	private static class VariableComparator implements Comparator&lt;Object&gt;, Serializable
+	{
+		@Override
+		public int compare(Object o1, Object o2)
+		{
+<span class="nc bnc" id="L367" title="All 2 branches missed.">			final String s1 = (o1 == null ? &quot;&quot; : o1.toString());</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">			final String s2 = (o2 == null ? &quot;&quot; : o2.toString());</span>
+
+<span class="nc bnc" id="L370" title="All 2 branches missed.">			if (s1.length() &gt; s2.length())</span>
+			{
+<span class="nc" id="L372">				return -1;</span>
+			}
+<span class="nc bnc" id="L374" title="All 2 branches missed.">			else if (s1.length() &lt; s2.length())</span>
+			{
+<span class="nc" id="L376">				return 1;</span>
+			}
+			else
+			{
+<span class="nc" id="L380">				return s1.compareTo(s2);</span>
+			}
+		}
+	}
+
+	private static String replaceVariables(String expr, Map&lt;Object, Object&gt; variables)
+	{
+<span class="nc" id="L387">		List&lt;Object&gt; keys = new ArrayList&lt;&gt;(variables.keySet());</span>
+<span class="nc" id="L388">		keys.sort(new VariableComparator());</span>
+
+<span class="nc bnc" id="L390" title="All 2 branches missed.">		for (final Object anObject : keys)</span>
+		{
+<span class="nc bnc" id="L392" title="All 2 branches missed.">			if (anObject != null)</span>
+			{
+<span class="nc" id="L394">				final String fString = anObject.toString();</span>
+<span class="nc" id="L395">				final String rString = variables.get(fString).toString();</span>
+<span class="nc" id="L396">				expr = expr.replaceAll(Pattern.quote(fString), rString);</span>
+			}
+<span class="nc" id="L398">		}</span>
+<span class="nc" id="L399">		return expr;</span>
+	}
+
+	/**
+	 * Helper method to evaluate an expression, used by OIF and IIF tokens
+	 * 
+	 * @param expr Expression to evaluate
+	 * @param aPC PC containing values to help evaluate the expression
+	 * @return true if the expression was evaluated successfully, else false
+	 */
+	private boolean evaluateExpression(final String expr, final PlayerCharacter aPC)
+	{
+		// Deal with the AND case
+<span class="nc bnc" id="L412" title="All 2 branches missed.">		if (expr.indexOf(&quot;.AND.&quot;) &gt; 0)</span>
+		{
+<span class="nc" id="L414">			final String part1 = expr.substring(0, expr.indexOf(&quot;.AND.&quot;));</span>
+<span class="nc" id="L415">			final String part2 = expr.substring(expr.indexOf(&quot;.AND.&quot;) + 5);</span>
+
+<span class="nc bnc" id="L417" title="All 4 branches missed.">			return (evaluateExpression(part1, aPC) &amp;&amp; evaluateExpression(part2, aPC));</span>
+		}
+
+		// Deal with the OR case
+<span class="nc bnc" id="L421" title="All 2 branches missed.">		if (expr.indexOf(&quot;.OR.&quot;) &gt; 0)</span>
+		{
+<span class="nc" id="L423">			final String part1 = expr.substring(0, expr.indexOf(&quot;.OR.&quot;));</span>
+<span class="nc" id="L424">			final String part2 = expr.substring(expr.indexOf(&quot;.OR.&quot;) + 4);</span>
+
+<span class="nc bnc" id="L426" title="All 4 branches missed.">			return (evaluateExpression(part1, aPC) || evaluateExpression(part2, aPC));</span>
+		}
+
+		/* 
+		 * Deal with objects held in the loopVariables and loopParameters
+		 * sets, e.g. replace the key place holder with the actual value
+		 */
+<span class="nc" id="L433">		String expr1 = expr;</span>
+<span class="nc" id="L434">		expr1 = replaceVariables(expr1, loopParameters);</span>
+<span class="nc" id="L435">		expr1 = replaceVariables(expr1, loopVariables);</span>
+
+		// Deal with HASVAR:
+<span class="nc bnc" id="L438" title="All 2 branches missed.">		if (expr1.startsWith(&quot;HASVAR:&quot;))</span>
+		{
+<span class="nc" id="L440">			expr1 = expr1.substring(7).trim();</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">			return (aPC.getVariableValue(expr1, &quot;&quot;).intValue() &gt; 0);</span>
+		}
+
+		// Deal with HASFEAT:
+<span class="nc bnc" id="L445" title="All 2 branches missed.">		if (expr1.startsWith(&quot;HASFEAT:&quot;))</span>
+		{
+<span class="nc" id="L447">			expr1 = expr1.substring(8).trim();</span>
+<span class="nc" id="L448">			return (aPC.hasAbilityKeyed(AbilityCategory.FEAT, expr1));</span>
+		}
+
+		// Deal with HASSA:
+<span class="nc bnc" id="L452" title="All 2 branches missed.">		if (expr1.startsWith(&quot;HASSA:&quot;))</span>
+		{
+<span class="nc" id="L454">			expr1 = expr1.substring(6).trim();</span>
+<span class="nc" id="L455">			return (aPC.hasSpecialAbility(expr1));</span>
+		}
+
+		// Deal with HASEQUIP:
+<span class="nc bnc" id="L459" title="All 2 branches missed.">		if (expr1.startsWith(&quot;HASEQUIP:&quot;))</span>
+		{
+<span class="nc" id="L461">			expr1 = expr1.substring(9).trim();</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">			return (aPC.getEquipmentNamed(expr1) != null);</span>
+		}
+
+<span class="nc bnc" id="L465" title="All 2 branches missed.">		if (expr1.startsWith(&quot;SPELLCASTER:&quot;))</span>
+		{
+<span class="nc" id="L467">			return processSpellcasterExpression(expr1, aPC);</span>
+		}
+
+		// Deal with EVEN:
+<span class="nc bnc" id="L471" title="All 2 branches missed.">		if (expr1.startsWith(&quot;EVEN:&quot;))</span>
+		{
+<span class="nc" id="L473">			int i = 0;</span>
+
+			try
+			{
+<span class="nc" id="L477">				i = Integer.parseInt(expr1.substring(5).trim());</span>
+			}
+<span class="nc" id="L479">			catch (NumberFormatException exc)</span>
+			{
+<span class="nc" id="L481">				Logging.errorPrint(&quot;EVEN:&quot; + i);</span>
+
+<span class="nc" id="L483">				return true;</span>
+<span class="nc" id="L484">			}</span>
+
+<span class="nc bnc" id="L486" title="All 2 branches missed.">			return ((i % 2) == 0);</span>
+		}
+
+		// Deal with UNTRAINED (skills)
+<span class="nc bnc" id="L490" title="All 4 branches missed.">		if (expr1.endsWith(&quot;UNTRAINED&quot;) &amp;&amp; !expr1.startsWith(&quot;SKILLSIT.&quot;))</span>
+		{
+<span class="nc" id="L492">			final StringTokenizer aTok = new StringTokenizer(expr1, &quot;.&quot;);</span>
+<span class="nc" id="L493">			final String fString = aTok.nextToken();</span>
+<span class="nc" id="L494">			Skill aSkill = null;</span>
+
+<span class="nc bnc" id="L496" title="All 2 branches missed.">			if (fString.length() &gt; 5)</span>
+			{
+<span class="nc" id="L498">				final int i = Integer.parseInt(fString.substring(5));</span>
+<span class="nc" id="L499">				final List&lt;Skill&gt; pcSkills = SkillDisplay.getSkillListInOutputOrder(aPC);</span>
+
+<span class="nc bnc" id="L501" title="All 2 branches missed.">				if (i &lt;= (pcSkills.size() - 1))</span>
+				{
+<span class="nc" id="L503">					aSkill = pcSkills.get(i);</span>
+				}
+			}
+
+<span class="nc bnc" id="L507" title="All 2 branches missed.">			if (aSkill == null)</span>
+			{
+<span class="nc" id="L509">				return false;</span>
+			}
+			else
+			{
+<span class="nc" id="L513">				return aSkill.getSafe(ObjectKey.USE_UNTRAINED);</span>
+			}
+
+		}
+
+		// Deal with JEP formula 
+<span class="nc" id="L519">		final Float res = aPC.getVariableProcessor().getJepOnlyVariableValue(null, expr1, &quot;&quot;, 0);</span>
+<span class="nc bnc" id="L520" title="All 2 branches missed.">		if (res != null)</span>
+		{
+<span class="nc" id="L522">			return res.equals(JEP_TRUE);</span>
+		}
+
+		/* 
+		 * Deal with anything else
+		 * 
+		 * Before returning a default false, let's see if this is a valid token, like this:
+		 *
+		 * |IIF(WEAPON%weap.CATEGORY:Ranged)|
+		 * something 1
+		 * |ELSE|
+		 * something 2
+		 * |ENDIF|
+		 * 
+		 * It can theoretically be used with any valid token, doing an equal compare
+		 * (integer or string equalities are valid)
+		 * 
+		 * Can now contain a token on the right side as well, so two tokens can be
+		 * compared to each other. Comparison is case-insensitive.
+		 */
+<span class="nc" id="L542">		final StringTokenizer aTok = new StringTokenizer(expr1, &quot;:&quot;);</span>
+		final String leftToken;
+		final String rightToken;
+
+<span class="nc" id="L546">		final int tokenCount = aTok.countTokens();</span>
+<span class="nc bnc" id="L547" title="All 2 branches missed.">		if (tokenCount == 1)</span>
+		{
+<span class="nc" id="L549">			leftToken = expr1;</span>
+<span class="nc" id="L550">			rightToken = &quot;TRUE&quot;;</span>
+		}
+<span class="nc bnc" id="L552" title="All 2 branches missed.">		else if (tokenCount != 2)</span>
+		{
+<span class="nc" id="L554">			Logging.errorPrint(&quot;evaluateExpression: Incorrect syntax (missing parameter)&quot;);</span>
+<span class="nc" id="L555">			return false;</span>
+		}
+		else
+		{
+<span class="nc" id="L559">			leftToken = aTok.nextToken();</span>
+<span class="nc" id="L560">			rightToken = aTok.nextToken();</span>
+		}
+
+<span class="nc" id="L563">		final StringWriter sLeftWriter = new StringWriter();</span>
+<span class="nc" id="L564">		final BufferedWriter leftWriter = new BufferedWriter(sLeftWriter);</span>
+<span class="nc" id="L565">		replaceToken(leftToken, leftWriter, aPC);</span>
+<span class="nc" id="L566">		sLeftWriter.flush();</span>
+
+<span class="nc" id="L568">		final StringWriter sRightWriter = new StringWriter();</span>
+<span class="nc" id="L569">		final BufferedWriter rightWriter = new BufferedWriter(sRightWriter);</span>
+<span class="nc" id="L570">		replaceToken(rightToken, rightWriter, aPC);</span>
+<span class="nc" id="L571">		sRightWriter.flush();</span>
+
+		// Try to flush the output writer
+		try
+		{
+<span class="nc" id="L576">			leftWriter.flush();</span>
+<span class="nc" id="L577">			rightWriter.flush();</span>
+		}
+<span class="nc" id="L579">		catch (IOException ignore)</span>
+		{
+<span class="nc bnc" id="L581" title="All 2 branches missed.">			if (Logging.isDebugMode())</span>
+			{
+<span class="nc" id="L583">				Logging.debugPrint(&quot;Could not flush output buffer in evaluateExpression&quot;, ignore);</span>
+			}
+<span class="nc" id="L585">		}</span>
+
+<span class="nc" id="L587">		String leftString = sLeftWriter.toString();</span>
+<span class="nc bnc" id="L588" title="All 2 branches missed.">		if (leftToken.startsWith(&quot;VAR.&quot;))</span>
+		{
+<span class="nc" id="L590">			leftString = aPC.getVariableValue(leftToken.substring(4), &quot;&quot;).toString();</span>
+		}
+
+<span class="nc" id="L593">		String rightString = sRightWriter.toString();</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">		if (rightToken.startsWith(&quot;VAR.&quot;))</span>
+		{
+<span class="nc" id="L596">			rightString = aPC.getVariableValue(rightToken.substring(4), &quot;&quot;).toString();</span>
+		}
+
+		try
+		{
+			// integer values
+<span class="nc" id="L602">			final int left = Integer.parseInt(leftString);</span>
+<span class="nc" id="L603">			final int right = Integer.parseInt(rightString);</span>
+<span class="nc bnc" id="L604" title="All 2 branches missed.">			return left == right;</span>
+		}
+<span class="nc" id="L606">		catch (NumberFormatException e)</span>
+		{
+			// String values
+			// if right string starts with =, test exact match, otherwise test substring match
+<span class="nc bnc" id="L610" title="All 2 branches missed.">			if (rightString.startsWith(&quot;=&quot;))</span>
+			{
+<span class="nc" id="L612">				return leftString.equals(rightString.substring(1));</span>
+			}
+<span class="nc" id="L614">			return leftString.toUpperCase().contains(rightString.toUpperCase());</span>
+		}
+	}
+
+	/**
+	 * Deal with SPELLCASTER.
+	 *  
+	 * Could look like one of the following:
+	 * 
+	 * Arcane
+	 * Chaos
+	 * Divine
+	 * EleMage
+	 * Psionic
+	 * Wizard
+	 * Prepare
+	 * !Prepare
+	 * 0=Wizard    (%classNum=className)
+	 * 0=Divine    (%classNum=spell_type)
+	 * 0=Prepare   (%classNum=preparation_type)
+	 *
+	 * @param expr1 Expression to evaluate
+	 * @param aPC PC containing values to help evaluate the expression
+	 * @return true if the expression was evaluated successfully, else false
+	 */
+	private static boolean processSpellcasterExpression(String expr1, PlayerCharacter aPC)
+	{
+<span class="nc" id="L641">		final String fString = expr1.substring(12).trim();</span>
+
+		// If the SPELLCASTER expression has an '=' sign
+<span class="nc bnc" id="L644" title="All 2 branches missed.">		if (fString.indexOf('=') != -1)</span>
+		{
+<span class="nc" id="L646">			final StringTokenizer aTok = new StringTokenizer(fString, &quot;=&quot;, false);</span>
+<span class="nc" id="L647">			final int i = Integer.parseInt(aTok.nextToken());</span>
+<span class="nc" id="L648">			final String cs = aTok.nextToken();</span>
+<span class="nc" id="L649">			final List&lt;PCClass&gt; cList = aPC.getClassList();</span>
+
+<span class="nc bnc" id="L651" title="All 2 branches missed.">			if (i &gt;= cList.size())</span>
+			{
+<span class="nc" id="L653">				return false;</span>
+			}
+
+<span class="nc" id="L656">			final PCClass aClass = cList.get(i);</span>
+
+<span class="nc bnc" id="L658" title="All 2 branches missed.">			if (cs.equalsIgnoreCase(aClass.getSpellType()))</span>
+			{
+<span class="nc" id="L660">				return true;</span>
+			}
+
+<span class="nc bnc" id="L663" title="All 2 branches missed.">			if (cs.equalsIgnoreCase(aClass.getKeyName()))</span>
+			{
+<span class="nc" id="L665">				return true;</span>
+			}
+
+<span class="nc bnc" id="L668" title="All 4 branches missed.">			if (&quot;!Prepare&quot;.equalsIgnoreCase(cs) &amp;&amp; aClass.getSafe(ObjectKey.MEMORIZE_SPELLS))</span>
+			{
+<span class="nc" id="L670">				return true;</span>
+			}
+
+<span class="nc bnc" id="L673" title="All 4 branches missed.">			if (&quot;Prepare&quot;.equalsIgnoreCase(cs) &amp;&amp; (!aClass.getSafe(ObjectKey.MEMORIZE_SPELLS)))</span>
+			{
+<span class="nc" id="L675">				return true;</span>
+			}
+<span class="nc" id="L677">		}</span>
+		else
+		{
+<span class="nc bnc" id="L680" title="All 2 branches missed.">			for (final PCClass pcClass : aPC.getClassSet())</span>
+			{
+<span class="nc bnc" id="L682" title="All 2 branches missed.">				if (fString.equalsIgnoreCase(pcClass.getSpellType()))</span>
+				{
+<span class="nc" id="L684">					return true;</span>
+				}
+
+<span class="nc bnc" id="L687" title="All 2 branches missed.">				if (fString.equalsIgnoreCase(pcClass.getKeyName()))</span>
+				{
+<span class="nc" id="L689">					return true;</span>
+				}
+
+<span class="nc bnc" id="L692" title="All 4 branches missed.">				if (&quot;!Prepare&quot;.equalsIgnoreCase(fString) &amp;&amp; pcClass.getSafe(ObjectKey.MEMORIZE_SPELLS))</span>
+				{
+<span class="nc" id="L694">					return true;</span>
+				}
+
+<span class="nc bnc" id="L697" title="All 4 branches missed.">				if (&quot;Prepare&quot;.equalsIgnoreCase(fString) &amp;&amp; (!pcClass.getSafe(ObjectKey.MEMORIZE_SPELLS)))</span>
+				{
+<span class="nc" id="L699">					return true;</span>
+				}
+<span class="nc" id="L701">			}</span>
+		}
+<span class="nc" id="L703">		Logging.errorPrint(&quot;Should have exited before this in ExportHandler::processSpellcasterExpression&quot;);</span>
+<span class="nc" id="L704">		return false;</span>
+	}
+
+	/**
+	 * Helper method to evaluate a IIF token
+	 * 
+	 * @param node The IIFNode to evaluate
+	 * @param output The output to write to (character sheet template)
+	 * @param aPC The PC we are outputting
+	 */
+	private void evaluateIIF(final IIFNode node, final BufferedWriter output, final PlayerCharacter aPC)
+	{
+		// Comma is a delimiter for a higher-level parser, so 
+		// we'll use a semicolon and replace it with a comma for
+		// expressions like:
+		// |IIF(VAR.IF(var(&quot;COUNT[SKILLTYPE=Strength]&quot;)&gt;0;1;0):1)|
+<span class="nc" id="L720">		final String aString = node.expr().replaceAll(Pattern.quote(&quot;;&quot;), &quot;,&quot;);</span>
+
+		// If we can evaluate the expression then evaluate its children
+<span class="nc bnc" id="L723" title="All 2 branches missed.">		if (evaluateExpression(aString, aPC))</span>
+		{
+<span class="nc" id="L725">			evaluateIIFChildren(node.trueChildren(), output, aPC);</span>
+		}
+		else
+		{
+<span class="nc" id="L729">			evaluateIIFChildren(node.falseChildren(), output, aPC);</span>
+		}
+<span class="nc" id="L731">	}</span>
+
+	/**
+	 * Helper method to evaluate the results of a IIF child node
+	 * 
+	 * @param children The list of children for the IIF node
+	 * @param output The output to write to (filling in the character sheet template)
+	 * @param aPC THe PC to output
+	 */
+	private void evaluateIIFChildren(final List&lt;?&gt; children, final BufferedWriter output, final PlayerCharacter aPC)
+	{
+<span class="nc bnc" id="L742" title="All 2 branches missed.">		for (Object aChild : children)</span>
+		{
+<span class="nc bnc" id="L744" title="All 2 branches missed.">			if (aChild instanceof final FORNode nextFor)</span>
+			{
+				// If the child is a FORNode then put it in the loopVariables map as 
+				// a key with a corresponding value of 0
+<span class="nc" id="L748">				loopVariables.put(nextFor.var(), 0);</span>
+<span class="nc" id="L749">				existsOnly = nextFor.exists();</span>
+
+<span class="nc" id="L751">				String minString = nextFor.min();</span>
+<span class="nc" id="L752">				String maxString = nextFor.max();</span>
+<span class="nc" id="L753">				String stepString = nextFor.step();</span>
+
+				// Go through the list of objects in the loopVariables and loopParameters
+				// sets and set the values in place of keys for min, max and step
+<span class="nc" id="L757">				minString = replaceVariables(minString, loopParameters);</span>
+<span class="nc" id="L758">				minString = replaceVariables(minString, loopVariables);</span>
+<span class="nc" id="L759">				maxString = replaceVariables(maxString, loopParameters);</span>
+<span class="nc" id="L760">				maxString = replaceVariables(maxString, loopVariables);</span>
+<span class="nc" id="L761">				stepString = replaceVariables(stepString, loopParameters);</span>
+<span class="nc" id="L762">				stepString = replaceVariables(stepString, loopVariables);</span>
+
+<span class="nc" id="L764">				int minValue = getVarValue(minString, aPC);</span>
+<span class="nc" id="L765">				int maxValue = getVarValue(maxString, aPC);</span>
+<span class="nc" id="L766">				int stepValue = getVarValue(stepString, aPC);</span>
+<span class="nc" id="L767">				String var = nextFor.var();</span>
+<span class="nc" id="L768">				loopParameters.put(var + &quot;!MIN&quot;, minValue);</span>
+<span class="nc" id="L769">				loopParameters.put(var + &quot;!MAX&quot;, maxValue);</span>
+<span class="nc" id="L770">				loopParameters.put(var + &quot;!STEP&quot;, stepValue);</span>
+
+<span class="nc" id="L772">				loopFOR(nextFor, minValue, maxValue, stepValue, output, aPC);</span>
+<span class="nc" id="L773">				loopParameters.remove(var + &quot;!MIN&quot;);</span>
+<span class="nc" id="L774">				loopParameters.remove(var + &quot;!MAX&quot;);</span>
+<span class="nc" id="L775">				loopParameters.remove(var + &quot;!STEP&quot;);</span>
+
+<span class="nc" id="L777">				existsOnly = nextFor.exists();</span>
+<span class="nc" id="L778">				loopVariables.remove(nextFor.var());</span>
+<span class="nc" id="L779">			}</span>
+			// If child is an IIFNode, then evaluate that 
+<span class="nc bnc" id="L781" title="All 2 branches missed.">			else if (aChild instanceof IIFNode)</span>
+			{
+<span class="nc" id="L783">				evaluateIIF((IIFNode) aChild, output, aPC);</span>
+			}
+			// Else it's something to be processed
+			else
+			{
+<span class="nc" id="L788">				String lineString = (String) aChild;</span>
+<span class="nc" id="L789">				lineString = replaceVariables(lineString, loopParameters);</span>
+<span class="nc" id="L790">				lineString = replaceVariables(lineString, loopVariables);</span>
+
+<span class="nc" id="L792">				replaceLine(lineString, output, aPC);</span>
+
+				// Each time we replace a line that is part of an IIF statement
+				// we output a newline if we are allowed to write and the 
+				// whitespace is not controlled by the OS author
+<span class="nc bnc" id="L797" title="All 4 branches missed.">				if (canWrite &amp;&amp; !manualWhitespace)</span>
+				{
+<span class="nc" id="L799">					FileAccess.newLine(output);</span>
+				}
+			}
+<span class="nc" id="L802">		}</span>
+<span class="nc" id="L803">	}</span>
+
+	/**
+	 * Loop through a set of output as required by a FOR loop.
+	 * 
+	 * @param node The node being processed
+	 * @param start The starting value of the loop
+	 * @param end The ending value of the loop
+	 * @param step The amount by which the counter should be changed each iteration.
+	 * @param output The writer output is to be sent to.
+	 * @param aPC The character being processed.
+	 */
+	protected void loopFOR(final FORNode node, final int start, final int end, final int step,
+						   final BufferedWriter output, final PlayerCharacter aPC)
+	{
+<span class="nc bnc" id="L818" title="All 6 branches missed.">		for (int x = start; ((step &lt; 0) ? x &gt;= end : x &lt;= end); x += step)</span>
+		{
+<span class="nc bnc" id="L820" title="All 2 branches missed.">			if (processLoop(node, output, aPC, x))</span>
+			{
+<span class="nc" id="L822">				break;</span>
+			}
+		}
+<span class="nc" id="L825">	}</span>
+
+	/**
+	 * Process an iteration of a FOR loop.
+	 * 
+	 * @param node The node being processed
+	 * @param output The writer output is to be sent to.
+	 * @param aPC The character being processed.
+	 * @param index The current value of the loop index
+	 * @return true if the loop should be stopped.
+	 */
+	private boolean processLoop(FORNode node, BufferedWriter output, PlayerCharacter aPC, int index)
+	{
+<span class="nc" id="L838">		loopVariables.put(node.var(), index);</span>
+<span class="nc" id="L839">		int numberOfChildrenNodes = node.children().size();</span>
+<span class="nc bnc" id="L840" title="All 2 branches missed.">		for (int y = 0; y &lt; numberOfChildrenNodes; ++y)</span>
+		{
+<span class="nc bnc" id="L842" title="All 2 branches missed.">			if (node.children().get(y) instanceof FORNode nextFor)</span>
+			{
+<span class="nc" id="L844">				loopVariables.put(nextFor.var(), 0);</span>
+<span class="nc" id="L845">				existsOnly = nextFor.exists();</span>
+
+<span class="nc" id="L847">				String minString = nextFor.min();</span>
+<span class="nc" id="L848">				String maxString = nextFor.max();</span>
+<span class="nc" id="L849">				String stepString = nextFor.step();</span>
+
+<span class="nc" id="L851">				minString = replaceVariables(minString, loopParameters);</span>
+<span class="nc" id="L852">				minString = replaceVariables(minString, loopVariables);</span>
+<span class="nc" id="L853">				maxString = replaceVariables(maxString, loopParameters);</span>
+<span class="nc" id="L854">				maxString = replaceVariables(maxString, loopVariables);</span>
+<span class="nc" id="L855">				stepString = replaceVariables(stepString, loopParameters);</span>
+<span class="nc" id="L856">				stepString = replaceVariables(stepString, loopVariables);</span>
+
+<span class="nc" id="L858">				final int varMin = getVarValue(minString, aPC);</span>
+<span class="nc" id="L859">				final int varMax = getVarValue(maxString, aPC);</span>
+<span class="nc" id="L860">				final int varStep = getVarValue(stepString, aPC);</span>
+<span class="nc" id="L861">				String var = nextFor.var();</span>
+<span class="nc" id="L862">				loopParameters.put(var + &quot;!MIN&quot;, varMin);</span>
+<span class="nc" id="L863">				loopParameters.put(var + &quot;!MAX&quot;, varMax);</span>
+<span class="nc" id="L864">				loopParameters.put(var + &quot;!STEP&quot;, varMax);</span>
+
+<span class="nc" id="L866">				loopFOR(nextFor, varMin, varMax, varStep, output, aPC);</span>
+<span class="nc" id="L867">				loopParameters.remove(var + &quot;!MIN&quot;);</span>
+<span class="nc" id="L868">				loopParameters.remove(var + &quot;!MAX&quot;);</span>
+<span class="nc" id="L869">				loopParameters.remove(var + &quot;!STEP&quot;);</span>
+
+<span class="nc" id="L871">				existsOnly = node.exists();</span>
+<span class="nc" id="L872">				loopVariables.remove(nextFor.var());</span>
+<span class="nc" id="L873">			}</span>
+<span class="nc bnc" id="L874" title="All 2 branches missed.">			else if (node.children().get(y) instanceof IIFNode)</span>
+			{
+<span class="nc" id="L876">				evaluateIIF((IIFNode) node.children().get(y), output, aPC);</span>
+			}
+			else
+			{
+<span class="nc" id="L880">				String lineString = (String) node.children().get(y);</span>
+<span class="nc" id="L881">				lineString = replaceVariables(lineString, loopParameters);</span>
+<span class="nc" id="L882">				lineString = replaceVariables(lineString, loopVariables);</span>
+
+<span class="nc" id="L884">				noMoreItems = false;</span>
+<span class="nc" id="L885">				replaceLine(lineString, output, aPC);</span>
+
+				// If the output sheet author has no control 
+				// over the whitespace then print a newline.
+<span class="nc bnc" id="L889" title="All 4 branches missed.">				if (canWrite &amp;&amp; !manualWhitespace)</span>
+				{
+<span class="nc" id="L891">					FileAccess.newLine(output);</span>
+				}
+
+				// break out of loop if no more items
+<span class="nc bnc" id="L895" title="All 4 branches missed.">				if (existsOnly &amp;&amp; noMoreItems)</span>
+				{
+<span class="nc" id="L897">					return true;</span>
+				}
+			}
+		}
+<span class="nc" id="L901">		return false;</span>
+	}
+
+	/**
+	 * Math Mode - Most of the code logic was copied from PlayerCharacter.getVariableValue
+	 * included a treatment for math with attack routines (for example +6/+1 - 2 = +4/-1)
+	 *
+	 * @param aString The string to be converted
+	 * @param aPC the PC being exported
+	 * @return String
+	 */
+	private String mathMode(String aString, PlayerCharacter aPC)
+	{
+<span class="nc" id="L914">		String str = aString;</span>
+
+		// Deal with Knowledge () type tokens
+<span class="nc" id="L917">		str = processBracketedTokens(str, aPC);</span>
+
+		// Replace all square brackets with curved ones
+<span class="nc" id="L920">		str = str.replaceAll(Pattern.quote(&quot;[&quot;), &quot;(&quot;);</span>
+<span class="nc" id="L921">		str = str.replaceAll(Pattern.quote(&quot;]&quot;), &quot;)&quot;);</span>
+
+		// A list of mathematical delimiters
+<span class="nc" id="L924">		final String delimiter = &quot;+-/*&quot;;</span>
+<span class="nc" id="L925">		String valString = &quot;&quot;;</span>
+<span class="nc" id="L926">		final int ADDITION_MODE = 0;</span>
+<span class="nc" id="L927">		final int SUBTRACTION_MODE = 1;</span>
+<span class="nc" id="L928">		final int MULTIPLICATION_MODE = 2;</span>
+<span class="nc" id="L929">		final int DIVISION_MODE = 3;</span>
+		// Mode is addition mode by default
+<span class="nc" id="L931">		int mode = ADDITION_MODE;</span>
+
+<span class="nc" id="L933">		int nextMode = 0;</span>
+<span class="nc" id="L934">		final int REGULAR_MODE = 0;</span>
+<span class="nc" id="L935">		final int INTVAL_MODE = 1;</span>
+<span class="nc" id="L936">		final int SIGN_MODE = 2;</span>
+<span class="nc" id="L937">		final int NO_ZERO_MODE = 3;</span>
+<span class="nc" id="L938">		int endMode = REGULAR_MODE;</span>
+<span class="nc" id="L939">		boolean attackRoutine = false;</span>
+<span class="nc" id="L940">		String attackData = &quot;&quot;;</span>
+
+<span class="nc" id="L942">		float total = 0.0f;</span>
+<span class="nc bnc" id="L943" title="All 2 branches missed.">		for (int i = 0; i &lt; str.length(); ++i)</span>
+		{
+<span class="nc" id="L945">			valString += str.substring(i, i + 1);</span>
+
+<span class="nc bnc" id="L947" title="All 2 branches missed.">			if ((i == (str.length() - 1))</span>
+<span class="nc bnc" id="L948" title="All 6 branches missed.">				|| ((delimiter.lastIndexOf(str.charAt(i)) &gt; -1) &amp;&amp; (i &gt; 0) &amp;&amp; (str.charAt(i - 1) != '.')))</span>
+			{
+<span class="nc bnc" id="L950" title="All 2 branches missed.">				if (delimiter.lastIndexOf(str.charAt(i)) &gt; -1)</span>
+				{
+<span class="nc" id="L952">					valString = valString.substring(0, valString.length() - 1);</span>
+				}
+
+				{
+					// Deal with .TRUNC
+<span class="nc bnc" id="L957" title="All 2 branches missed.">					if (valString.endsWith(&quot;.TRUNC&quot;))</span>
+					{
+<span class="nc bnc" id="L959" title="All 2 branches missed.">						if (attackRoutine)</span>
+						{
+<span class="nc" id="L961">							Logging.errorPrint(&quot;Math Mode Error: Not allowed to use .TRUNC in Attack Mode.&quot;);</span>
+						}
+						else
+						{
+<span class="nc" id="L965">							valString = String.valueOf(Float</span>
+<span class="nc" id="L966">								.valueOf(mathMode(valString.substring(0, valString.length() - 6), aPC)).intValue());</span>
+						}
+					}
+
+					// Deal with .INTVAL
+<span class="nc bnc" id="L971" title="All 2 branches missed.">					if (valString.endsWith(&quot;.INTVAL&quot;))</span>
+					{
+<span class="nc bnc" id="L973" title="All 2 branches missed.">						if (attackRoutine)</span>
+						{
+<span class="nc" id="L975">							Logging.errorPrint(&quot;Math Mode Error: Using .INTVAL in Attack Mode.&quot;);</span>
+						}
+						else
+						{
+<span class="nc" id="L979">							valString = mathMode(valString.substring(0, valString.length() - 7), aPC);</span>
+						}
+
+<span class="nc" id="L982">						endMode = INTVAL_MODE;</span>
+					}
+
+					// Deal with .SIGN
+<span class="nc bnc" id="L986" title="All 2 branches missed.">					if (valString.endsWith(&quot;.SIGN&quot;))</span>
+					{
+<span class="nc" id="L988">						valString = mathMode(valString.substring(0, valString.length() - 5), aPC);</span>
+<span class="nc" id="L989">						endMode = SIGN_MODE;</span>
+					}
+
+					// Deal with .NOZERO
+<span class="nc bnc" id="L993" title="All 2 branches missed.">					if (valString.endsWith(&quot;.NOZERO&quot;))</span>
+					{
+<span class="nc" id="L995">						valString = mathMode(valString.substring(0, valString.length() - 7), aPC);</span>
+<span class="nc" id="L996">						endMode = NO_ZERO_MODE;</span>
+					}
+
+					// Set the next mode based on the mathematical sign
+<span class="nc bnc" id="L1000" title="All 5 branches missed.">					switch (str.charAt(i))</span>
+					{
+<span class="nc" id="L1002">						case '+' -&gt; nextMode = ADDITION_MODE;</span>
+<span class="nc" id="L1003">						case '-' -&gt; nextMode = SUBTRACTION_MODE;</span>
+<span class="nc" id="L1004">						case '*' -&gt; nextMode = MULTIPLICATION_MODE;</span>
+<span class="nc" id="L1005">						case '/' -&gt; nextMode = DIVISION_MODE;</span>
+					}
+
+<span class="nc" id="L1008">					StringWriter sWriter = new StringWriter();</span>
+<span class="nc" id="L1009">					BufferedWriter aWriter = new BufferedWriter(sWriter);</span>
+<span class="nc" id="L1010">					replaceTokenSkipMath(aPC, valString, aWriter);</span>
+<span class="nc" id="L1011">					sWriter.flush();</span>
+
+					try
+					{
+<span class="nc" id="L1015">						aWriter.flush();</span>
+					}
+<span class="nc" id="L1017">					catch (IOException e)</span>
+					{
+<span class="nc" id="L1019">						Logging.errorPrint(&quot;Failed to flush oputput in MathMode.&quot;, e);</span>
+<span class="nc" id="L1020">					}</span>
+
+<span class="nc" id="L1022">					final String bString = sWriter.toString();</span>
+
+					try
+					{
+						// Float values
+<span class="nc" id="L1027">						DecimalFormatSymbols decimalFormatSymbols = new DecimalFormatSymbols(Locale.US);</span>
+<span class="nc" id="L1028">						DecimalFormat decimalFormat = new DecimalFormat(&quot;#,##0.##&quot;, decimalFormatSymbols);</span>
+<span class="nc" id="L1029">						valString = String.valueOf(decimalFormat.parse(bString));</span>
+					}
+<span class="nc" id="L1031">					catch (ParseException e)</span>
+					{
+						// String values
+<span class="nc" id="L1034">						valString = bString;</span>
+<span class="nc" id="L1035">					}</span>
+
+<span class="nc bnc" id="L1037" title="All 4 branches missed.">					if ((!attackRoutine) &amp;&amp; Pattern.matches(&quot;^([-+]\\d+/)*[-+]\\d+$&quot;, valString))</span>
+					{
+<span class="nc" id="L1039">						attackRoutine = true;</span>
+<span class="nc" id="L1040">						attackData = valString;</span>
+<span class="nc" id="L1041">						valString = &quot;&quot;;</span>
+					}
+				}
+
+				try
+				{
+<span class="nc bnc" id="L1047" title="All 2 branches missed.">					if (!valString.isEmpty())</span>
+					{
+<span class="nc bnc" id="L1049" title="All 2 branches missed.">						if (attackRoutine)</span>
+						{
+<span class="nc" id="L1051">							StringTokenizer bTok = new StringTokenizer(attackData, &quot;/&quot;);</span>
+
+<span class="nc bnc" id="L1053" title="All 2 branches missed.">							if (bTok.countTokens() &gt; 0)</span>
+							{
+<span class="nc" id="L1055">								StringBuilder newAttackData = new StringBuilder();</span>
+<span class="nc bnc" id="L1056" title="All 2 branches missed.">								while (bTok.hasMoreTokens())</span>
+								{
+<span class="nc" id="L1058">									final String bString = bTok.nextToken();</span>
+
+<span class="nc" id="L1060">									float bf = Float.parseFloat(bString);</span>
+<span class="nc" id="L1061">									float vf = Float.parseFloat(valString);</span>
+<span class="nc bnc" id="L1062" title="All 5 branches missed.">									switch (mode)</span>
+									{
+										case ADDITION_MODE -&gt; {
+<span class="nc" id="L1065">											float addf = bf + vf;</span>
+<span class="nc" id="L1066">											newAttackData.append(&quot;/+&quot;).append(Integer.toString((int) addf));</span>
+<span class="nc" id="L1067">										}</span>
+										case SUBTRACTION_MODE -&gt; {
+<span class="nc" id="L1069">											float subf = bf - vf;</span>
+<span class="nc" id="L1070">											newAttackData.append(&quot;/+&quot;).append(Integer.toString((int) subf));</span>
+<span class="nc" id="L1071">										}</span>
+										case MULTIPLICATION_MODE -&gt; {
+<span class="nc" id="L1073">											float multf = bf * vf;</span>
+<span class="nc" id="L1074">											newAttackData.append(&quot;/+&quot;).append(Integer.toString((int) multf));</span>
+<span class="nc" id="L1075">										}</span>
+										case DIVISION_MODE -&gt; {
+<span class="nc" id="L1077">											float divf = bf / vf;</span>
+<span class="nc" id="L1078">											newAttackData.append(&quot;/+&quot;).append(Integer.toString((int) divf));</span>
+<span class="nc" id="L1079">										}</span>
+<span class="nc" id="L1080">										default -&gt; Logging.errorPrint(</span>
+												&quot;In mathMode the mode &quot; + mode + &quot; is unsupported.&quot;);
+									}
+<span class="nc" id="L1083">								}</span>
+
+<span class="nc" id="L1085">								attackData = newAttackData.substring(1).replaceAll(Pattern.quote(&quot;+-&quot;), &quot;-&quot;);</span>
+							}
+<span class="nc" id="L1087">						}</span>
+						else
+						{
+<span class="nc bnc" id="L1090" title="All 5 branches missed.">							switch (mode)</span>
+							{
+<span class="nc" id="L1092">								case ADDITION_MODE -&gt; total = (float) (total + Double.parseDouble(valString));</span>
+<span class="nc" id="L1093">								case SUBTRACTION_MODE -&gt; total = (float) (total - Double.parseDouble(valString));</span>
+<span class="nc" id="L1094">								case MULTIPLICATION_MODE -&gt; total = (float) (total * Double.parseDouble(valString));</span>
+<span class="nc" id="L1095">								case DIVISION_MODE -&gt; total = (float) (total / Double.parseDouble(valString));</span>
+<span class="nc" id="L1096">								default -&gt; Logging.errorPrint(&quot;In mathMode the mode &quot; + mode + &quot; is unsupported.&quot;);</span>
+							}
+						}
+					}
+				}
+<span class="nc" id="L1101">				catch (NumberFormatException exc)</span>
+				{
+<span class="nc" id="L1103">					StringWriter sWriter = new StringWriter();</span>
+<span class="nc" id="L1104">					BufferedWriter aWriter = new BufferedWriter(sWriter);</span>
+<span class="nc" id="L1105">					replaceTokenSkipMath(aPC, str, aWriter);</span>
+<span class="nc" id="L1106">					sWriter.flush();</span>
+
+					try
+					{
+<span class="nc" id="L1110">						aWriter.flush();</span>
+					}
+<span class="nc" id="L1112">					catch (IOException e)</span>
+					{
+<span class="nc" id="L1114">						Logging.errorPrint(&quot;Math Mode Error: Could not flush output.&quot;);</span>
+<span class="nc" id="L1115">					}</span>
+
+<span class="nc" id="L1117">					return sWriter.toString();</span>
+<span class="nc" id="L1118">				}</span>
+
+<span class="nc" id="L1120">				mode = nextMode;</span>
+				// Set the nextMode back to the default
+<span class="nc" id="L1122">				nextMode = ADDITION_MODE;</span>
+<span class="nc" id="L1123">				valString = &quot;&quot;;</span>
+			}
+		}
+
+<span class="nc bnc" id="L1127" title="All 2 branches missed.">		if (attackRoutine)</span>
+		{
+<span class="nc" id="L1129">			return attackData;</span>
+		}
+<span class="nc bnc" id="L1131" title="All 2 branches missed.">		if (endMode == INTVAL_MODE)</span>
+		{
+<span class="nc" id="L1133">			return Integer.toString((int) total);</span>
+		}
+
+<span class="nc bnc" id="L1136" title="All 2 branches missed.">		if (endMode == SIGN_MODE)</span>
+		{
+<span class="nc" id="L1138">			return Delta.toString((int) total);</span>
+		}
+
+<span class="nc bnc" id="L1141" title="All 2 branches missed.">		if (endMode == NO_ZERO_MODE)</span>
+		{
+<span class="nc" id="L1143">			final int totalIntValue = (int) total;</span>
+<span class="nc bnc" id="L1144" title="All 2 branches missed.">			if (totalIntValue == 0)</span>
+			{
+<span class="nc" id="L1146">				return &quot;&quot;;</span>
+			}
+
+<span class="nc" id="L1149">			return Delta.toString(totalIntValue);</span>
+		}
+
+<span class="nc" id="L1152">		return Float.toString(total);</span>
+	}
+
+	/**
+	 * Helper method to process the math for Knowledge (xx) types of tokens
+	 * 
+	 * @param str String to process
+	 * @param aPC PC we are exporting
+	 * @return Processed string
+	 */
+	private String processBracketedTokens(String str, PlayerCharacter aPC)
+	{
+<span class="nc bnc" id="L1164" title="All 2 branches missed.">		while (str.lastIndexOf('(') != -1)</span>
+		{
+<span class="nc" id="L1166">			int x = CoreUtility.innerMostStringStart(str);</span>
+<span class="nc" id="L1167">			int y = CoreUtility.innerMostStringEnd(str);</span>
+
+			// If the end is before the start we have a problem
+<span class="nc bnc" id="L1170" title="All 2 branches missed.">			if (y &lt; x)</span>
+			{
+				// This was breaking some homebrew sheets. [Felipe - 13-may-03]
+<span class="nc" id="L1173">				Logging.debugPrint(</span>
+					&quot;End is before start for string processing.  We are skipping the processing of this item.&quot;);
+<span class="nc" id="L1175">				break;</span>
+			}
+
+<span class="nc" id="L1178">			String bString = str.substring(x + 1, y);</span>
+
+			// This will treat Knowledge (xx) kind of token
+<span class="nc bnc" id="L1181" title="All 8 branches missed.">			if ((x &gt; 0) &amp;&amp; (str.charAt(x - 1) == ' ') &amp;&amp; ((str.charAt(y + 1) == '.') || (y == (str.length() - 1))))</span>
+			{
+<span class="nc" id="L1183">				str = str.substring(0, x) + &quot;[&quot; + bString + &quot;]&quot; + str.substring(y + 1);</span>
+			}
+			else
+			{
+<span class="nc" id="L1187">				str = str.substring(0, x) + mathMode(bString, aPC) + str.substring(y + 1);</span>
+			}
+<span class="nc" id="L1189">		}</span>
+<span class="nc" id="L1190">		return str;</span>
+	}
+
+	/**
+	 * Helper class to output normal text
+	 * 
+	 * @param nonToken
+	 * @param output
+	 */
+	private void outputNonToken(String nonToken, java.io.Writer output)
+	{
+		// Do nothing if something shouldn't be output.
+<span class="nc bnc" id="L1202" title="All 4 branches missed.">		if (canWrite &amp;&amp; !nonToken.isEmpty())</span>
+		{
+			String finalToken;
+			// If we have manual white space then remove an tab characters
+<span class="nc bnc" id="L1206" title="All 2 branches missed.">			if (manualWhitespace)</span>
+			{
+<span class="nc" id="L1208">				finalToken = nonToken.replaceAll(&quot;[ \\t]&quot;, &quot;&quot;);</span>
+			}
+			else
+			{
+<span class="nc" id="L1212">				finalToken = nonToken;</span>
+			}
+
+<span class="nc" id="L1215">			FileAccess.write(output, finalToken);</span>
+		}
+<span class="nc" id="L1217">	}</span>
+
+	/**
+	 * Helper method to parse |FOR tokens (pre-processing for a template)
+	 * 
+	 * @param forLine
+	 * @param tokens
+	 * @return A FORNode of the parsed tokens
+	 */
+	protected FORNode parseFORs(String forLine, StringTokenizer tokens)
+	{
+<span class="nc" id="L1228">		final List&lt;String&gt; forVars = getParameters(forLine);</span>
+<span class="nc" id="L1229">		final String var = forVars.get(1);</span>
+<span class="nc" id="L1230">		final String min = forVars.get(2);</span>
+<span class="nc" id="L1231">		final String max = forVars.get(3);</span>
+<span class="nc" id="L1232">		final String step = forVars.get(4);</span>
+<span class="nc" id="L1233">		final String eTest = forVars.get(5);</span>
+<span class="nc" id="L1234">		boolean exists = false;</span>
+
+<span class="nc bnc" id="L1236" title="All 8 branches missed.">		if (((!eTest.isEmpty()) &amp;&amp; (eTest.charAt(0) == '1')) || ((!eTest.isEmpty()) &amp;&amp; (eTest.charAt(0) == '2')))</span>
+		{
+<span class="nc" id="L1238">			exists = true;</span>
+		}
+
+<span class="nc" id="L1241">		final FORNode node = new FORNode(var, min, max, step, exists);</span>
+
+<span class="nc bnc" id="L1243" title="All 2 branches missed.">		while (tokens.hasMoreTokens())</span>
+		{
+<span class="nc" id="L1245">			final String line = tokens.nextToken();</span>
+
+<span class="nc bnc" id="L1247" title="All 2 branches missed.">			if (line.startsWith(&quot;|FOR&quot;))</span>
+			{
+<span class="nc" id="L1249">				StringTokenizer newFor = new StringTokenizer(line, &quot;,&quot;);</span>
+<span class="nc" id="L1250">				newFor.nextToken();</span>
+
+<span class="nc bnc" id="L1252" title="All 2 branches missed.">				if (newFor.nextToken().startsWith(&quot;%&quot;))</span>
+				{
+<span class="nc" id="L1254">					node.addChild(parseFORs(line, tokens));</span>
+				}
+				else
+				{
+<span class="nc" id="L1258">					node.addChild(line);</span>
+				}
+<span class="nc" id="L1260">			}</span>
+<span class="nc bnc" id="L1261" title="All 4 branches missed.">			else if (line.startsWith(&quot;|IIF(&quot;) &amp;&amp; (line.lastIndexOf(',') == -1))</span>
+			{
+<span class="nc" id="L1263">				String expr = line.substring(5, line.lastIndexOf(')'));</span>
+<span class="nc" id="L1264">				node.addChild(parseIIFs(expr, tokens));</span>
+<span class="nc" id="L1265">			}</span>
+<span class="nc bnc" id="L1266" title="All 2 branches missed.">			else if (line.startsWith(&quot;|ENDFOR|&quot;))</span>
+			{
+<span class="nc" id="L1268">				return node;</span>
+			}
+			else
+			{
+<span class="nc" id="L1272">				node.addChild(line);</span>
+			}
+<span class="nc" id="L1274">		}</span>
+
+<span class="nc" id="L1276">		return node;</span>
+	}
+
+	/**
+	 * Retrieve the parameters of a comma separated command such as a 
+	 * FOR token. Commas inside brackets are ignored, thus allowing JEP 
+	 * functions with multiple parameters to be included in FOR loops.
+	 *  
+	 * @param forToken The token to be broken up. 
+	 * @return The token parameters.
+	 */
+	public static List&lt;String&gt; getParameters(String forToken)
+	{
+<span class="nc" id="L1289">		String[] splitStr = forToken.split(&quot;,&quot;);</span>
+<span class="nc" id="L1290">		List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L1291">		StringBuilder buf = new StringBuilder();</span>
+<span class="nc" id="L1292">		boolean inFormula = false;</span>
+<span class="nc bnc" id="L1293" title="All 2 branches missed.">		for (String string : splitStr)</span>
+		{
+<span class="nc bnc" id="L1295" title="All 4 branches missed.">			if (string.contains(&quot;(&quot;) &amp;&amp; (string.indexOf(')') &lt; string.indexOf('(')))</span>
+			{
+<span class="nc" id="L1297">				inFormula = true;</span>
+<span class="nc" id="L1298">				buf.append(string);</span>
+			}
+<span class="nc bnc" id="L1300" title="All 4 branches missed.">			else if (inFormula &amp;&amp; string.contains(&quot;)&quot;))</span>
+			{
+<span class="nc" id="L1302">				inFormula = false;</span>
+<span class="nc" id="L1303">				buf.append(&quot;,&quot;);</span>
+<span class="nc" id="L1304">				buf.append(string);</span>
+<span class="nc" id="L1305">				result.add(buf.toString());</span>
+<span class="nc" id="L1306">				buf = new StringBuilder();</span>
+			}
+<span class="nc bnc" id="L1308" title="All 2 branches missed.">			else if (inFormula)</span>
+			{
+<span class="nc" id="L1310">				buf.append(&quot;,&quot;);</span>
+<span class="nc" id="L1311">				buf.append(string);</span>
+			}
+			else
+			{
+<span class="nc" id="L1315">				result.add(string);</span>
+			}
+		}
+<span class="nc" id="L1318">		return result;</span>
+	}
+
+	/**
+	 * Helper method to parse the IIF tokens, includes dealing with a 
+	 * |FOR child, |IIF child, ELSE, END IF and plain text
+	 * 
+	 * @param expr
+	 * @param tokens
+	 * @return IIFNode representing the parsed tokens
+	 */
+	protected IIFNode parseIIFs(String expr, StringTokenizer tokens)
+	{
+<span class="nc" id="L1331">		final IIFNode node = new IIFNode(expr);</span>
+
+		// Flag to indicate whether we are adding the 
+		// true case (e.g.  The IF) or the false case 
+		// (e.g.  The ELSE)
+<span class="nc" id="L1336">		boolean trueCase = true;</span>
+
+<span class="nc bnc" id="L1338" title="All 2 branches missed.">		while (tokens.hasMoreTokens())</span>
+		{
+<span class="nc" id="L1340">			final String line = tokens.nextToken();</span>
+
+			// It's a |FOR child
+<span class="nc bnc" id="L1343" title="All 2 branches missed.">			if (line.startsWith(&quot;|FOR&quot;))</span>
+			{
+<span class="nc" id="L1345">				StringTokenizer newFor = new StringTokenizer(line, &quot;,&quot;);</span>
+<span class="nc" id="L1346">				newFor.nextToken();</span>
+				// It's the first type of |FOR, e.g.  With a variable name, 
+				// see PCGen docs for |FOR token
+<span class="nc bnc" id="L1349" title="All 2 branches missed.">				if (newFor.nextToken().startsWith(&quot;%&quot;))</span>
+				{
+<span class="nc bnc" id="L1351" title="All 2 branches missed.">					if (trueCase)</span>
+					{
+<span class="nc" id="L1353">						node.addTrueChild(parseFORs(line, tokens));</span>
+					}
+					else
+					{
+<span class="nc" id="L1357">						node.addFalseChild(parseFORs(line, tokens));</span>
+					}
+				}
+				else
+				{
+<span class="nc bnc" id="L1362" title="All 2 branches missed.">					if (trueCase)</span>
+					{
+<span class="nc" id="L1364">						node.addTrueChild(line);</span>
+					}
+					else
+					{
+<span class="nc" id="L1368">						node.addFalseChild(line);</span>
+					}
+				}
+<span class="nc" id="L1371">			}</span>
+			// It's a child IIF, make a recursive call
+<span class="nc bnc" id="L1373" title="All 4 branches missed.">			else if (line.startsWith(&quot;|IIF(&quot;) &amp;&amp; (line.lastIndexOf(',') == -1))</span>
+			{
+<span class="nc" id="L1375">				String newExpr = line.substring(5, line.lastIndexOf(')'));</span>
+<span class="nc bnc" id="L1376" title="All 2 branches missed.">				if (trueCase)</span>
+				{
+<span class="nc" id="L1378">					node.addTrueChild(parseIIFs(newExpr, tokens));</span>
+				}
+				else
+				{
+<span class="nc" id="L1382">					node.addFalseChild(parseIIFs(newExpr, tokens));</span>
+				}
+<span class="nc" id="L1384">			}</span>
+			// Set the flag so that the false case is added next
+<span class="nc bnc" id="L1386" title="All 2 branches missed.">			else if (line.startsWith(&quot;|ELSE|&quot;))</span>
+			{
+<span class="nc" id="L1388">				trueCase = false;</span>
+			}
+			// We're done, so exit
+<span class="nc bnc" id="L1391" title="All 2 branches missed.">			else if (line.startsWith(&quot;|ENDIF|&quot;))</span>
+			{
+<span class="nc" id="L1393">				return node;</span>
+			}
+			else
+			{
+<span class="nc bnc" id="L1397" title="All 2 branches missed.">				if (trueCase)</span>
+				{
+<span class="nc" id="L1399">					node.addTrueChild(line);</span>
+				}
+				else
+				{
+<span class="nc" id="L1403">					node.addFalseChild(line);</span>
+				}
+			}
+<span class="nc" id="L1406">		}</span>
+
+<span class="nc" id="L1408">		return node;</span>
+	}
+
+	/**
+	 * Populate the token map (if not already done so), e.g. Add all 
+	 * of the types of Output Tokens to the map
+	 */
+	private static void populateTokenMap()
+	{
+<span class="nc bnc" id="L1417" title="All 2 branches missed.">		if (!tokenMapPopulated)</span>
+		{
+<span class="nc" id="L1419">			addToTokenMap(new AbilityToken());</span>
+<span class="nc" id="L1420">			addToTokenMap(new AbilityListToken());</span>
+<span class="nc" id="L1421">			addToTokenMap(new BonusToken());</span>
+<span class="nc" id="L1422">			addToTokenMap(new EqToken());</span>
+<span class="nc" id="L1423">			addToTokenMap(new EqTypeToken());</span>
+<span class="nc" id="L1424">			addToTokenMap(new GameModeToken());</span>
+<span class="nc" id="L1425">			addToTokenMap(new MovementToken());</span>
+<span class="nc" id="L1426">			addToTokenMap(new SkillToken());</span>
+<span class="nc" id="L1427">			addToTokenMap(new SkillpointsToken());</span>
+<span class="nc" id="L1428">			addToTokenMap(new StatToken());</span>
+<span class="nc" id="L1429">			addToTokenMap(new TotalToken());</span>
+<span class="nc" id="L1430">			addToTokenMap(new WeaponToken());</span>
+<span class="nc" id="L1431">			addToTokenMap(new WeaponhToken());</span>
+<span class="nc" id="L1432">			tokenMapPopulated = true;</span>
+		}
+<span class="nc" id="L1434">	}</span>
+
+	/**
+	 * This method performs some work on a given character sheet template line, 
+	 * namely replacing tokens, dealing with Malformed lines and simply outputting 
+	 * plain text.
+	 *  
+	 * @param aLine The line to do the work on
+	 * @param output The output buffer that is effectively the character sheet template
+	 * @param aPC The PC that we are outputting
+	 */
+	private void replaceLine(String aLine, BufferedWriter output, PlayerCharacter aPC)
+	{
+		// Find the last index of the | character
+<span class="nc" id="L1448">		int lastIndex = aLine.lastIndexOf('|');</span>
+
+		// If there are no pipes and it's a non empty string, just output the fixed text
+<span class="nc bnc" id="L1451" title="All 4 branches missed.">		if (lastIndex &lt; 0 &amp;&amp; !aLine.isEmpty())</span>
+		{
+<span class="nc" id="L1453">			outputNonToken(aLine, output);</span>
+		}
+
+		/*
+		 * When the line starts with a pipe and that pipe is the only
+		 * one on the line, this operation ignores the line.  This is
+		 * because the token is malformed.  Malformed because it should be
+		 * between pipes.
+		 */
+<span class="nc bnc" id="L1462" title="All 2 branches missed.">		if (lastIndex &gt;= 1)</span>
+		{
+<span class="nc" id="L1464">			final StringTokenizer aTok = new StringTokenizer(aLine, &quot;|&quot;, false);</span>
+
+<span class="nc" id="L1466">			boolean inPipe = false;</span>
+<span class="nc bnc" id="L1467" title="All 2 branches missed.">			if (aLine.charAt(0) == '|')</span>
+			{
+<span class="nc" id="L1469">				inPipe = true;</span>
+			}
+
+<span class="nc" id="L1472">			boolean lastIsPipe = false;</span>
+<span class="nc bnc" id="L1473" title="All 2 branches missed.">			if (aLine.charAt(aLine.length() - 1) == '|')</span>
+			{
+<span class="nc" id="L1475">				lastIsPipe = true;</span>
+			}
+
+<span class="nc bnc" id="L1478" title="All 2 branches missed.">			while (aTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L1480">				String tok = aTok.nextToken();</span>
+
+<span class="nc bnc" id="L1482" title="All 2 branches missed.">				if (inPipe)</span>
+				{
+<span class="nc bnc" id="L1484" title="All 4 branches missed.">					if (aTok.hasMoreTokens() || lastIsPipe)</span>
+					{
+<span class="nc" id="L1486">						replaceToken(tok, output, aPC);</span>
+					}
+					/*
+					 * No else condition because we should be between
+					 * pipes at this point i.e. this should be a token but
+					 * it appears to be malformed.  Malformed because there
+					 * are no more tokens and the last character of the string
+					 * is not a pipe
+					 */
+				}
+				else
+				{
+<span class="nc" id="L1498">					outputNonToken(tok, output);</span>
+				}
+				// Reverse the inPipe state, causing the next token to 
+				// take the other decision path
+<span class="nc bnc" id="L1502" title="All 2 branches missed.">				if (aTok.hasMoreTokens())</span>
+				{
+<span class="nc bnc" id="L1504" title="All 2 branches missed.">					inPipe = !inPipe;</span>
+				}
+<span class="nc" id="L1506">			}</span>
+		}
+<span class="nc" id="L1508">	}</span>
+
+	/**
+	 * Replace the token with the value it represents
+	 * 
+	 * @param aString The string containing the token to be replaced
+	 * @param output The object that will capture the output
+	 * @param aPC The PC currently being exported
+	 * @return value
+	 */
+	public int replaceToken(String aString, BufferedWriter output, PlayerCharacter aPC)
+	{
+		try
+		{
+			// If it is plain text then there's no replacement necessary
+<span class="nc bnc" id="L1523" title="All 2 branches missed.">			if (isPlainText(aString))</span>
+			{
+<span class="nc" id="L1525">				return 0;</span>
+			}
+
+			// If it is purely a filter everything (not a filter on a specific token)
+			// then there is nothing to replace so return 0
+<span class="nc bnc" id="L1530" title="All 2 branches missed.">			if (&quot;%&quot;.equals(aString))</span>
+			{
+<span class="nc" id="L1532">				canWrite = true;</span>
+<span class="nc" id="L1533">				return 0;</span>
+			}
+
+			// If the line starts with ${ and ends with } then write the JEP variable
+			// and return the length of the line (minus any whitespace)
+<span class="nc bnc" id="L1538" title="All 4 branches missed.">			if (aString.startsWith(&quot;${&quot;) &amp;&amp; aString.endsWith(&quot;}&quot;))</span>
+			{
+<span class="nc" id="L1540">				String jepString = aString.substring(2, aString.length() - 1);</span>
+<span class="nc" id="L1541">				String variableValue = aPC.getVariableValue(jepString, &quot;&quot;).toString();</span>
+<span class="nc" id="L1542">				FileAccess.write(output, variableValue);</span>
+<span class="nc" id="L1543">				return aString.trim().length();</span>
+			}
+
+			// TODO Why?
+<span class="nc" id="L1547">			FileAccess.maxLength(-1);</span>
+
+			// Start the |%blah| token section, e.g. Deal with filtering tokens
+			// (e.g.  If it doesn't meet a criteria then don't write)
+			// If the string is a non empty filter and does not have a '&lt;' or a '&gt;' in it then replace the token
+<span class="nc bnc" id="L1552" title="All 2 branches missed.">			if (isFilterToken(aString))</span>
+			{
+<span class="nc" id="L1554">				return dealWithFilteredTokens(aString, aPC);</span>
+			}
+
+<span class="nc" id="L1557">			String tokenString = aString;</span>
+
+			// now check for max length tokens
+			// e.g: |SUB10.ARMOR.AC|
+<span class="nc bnc" id="L1561" title="All 2 branches missed.">			if (isValidSubToken(tokenString))</span>
+			{
+<span class="nc" id="L1563">				tokenString = replaceSubToken(tokenString);</span>
+			}
+
+			// Now check for the rest of the tokens
+<span class="nc" id="L1567">			populateTokenMap();</span>
+
+<span class="nc" id="L1569">			StringTokenizer tok = new StringTokenizer(tokenString, &quot;.,&quot;, false);</span>
+<span class="nc" id="L1570">			String firstToken = tok.nextToken();</span>
+
+			// Get the remaining token/test string 
+			// TODO Understand this
+<span class="nc" id="L1574">			String testString = tokenString;</span>
+<span class="nc bnc" id="L1575" title="All 2 branches missed.">			if (testString.indexOf(',') &gt; -1)</span>
+			{
+<span class="nc" id="L1577">				testString = testString.substring(0, testString.indexOf(','));</span>
+			}
+<span class="nc bnc" id="L1579" title="All 2 branches missed.">			if (testString.indexOf('~') &gt; -1)</span>
+			{
+<span class="nc" id="L1581">				testString = testString.substring(0, testString.indexOf('~'));</span>
+			}
+
+<span class="nc" id="L1584">			int len = 1;</span>
+
+			// Deal with FOR/DFOR token
+<span class="nc bnc" id="L1587" title="All 2 branches missed.">			if (isForOrDForToken(tokenString))</span>
+			{
+<span class="nc" id="L1589">				processLoopToken(tokenString, output, aPC);</span>
+<span class="nc" id="L1590">				return 0;</span>
+			}
+			// Deal with OIF token
+<span class="nc bnc" id="L1593" title="All 2 branches missed.">			else if (tokenString.startsWith(&quot;OIF(&quot;))</span>
+			{
+<span class="nc" id="L1595">				replaceTokenOIF(tokenString, output, aPC);</span>
+			}
+			// Deal with mathematical tokenLeave
+<span class="nc bnc" id="L1598" title="All 4 branches missed.">			else if (containsMathematicalToken(testString) &amp;&amp; (!skipMath))</span>
+			{
+<span class="nc" id="L1600">				FileAccess.maxLength(-1);</span>
+<span class="nc" id="L1601">				FileAccess.write(output, mathMode(tokenString, aPC));</span>
+<span class="nc" id="L1602">				return 0;</span>
+			}
+			// Deal with CSHEETTAG2.
+<span class="nc bnc" id="L1605" title="All 2 branches missed.">			else if (tokenString.startsWith(&quot;CSHEETTAG2.&quot;))</span>
+			{
+<span class="nc" id="L1607">				csheetTag2 = tokenString.substring(11, 12);</span>
+<span class="nc" id="L1608">				FileAccess.maxLength(-1);</span>
+<span class="nc" id="L1609">				return 0;</span>
+			}
+<span class="nc bnc" id="L1611" title="All 2 branches missed.">			else if (tokenString.indexOf(&quot;.INFO.&quot;)&gt;-1) {</span>
+<span class="nc" id="L1612">				List&lt;? extends CDOMObject&gt; plist = aPC.getCDOMObjectList();</span>
+<span class="nc" id="L1613">				String v = tokenString;</span>
+<span class="nc bnc" id="L1614" title="All 2 branches missed.">				for (String key : TOKEN_MAP.keySet()) {</span>
+<span class="nc" id="L1615">					Token token = TOKEN_MAP.get(key);</span>
+<span class="nc bnc" id="L1616" title="All 2 branches missed.">					for (CDOMObject cd : plist) {</span>
+<span class="nc bnc" id="L1617" title="All 2 branches missed.">						if (cd instanceof PObject) {</span>
+<span class="nc" id="L1618">							PObject po = (PObject) cd;</span>
+<span class="nc" id="L1619">							v = aPC.getInfoToken(tokenString, po);</span>
+<span class="nc bnc" id="L1620" title="All 2 branches missed.">							if (!v.equals(tokenString)) {</span>
+<span class="nc" id="L1621">								FileAccess.encodeWrite(output, v);</span>
+<span class="nc" id="L1622">								break;</span>
+							}
+						}
+<span class="nc" id="L1625">					}</span>
+<span class="nc bnc" id="L1626" title="All 2 branches missed.">					if (!v.equals(tokenString))</span>
+<span class="nc" id="L1627">						break;</span>
+<span class="nc" id="L1628">				}</span>
+<span class="nc" id="L1629">			}</span>
+			// Else if the token is in the list of valid output tokens
+<span class="nc bnc" id="L1631" title="All 2 branches missed.">			else if (TOKEN_MAP.get(firstToken) != null)</span>
+			{
+<span class="nc" id="L1633">				Token token = TOKEN_MAP.get(firstToken);</span>
+<span class="nc bnc" id="L1634" title="All 2 branches missed.">				if (tokenString.indexOf(&quot;.INFO.&quot;)&gt;-1) {</span>
+<span class="nc" id="L1635">					FileAccess.encodeWrite(output, aPC.getInfoToken(tokenString, aPC.getDisplay().getRace()));</span>
+				}
+<span class="nc bnc" id="L1637" title="All 2 branches missed.">				else if (token.isEncoded())</span>
+				{
+<span class="nc" id="L1639">					FileAccess.encodeWrite(output, token.getToken(tokenString, aPC, this));</span>
+				}
+				else
+				{
+<span class="nc" id="L1643">					FileAccess.write(output, token.getToken(tokenString, aPC, this));</span>
+				}
+<span class="nc" id="L1645">			}</span>
+			// Default case
+			else
+			{
+<span class="nc" id="L1649">				len = tokenString.trim().length();</span>
+
+<span class="nc bnc" id="L1651" title="All 2 branches missed.">				if (manualWhitespace)</span>
+				{
+<span class="nc" id="L1653">					tokenString = tokenString.replaceAll(&quot;[ \\t]&quot;, &quot;&quot;);</span>
+<span class="nc bnc" id="L1654" title="All 2 branches missed.">					if (len &gt; 0)</span>
+					{
+<span class="nc" id="L1656">						FileAccess.write(output, tokenString);</span>
+					}
+				}
+				else
+				{
+<span class="nc" id="L1661">					FileAccess.write(output, tokenString);</span>
+				}
+			}
+
+<span class="nc" id="L1665">			FileAccess.maxLength(-1);</span>
+<span class="nc" id="L1666">			return len;</span>
+		}
+<span class="nc" id="L1668">		catch (Exception exc)</span>
+		{
+<span class="nc" id="L1670">			Logging.errorPrint(&quot;Error replacing &quot; + aString, exc);</span>
+<span class="nc" id="L1671">			return 0;</span>
+		}
+	}
+
+	/**
+	 * Helper method to determine if a line of text needs replacing or not
+	 * 
+	 * @param aString
+	 * @return true If it is plain text (e.g. Does not need replacing)
+	 */
+	private boolean isPlainText(String aString)
+	{
+		// If we 'cannot write' and the string is non-empty, non-filter token then 
+		// there is nothing to replace so return 0
+<span class="nc bnc" id="L1685" title="All 6 branches missed.">		if (!canWrite &amp;&amp; (!aString.isEmpty()) &amp;&amp; (aString.charAt(0) != '%'))</span>
+		{
+<span class="nc" id="L1687">			return true;</span>
+		}
+<span class="nc" id="L1689">		return aString.isEmpty();</span>
+	}
+
+	/**
+	 * Helper method to determine if a token is a filter token or not
+	 * 
+	 * @param aString token to evaluate
+	 * @return true if it is a filter token
+	 */
+	private boolean isFilterToken(String aString)
+	{
+<span class="nc bnc" id="L1700" title="All 6 branches missed.">		return (!aString.isEmpty()) &amp;&amp; (aString.charAt(0) == '%') &amp;&amp; (aString.length() &gt; 1)</span>
+<span class="nc bnc" id="L1701" title="All 4 branches missed.">			&amp;&amp; (aString.lastIndexOf('&lt;') == -1) &amp;&amp; (aString.lastIndexOf('&gt;') == -1);</span>
+	}
+
+	/**
+	 * Helper method, determines if a token is a valid SUB token
+	 * 
+	 * @param tokenString token to evaluate
+	 * @return true if it is a valid SUB token
+	 */
+	private boolean isValidSubToken(String tokenString)
+	{
+<span class="nc bnc" id="L1712" title="All 4 branches missed.">		return tokenString.indexOf(&quot;SUB&quot;) == 0 &amp;&amp; (tokenString.indexOf(&quot;.&quot;) &gt; 3);</span>
+	}
+
+	/**
+	 * Helper method to detect if a token is a DFOR or FOR token
+	 * 
+	 * @param tokenString token to check
+	 * @return true if it is a DFOR or FOR token 
+	 */
+	private boolean isForOrDForToken(String tokenString)
+	{
+<span class="nc bnc" id="L1723" title="All 4 branches missed.">		return tokenString.startsWith(&quot;FOR.&quot;) || tokenString.startsWith(&quot;DFOR.&quot;);</span>
+	}
+
+	/**
+	 * Helper method to determine if a string contains a mathematical token
+	 * 
+	 * @param testString String to test
+	 * @return true if it 
+	 */
+	private boolean containsMathematicalToken(String testString)
+	{
+<span class="nc bnc" id="L1734" title="All 6 branches missed.">		return (testString.indexOf('+') &gt;= 0) || (testString.indexOf('-') &gt;= 0) || (testString.contains(&quot;.INTVAL&quot;))</span>
+<span class="nc bnc" id="L1735" title="All 6 branches missed.">			|| (testString.contains(&quot;.SIGN&quot;)) || (testString.contains(&quot;.NOZERO&quot;)) || (testString.contains(&quot;.TRUNC&quot;))</span>
+<span class="nc bnc" id="L1736" title="All 4 branches missed.">			|| (testString.indexOf('*') &gt;= 0) || (testString.indexOf('/') &gt;= 0);</span>
+	}
+
+	/**
+	 * Helper method, deals with replacing the SUB token
+	 * 
+	 * @param tokenString the SUB token
+	 * @return The altered SUB token
+	 */
+	private String replaceSubToken(String tokenString)
+	{
+<span class="nc" id="L1747">		int iEnd = tokenString.indexOf('.');</span>
+		int maxLength;
+
+		try
+		{
+<span class="nc" id="L1752">			maxLength = Integer.parseInt(tokenString.substring(3, iEnd));</span>
+		}
+<span class="nc" id="L1754">		catch (NumberFormatException ex)</span>
+		{
+			// Hmm, no number?
+<span class="nc" id="L1757">			Logging.errorPrint(&quot;Number format error: &quot; + tokenString);</span>
+<span class="nc" id="L1758">			maxLength = -1;</span>
+<span class="nc" id="L1759">		}</span>
+
+<span class="nc bnc" id="L1761" title="All 2 branches missed.">		if (maxLength &gt; 0)</span>
+		{
+<span class="nc" id="L1763">			tokenString = tokenString.substring(iEnd + 1);</span>
+<span class="nc" id="L1764">			FileAccess.maxLength(maxLength);</span>
+		}
+
+<span class="nc" id="L1767">		return tokenString;</span>
+	}
+
+	/**
+	 * Helper method that deals with Processing the FOR./DFOR. tokens as a 
+	 * DFOR loop
+	 * 
+	 * @param tokenString the token to loop over
+	 * @param output The writer we write to
+	 * @param aPC The PC we are exporting
+	 */
+	private void processLoopToken(String tokenString, BufferedWriter output, PlayerCharacter aPC)
+	{
+<span class="nc" id="L1780">		FileAccess.maxLength(-1);</span>
+
+<span class="nc" id="L1782">		existsOnly = false;</span>
+<span class="nc" id="L1783">		noMoreItems = false;</span>
+<span class="nc" id="L1784">		checkBefore = false;</span>
+
+<span class="nc" id="L1786">		replaceTokenForDfor(tokenString, output, aPC);</span>
+
+<span class="nc" id="L1788">		existsOnly = false;</span>
+<span class="nc" id="L1789">		noMoreItems = false;</span>
+<span class="nc" id="L1790">	}</span>
+
+	/**
+	 * Helper method for replaceToken, deals with the filter tokens e.g. %DOMAIN, basically 
+	 * returns 0 if we should not be writing something out, e.g. It's filtered out
+	 * 
+	 * @param aString
+	 * @param aPC
+	 * @return 0 If we should not be writing something out 
+	 */
+	private int dealWithFilteredTokens(String aString, PlayerCharacter aPC)
+	{
+		// Start by stating that we are allowed to write
+<span class="nc" id="L1803">		canWrite = true;</span>
+
+		// Get the merge strategy for equipment for later use
+<span class="nc" id="L1806">		int merge = getEquipmentMergingStrategy(aString);</span>
+
+		// Filter out on GAMEMODE
+<span class="nc bnc" id="L1809" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;GAMEMODE:&quot;))</span>
+		{
+<span class="nc bnc" id="L1811" title="All 2 branches missed.">			if (aString.substring(10).endsWith(GameModeToken.getGameModeToken()))</span>
+			{
+<span class="nc" id="L1813">				canWrite = false;</span>
+			}
+<span class="nc" id="L1815">			return 0;</span>
+		}
+
+		// Filter out REGION
+<span class="nc" id="L1819">		CharacterDisplay display = aPC.getDisplay();</span>
+<span class="nc bnc" id="L1820" title="All 2 branches missed.">		if (&quot;REGION&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L1822" title="All 2 branches missed.">			if (display.getRegion().isPresent()</span>
+<span class="nc bnc" id="L1823" title="All 2 branches missed.">				&amp;&amp; display.getRegion().get().equals(Region.NONE))</span>
+			{
+<span class="nc" id="L1825">				canWrite = false;</span>
+			}
+<span class="nc" id="L1827">			return 0;</span>
+		}
+
+		// Filter out NOTES
+<span class="nc bnc" id="L1831" title="All 2 branches missed.">		if (&quot;NOTES&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L1833" title="All 2 branches missed.">			if (aPC.getDisplay().getNotesCount() &lt;= 0)</span>
+			{
+<span class="nc" id="L1835">				canWrite = false;</span>
+			}
+<span class="nc" id="L1837">			return 0;</span>
+		}
+
+		// Filter out SKILLPOINTS
+<span class="nc bnc" id="L1841" title="All 2 branches missed.">		if (&quot;SKILLPOINTS&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L1843" title="All 2 branches missed.">			if (SkillpointsToken.getUnusedSkillPoints(aPC) == 0)</span>
+			{
+<span class="nc" id="L1845">				canWrite = false;</span>
+			}
+<span class="nc" id="L1847">			return 0;</span>
+		}
+
+		// Filter out TEMPLATE
+<span class="nc bnc" id="L1851" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;TEMPLATE&quot;))</span>
+		{
+			// New token syntax |%TEMPLATE.x| instead of |%TEMPLATEx|
+<span class="nc" id="L1854">			final StringTokenizer aTok = new StringTokenizer(aString.substring(1), &quot;.&quot;);</span>
+<span class="nc" id="L1855">			final List&lt;PCTemplate&gt; tList = new ArrayList&lt;&gt;(aPC.getTemplateSet());</span>
+<span class="nc" id="L1856">			String fString = aTok.nextToken();</span>
+			final int index;
+
+<span class="nc bnc" id="L1859" title="All 2 branches missed.">			if (aTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L1861">				index = Integer.parseInt(aTok.nextToken());</span>
+			}
+			else
+			{
+				// When removing old syntax, remove the else and leave the if
+<span class="nc bnc" id="L1866" title="All 2 branches missed.">				if (&quot;TEMPLATE&quot;.equals(fString))</span>
+				{
+<span class="nc bnc" id="L1868" title="All 2 branches missed.">					if (tList.isEmpty())</span>
+					{
+<span class="nc" id="L1870">						canWrite = false;</span>
+					}
+<span class="nc" id="L1872">					return 0;</span>
+				}
+<span class="nc" id="L1874">				Logging.errorPrint(&quot;Old syntax %TEMPLATEx will be replaced for %TEMPLATE.x&quot;);</span>
+<span class="nc" id="L1875">				index = Integer.parseInt(aString.substring(9));</span>
+			}
+
+<span class="nc bnc" id="L1878" title="All 2 branches missed.">			if (index &gt;= tList.size())</span>
+			{
+<span class="nc" id="L1880">				canWrite = false;</span>
+<span class="nc" id="L1881">				return 0;</span>
+			}
+
+<span class="nc" id="L1884">			final PCTemplate template = tList.get(index);</span>
+<span class="nc bnc" id="L1885" title="All 2 branches missed.">			if (!template.getSafe(ObjectKey.VISIBILITY).isVisibleTo(View.VISIBLE_EXPORT))</span>
+			{
+<span class="nc" id="L1887">				canWrite = false;</span>
+			}
+<span class="nc" id="L1889">			return 0;</span>
+		}
+
+		// Filter out FOLLOWER
+<span class="nc bnc" id="L1893" title="All 2 branches missed.">		if (&quot;FOLLOWER&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L1895" title="All 2 branches missed.">			if (!aPC.hasFollowers())</span>
+			{
+<span class="nc" id="L1897">				canWrite = false;</span>
+			}
+<span class="nc" id="L1899">			return 0;</span>
+		}
+
+		// Filter out FOLLOWEROF
+<span class="nc bnc" id="L1903" title="All 2 branches missed.">		if (&quot;FOLLOWEROF&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L1905" title="All 2 branches missed.">			if (aPC.getMasterPC() == null)</span>
+			{
+<span class="nc" id="L1907">				canWrite = false;</span>
+			}
+<span class="nc" id="L1909">			return 0;</span>
+		}
+
+		// Filter out FOLLOWERTYPE.
+<span class="nc bnc" id="L1913" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;FOLLOWERTYPE.&quot;))</span>
+		{
+<span class="nc" id="L1915">			List&lt;Follower&gt; aList = new ArrayList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L1917" title="All 2 branches missed.">			for (Follower follower : aPC.getFollowerList())</span>
+			{
+				// only allow followers that currently loaded
+				// Otherwise the stats a zero
+<span class="nc bnc" id="L1921" title="All 2 branches missed.">				for (PlayerCharacter pc : Globals.getPCList())</span>
+				{
+<span class="nc bnc" id="L1923" title="All 2 branches missed.">					if (pc.getFileName().equals(follower.getFileName()))</span>
+					{
+<span class="nc" id="L1925">						aList.add(follower);</span>
+					}
+<span class="nc" id="L1927">				}</span>
+<span class="nc" id="L1928">			}</span>
+
+<span class="nc" id="L1930">			StringTokenizer aTok = new StringTokenizer(aString, &quot;.&quot;);</span>
+<span class="nc" id="L1931">			aTok.nextToken(); // FOLLOWERTYPE</span>
+
+<span class="nc" id="L1933">			String typeString = aTok.nextToken();</span>
+
+<span class="nc bnc" id="L1935" title="All 2 branches missed.">			for (int i = aList.size() - 1; i &gt;= 0; --i)</span>
+			{
+<span class="nc" id="L1937">				final Follower fol = aList.get(i);</span>
+
+<span class="nc bnc" id="L1939" title="All 2 branches missed.">				if (!fol.getType().getKeyName().equalsIgnoreCase(typeString))</span>
+				{
+<span class="nc" id="L1941">					aList.remove(i);</span>
+				}
+			}
+
+<span class="nc bnc" id="L1945" title="All 2 branches missed.">			if (aList.isEmpty())</span>
+			{
+<span class="nc" id="L1947">				canWrite = false;</span>
+			}
+
+<span class="nc" id="L1950">			return 0;</span>
+		}
+
+		// Filter out PROHIBITEDLIST
+<span class="nc bnc" id="L1954" title="All 2 branches missed.">		if (&quot;PROHIBITEDLIST&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L1956" title="All 2 branches missed.">			for (PCClass pcClass : aPC.getClassSet())</span>
+			{
+<span class="nc bnc" id="L1958" title="All 2 branches missed.">				if (aPC.getLevel(pcClass) &gt; 0)</span>
+				{
+<span class="nc bnc" id="L1960" title="All 4 branches missed.">					if (pcClass.containsListFor(ListKey.PROHIBITED_SPELLS) || aPC.containsProhibitedSchools(pcClass))</span>
+					{
+<span class="nc" id="L1962">						return 0;</span>
+					}
+				}
+<span class="nc" id="L1965">			}</span>
+
+<span class="nc" id="L1967">			canWrite = false;</span>
+
+<span class="nc" id="L1969">			return 0;</span>
+		}
+
+		// Filter out CATCHPHRASE
+<span class="nc bnc" id="L1973" title="All 2 branches missed.">		if (&quot;CATCHPHRASE&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc" id="L1975">			String catchPhrase = display.getCatchPhrase();</span>
+<span class="nc bnc" id="L1976" title="All 2 branches missed.">			if (catchPhrase.equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L1978">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L1980" title="All 2 branches missed.">			else if (catchPhrase.trim().isEmpty())</span>
+			{
+<span class="nc" id="L1982">				canWrite = false;</span>
+			}
+<span class="nc" id="L1984">			return 0;</span>
+		}
+
+		// Filter out LOCATION
+<span class="nc bnc" id="L1988" title="All 2 branches missed.">		if (&quot;LOCATION&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc" id="L1990">			String location = display.getLocation();</span>
+<span class="nc bnc" id="L1991" title="All 2 branches missed.">			if (location.equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L1993">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L1995" title="All 2 branches missed.">			else if (location.trim().isEmpty())</span>
+			{
+<span class="nc" id="L1997">				canWrite = false;</span>
+			}
+<span class="nc" id="L1999">			return 0;</span>
+		}
+
+		// Filter out RESIDENCE
+<span class="nc bnc" id="L2003" title="All 2 branches missed.">		if (&quot;RESIDENCE&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc" id="L2005">			String residence = aPC.getSafeStringFor(PCStringKey.RESIDENCE);</span>
+<span class="nc bnc" id="L2006" title="All 2 branches missed.">			if (residence.equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2008">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2010" title="All 2 branches missed.">			else if (residence.trim().isEmpty())</span>
+			{
+<span class="nc" id="L2012">				canWrite = false;</span>
+			}
+<span class="nc" id="L2014">			return 0;</span>
+		}
+
+		// Filter out PHOBIAS
+<span class="nc bnc" id="L2018" title="All 2 branches missed.">		if (&quot;PHOBIAS&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc" id="L2020">			String phobias = display.getSafeStringFor(PCStringKey.PHOBIAS);</span>
+<span class="nc bnc" id="L2021" title="All 2 branches missed.">			if (phobias.equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2023">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2025" title="All 2 branches missed.">			else if (phobias.trim().isEmpty())</span>
+			{
+<span class="nc" id="L2027">				canWrite = false;</span>
+			}
+<span class="nc" id="L2029">			return 0;</span>
+		}
+
+		// Filter out INTERESTS
+<span class="nc bnc" id="L2033" title="All 2 branches missed.">		if (&quot;INTERESTS&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc" id="L2035">			String interests = display.getInterests();</span>
+<span class="nc bnc" id="L2036" title="All 2 branches missed.">			if (interests.equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2038">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2040" title="All 2 branches missed.">			else if (interests.trim().isEmpty())</span>
+			{
+<span class="nc" id="L2042">				canWrite = false;</span>
+			}
+<span class="nc" id="L2044">			return 0;</span>
+		}
+
+		// Filter out SPEECHTENDENCY
+<span class="nc bnc" id="L2048" title="All 2 branches missed.">		if (&quot;SPEECHTENDENCY&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc" id="L2050">			String speechTendency = display.getSpeechTendency();</span>
+<span class="nc bnc" id="L2051" title="All 2 branches missed.">			if (speechTendency.equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2053">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2055" title="All 2 branches missed.">			else if (speechTendency.trim().isEmpty())</span>
+			{
+<span class="nc" id="L2057">				canWrite = false;</span>
+			}
+<span class="nc" id="L2059">			return 0;</span>
+		}
+
+		// Filter out PERSONALITY1
+<span class="nc bnc" id="L2063" title="All 2 branches missed.">		if (&quot;PERSONALITY1&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc" id="L2065">			String trait1 = display.getTrait1();</span>
+<span class="nc bnc" id="L2066" title="All 2 branches missed.">			if (trait1.equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2068">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2070" title="All 2 branches missed.">			else if (trait1.trim().isEmpty())</span>
+			{
+<span class="nc" id="L2072">				canWrite = false;</span>
+			}
+<span class="nc" id="L2074">			return 0;</span>
+		}
+
+		// Filter out PERSONALITY2
+<span class="nc bnc" id="L2078" title="All 2 branches missed.">		if (&quot;PERSONALITY2&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc" id="L2080">			String trait2 = display.getTrait2();</span>
+<span class="nc bnc" id="L2081" title="All 2 branches missed.">			if (trait2.equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2083">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2085" title="All 2 branches missed.">			else if (trait2.trim().isEmpty())</span>
+			{
+<span class="nc" id="L2087">				canWrite = false;</span>
+			}
+<span class="nc" id="L2089">			return 0;</span>
+		}
+
+		// Filter out MISC.FUNDS
+<span class="nc bnc" id="L2093" title="All 2 branches missed.">		if (&quot;MISC.FUNDS&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L2095" title="All 2 branches missed.">			if (aPC.getSafeStringFor(PCStringKey.ASSETS).equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2097">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2099" title="All 2 branches missed.">			else if ((aPC.getSafeStringFor(PCStringKey.ASSETS)).trim().isEmpty())</span>
+			{
+<span class="nc" id="L2101">				canWrite = false;</span>
+			}
+<span class="nc" id="L2103">			return 0;</span>
+		}
+
+		// Filter out MISC.COMPANIONS and COMPANIONS
+<span class="nc bnc" id="L2107" title="All 4 branches missed.">		if (&quot;COMPANIONS&quot;.equals(aString.substring(1)) || &quot;MISC.COMPANIONS&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L2109" title="All 2 branches missed.">			if (aPC.getSafeStringFor(PCStringKey.COMPANIONS).equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2111">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2113" title="All 2 branches missed.">			else if (aPC.getSafeStringFor(PCStringKey.COMPANIONS).trim().isEmpty())</span>
+			{
+<span class="nc" id="L2115">				canWrite = false;</span>
+			}
+<span class="nc" id="L2117">			return 0;</span>
+		}
+
+		// Filter out MISC.MAGIC
+<span class="nc bnc" id="L2121" title="All 2 branches missed.">		if (&quot;MISC.MAGIC&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L2123" title="All 2 branches missed.">			if (aPC.getSafeStringFor(PCStringKey.MAGIC).equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2125">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2127" title="All 2 branches missed.">			else if (aPC.getSafeStringFor(PCStringKey.MAGIC).trim().isEmpty())</span>
+			{
+<span class="nc" id="L2129">				canWrite = false;</span>
+			}
+<span class="nc" id="L2131">			return 0;</span>
+		}
+
+		// Filter out DESC
+<span class="nc bnc" id="L2135" title="All 2 branches missed.">		if (&quot;DESC&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc" id="L2137">			String description = display.getSafeStringFor(PCStringKey.DESCRIPTION);</span>
+<span class="nc bnc" id="L2138" title="All 2 branches missed.">			if (description.equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2140">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2142" title="All 2 branches missed.">			else if (description.trim().isEmpty())</span>
+			{
+<span class="nc" id="L2144">				canWrite = false;</span>
+			}
+<span class="nc" id="L2146">			return 0;</span>
+		}
+
+		// Filter out BIO
+<span class="nc bnc" id="L2150" title="All 2 branches missed.">		if (&quot;BIO&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc" id="L2152">			String bio = display.getBio();</span>
+<span class="nc bnc" id="L2153" title="All 2 branches missed.">			if (bio.equals(Constants.NONE))</span>
+			{
+<span class="nc" id="L2155">				canWrite = false;</span>
+			}
+<span class="nc bnc" id="L2157" title="All 2 branches missed.">			else if (bio.trim().isEmpty())</span>
+			{
+<span class="nc" id="L2159">				canWrite = false;</span>
+			}
+<span class="nc" id="L2161">			return 0;</span>
+		}
+
+		// Filter out SUBREGION
+<span class="nc bnc" id="L2165" title="All 2 branches missed.">		if (&quot;SUBREGION&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L2167" title="All 2 branches missed.">			if (display.getSubRegion().isEmpty())</span>
+			{
+<span class="nc" id="L2169">				canWrite = false;</span>
+			}
+<span class="nc" id="L2171">			return 0;</span>
+		}
+
+		// Filter out TEMPBONUS.
+<span class="nc bnc" id="L2175" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;TEMPBONUS.&quot;))</span>
+		{
+<span class="nc" id="L2177">			StringTokenizer aTok = new StringTokenizer(aString.substring(1), &quot;.&quot;);</span>
+<span class="nc" id="L2178">			aTok.nextToken(); // discard first one</span>
+
+<span class="nc" id="L2180">			int index = -1;</span>
+<span class="nc bnc" id="L2181" title="All 2 branches missed.">			if (aTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L2183">				index = Integer.parseInt(aTok.nextToken());</span>
+			}
+
+<span class="nc bnc" id="L2186" title="All 2 branches missed.">			if (index &gt; aPC.getNamedTempBonusList().size())</span>
+			{
+<span class="nc" id="L2188">				canWrite = false;</span>
+<span class="nc" id="L2189">				return 0;</span>
+			}
+
+<span class="nc bnc" id="L2192" title="All 2 branches missed.">			if (aPC.getUseTempMods())</span>
+			{
+<span class="nc" id="L2194">				canWrite = true;</span>
+<span class="nc" id="L2195">				return 1;</span>
+			}
+		}
+
+		// Filter out ARMOR.ITEM
+<span class="nc bnc" id="L2200" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;ARMOR.ITEM&quot;))</span>
+		{
+			// New token syntax |%ARMOR.ITEM.x| instead of |%ARMOR.ITEMx|
+<span class="nc" id="L2203">			final StringTokenizer aTok = new StringTokenizer(aString.substring(1), &quot;.&quot;);</span>
+<span class="nc" id="L2204">			aTok.nextToken(); // ARMOR</span>
+
+<span class="nc" id="L2206">			String fString = aTok.nextToken();</span>
+<span class="nc" id="L2207">			final Collection&lt;Equipment&gt; aArrayList = new ArrayList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L2209" title="All 2 branches missed.">			for (Equipment eq : aPC.getEquipmentListInOutputOrder())</span>
+			{
+<span class="nc bnc" id="L2211" title="All 6 branches missed.">				if (eq.altersAC(aPC) &amp;&amp; (!eq.isArmor() &amp;&amp; !eq.isShield()))</span>
+				{
+<span class="nc" id="L2213">					aArrayList.add(eq);</span>
+				}
+<span class="nc" id="L2215">			}</span>
+
+			// When removing old syntax, remove the else and leave the if
+			final int count;
+<span class="nc bnc" id="L2219" title="All 2 branches missed.">			if (aTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L2221">				count = Integer.parseInt(aTok.nextToken());</span>
+			}
+			else
+			{
+<span class="nc" id="L2225">				Logging.errorPrint(&quot;Old syntax %ARMOR.ITEMx will be replaced for %ARMOR.ITEM.x&quot;);</span>
+
+<span class="nc" id="L2227">				count = Integer.parseInt(fString.substring(fString.length() - 1));</span>
+			}
+
+<span class="nc bnc" id="L2230" title="All 2 branches missed.">			if (count &gt; aArrayList.size())</span>
+			{
+<span class="nc" id="L2232">				canWrite = false;</span>
+			}
+<span class="nc" id="L2234">			return 0;</span>
+		}
+
+		// Filter out ARMOR.SHIELD
+<span class="nc bnc" id="L2238" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;ARMOR.SHIELD&quot;))</span>
+		{
+			// New token syntax |%ARMOR.SHIELD.x| instead of |%ARMOR.SHIELDx|
+<span class="nc" id="L2241">			final StringTokenizer aTok = new StringTokenizer(aString.substring(1), &quot;.&quot;);</span>
+<span class="nc" id="L2242">			aTok.nextToken(); // ARMOR</span>
+
+<span class="nc" id="L2244">			String fString = aTok.nextToken();</span>
+			final int count;
+<span class="nc" id="L2246">			final List&lt;Equipment&gt; aArrayList = aPC.getEquipmentOfTypeInOutputOrder(&quot;SHIELD&quot;, 3);</span>
+
+			// When removing old syntax, remove the else and leave the if
+<span class="nc bnc" id="L2249" title="All 2 branches missed.">			if (aTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L2251">				count = Integer.parseInt(aTok.nextToken());</span>
+			}
+			else
+			{
+<span class="nc" id="L2255">				Logging.errorPrint(&quot;Old syntax %ARMOR.SHIELDx will be replaced for %ARMOR.SHIELD.x&quot;);</span>
+
+<span class="nc" id="L2257">				count = Integer.parseInt(fString.substring(fString.length() - 1));</span>
+			}
+
+<span class="nc bnc" id="L2260" title="All 2 branches missed.">			if (count &gt; aArrayList.size())</span>
+			{
+<span class="nc" id="L2262">				canWrite = false;</span>
+			}
+<span class="nc" id="L2264">			return 0;</span>
+		}
+
+		// Filter out ARMOR
+<span class="nc bnc" id="L2268" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;ARMOR&quot;))</span>
+		{
+			// New token syntax |%ARMOR.x| instead of |%ARMORx|
+<span class="nc" id="L2271">			final StringTokenizer aTok = new StringTokenizer(aString.substring(1), &quot;.&quot;);</span>
+<span class="nc" id="L2272">			String fString = aTok.nextToken();</span>
+<span class="nc" id="L2273">			List&lt;Equipment&gt; aArrayList = aPC.getEquipmentOfTypeInOutputOrder(&quot;ARMOR&quot;, 3);</span>
+
+			// Get list of shields.  Remove any from list of armor
+			// Since shields are included in the armor list they will appear twice
+			// and they really shouldn't be in the list of armor
+<span class="nc" id="L2278">			List&lt;Equipment&gt; shieldList = aPC.getEquipmentOfTypeInOutputOrder(&quot;SHIELD&quot;, 3);</span>
+
+<span class="nc" id="L2280">			int z = 0;</span>
+<span class="nc bnc" id="L2281" title="All 2 branches missed.">			while (z &lt; shieldList.size())</span>
+			{
+<span class="nc" id="L2283">				aArrayList.remove(shieldList.get(z));</span>
+<span class="nc" id="L2284">				z++;</span>
+			}
+
+			// When removing old syntax, remove the else and leave the if
+			final int count;
+<span class="nc bnc" id="L2289" title="All 2 branches missed.">			if (aTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L2291">				count = Integer.parseInt(aTok.nextToken());</span>
+			}
+			else
+			{
+<span class="nc" id="L2295">				Logging.errorPrint(&quot;Old syntax %ARMORx will be replaced for %ARMOR.x&quot;);</span>
+
+<span class="nc" id="L2297">				count = Integer.parseInt(fString.substring(fString.length() - 1));</span>
+			}
+
+<span class="nc bnc" id="L2300" title="All 2 branches missed.">			if (count &gt; aArrayList.size())</span>
+			{
+<span class="nc" id="L2302">				canWrite = false;</span>
+			}
+<span class="nc" id="L2304">			return 0;</span>
+		}
+
+		// Filter out WEAPONPROF
+<span class="nc bnc" id="L2308" title="All 2 branches missed.">		if (&quot;WEAPONPROF&quot;.equals(aString.substring(1)))</span>
+		{
+<span class="nc bnc" id="L2310" title="All 2 branches missed.">			if (!SettingsHandler.getWeaponProfPrintout())</span>
+			{
+<span class="nc" id="L2312">				canWrite = false;</span>
+			}
+<span class="nc" id="L2314">			return 0;</span>
+		}
+
+		// Filter out WEAPON
+<span class="nc bnc" id="L2318" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;WEAPON&quot;))</span>
+		{
+			// New token syntax |%WEAPON.x| instead of |%WEAPONx|
+<span class="nc" id="L2321">			final StringTokenizer aTok = new StringTokenizer(aString.substring(1), &quot;.&quot;);</span>
+<span class="nc" id="L2322">			String fString = aTok.nextToken();</span>
+<span class="nc" id="L2323">			final List&lt;Equipment&gt; aArrayList = aPC.getExpandedWeapons(merge);</span>
+
+			int count;
+
+			// When removing old syntax, remove the else and leave the if
+<span class="nc bnc" id="L2328" title="All 2 branches missed.">			if (aTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L2330">				count = Integer.parseInt(aTok.nextToken());</span>
+			}
+			else
+			{
+<span class="nc" id="L2334">				Logging.errorPrint(&quot;Old syntax %WEAPONx will be replaced for %WEAPON.x&quot;);</span>
+
+<span class="nc" id="L2336">				count = Integer.parseInt(fString.substring(fString.length() - 1));</span>
+			}
+
+<span class="nc bnc" id="L2339" title="All 2 branches missed.">			if (count &gt;= aArrayList.size())</span>
+			{
+<span class="nc" id="L2341">				canWrite = false;</span>
+			}
+
+<span class="nc" id="L2344">			return 0;</span>
+		}
+
+		// Filter out DOMAIN
+<span class="nc bnc" id="L2348" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;DOMAIN&quot;))</span>
+		{
+			// New token syntax |%DOMAIN.x| instead of |%DOMAINx|
+<span class="nc" id="L2351">			final StringTokenizer aTok = new StringTokenizer(aString.substring(1), &quot;.&quot;);</span>
+<span class="nc" id="L2352">			String fString = aTok.nextToken();</span>
+			final int index;
+
+			// When removing old syntax, remove the else and leave the if
+<span class="nc bnc" id="L2356" title="All 2 branches missed.">			if (aTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L2358">				index = Integer.parseInt(aTok.nextToken());</span>
+			}
+			else
+			{
+<span class="nc" id="L2362">				Logging.errorPrint(&quot;Old syntax %DOMAINx will be replaced for %DOMAIN.x&quot;);</span>
+
+<span class="nc" id="L2364">				index = Integer.parseInt(fString.substring(6));</span>
+			}
+
+<span class="nc bnc" id="L2367" title="All 2 branches missed.">			canWrite = (index &lt;= display.getDomainCount());</span>
+
+<span class="nc" id="L2369">			return 0;</span>
+		}
+
+		// Filter out SPELLLISTBOOK
+<span class="nc bnc" id="L2373" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;SPELLLISTBOOK&quot;))</span>
+		{
+<span class="nc bnc" id="L2375" title="All 2 branches missed.">			if (SettingsHandler.getPrintSpellsWithPC())</span>
+			{
+				// New token syntax |%SPELLLISTBOOK.x| instead of |%SPELLLISTBOOKx|
+				// To remove old syntax, replace i with 15
+				int i;
+<span class="nc bnc" id="L2380" title="All 2 branches missed.">				if (aString.charAt(14) == '.')</span>
+				{
+<span class="nc" id="L2382">					i = 15;</span>
+				}
+				else
+				{
+<span class="nc" id="L2386">					i = 14;</span>
+				}
+
+<span class="nc" id="L2389">				return replaceTokenSpellListBook(aString.substring(i), aPC);</span>
+			}
+<span class="nc" id="L2391">			canWrite = false;</span>
+<span class="nc" id="L2392">			return 0;</span>
+		}
+
+		// Filter out VAR.
+<span class="nc bnc" id="L2396" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;VAR.&quot;))</span>
+		{
+<span class="nc" id="L2398">			replaceTokenVar(aString, aPC);</span>
+<span class="nc" id="L2399">			return 0;</span>
+		}
+
+		// Filter out COUNT[
+<span class="nc bnc" id="L2403" title="All 2 branches missed.">		if (aString.substring(1).startsWith(&quot;COUNT[&quot;))</span>
+		{
+<span class="nc bnc" id="L2405" title="All 2 branches missed.">			if (getVarValue(aString.substring(1), aPC) &gt; 0)</span>
+			{
+<span class="nc" id="L2407">				canWrite = true;</span>
+<span class="nc" id="L2408">				return 1;</span>
+			}
+
+<span class="nc" id="L2411">			canWrite = false;</span>
+<span class="nc" id="L2412">			return 0;</span>
+		}
+
+		// finally, check for classes
+<span class="nc" id="L2416">		final StringTokenizer aTok = new StringTokenizer(aString.substring(1), &quot;,&quot;, false);</span>
+
+<span class="nc" id="L2418">		boolean found = false;</span>
+<span class="nc bnc" id="L2419" title="All 2 branches missed.">		while (aTok.hasMoreTokens())</span>
+		{
+<span class="nc" id="L2421">			String cString = aTok.nextToken();</span>
+<span class="nc" id="L2422">			StringTokenizer bTok = new StringTokenizer(cString, &quot;=&quot;, false);</span>
+<span class="nc" id="L2423">			String bString = bTok.nextToken();</span>
+<span class="nc" id="L2424">			int i = 0;</span>
+
+<span class="nc bnc" id="L2426" title="All 2 branches missed.">			if (bTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L2428">				i = Integer.parseInt(bTok.nextToken());</span>
+			}
+
+<span class="nc" id="L2431">			PCClass aClass = aPC.getClassKeyed(bString);</span>
+<span class="nc bnc" id="L2432" title="All 2 branches missed.">			found = aClass != null;</span>
+
+<span class="nc bnc" id="L2434" title="All 2 branches missed.">			if (aClass == null)</span>
+			{
+<span class="nc" id="L2436">				canWrite = false;</span>
+			}
+			else
+			{
+<span class="nc bnc" id="L2440" title="All 2 branches missed.">				canWrite = (aPC.getLevel(aClass) &gt;= i);</span>
+			}
+
+			// Filter out SPELLLISTCLASS			
+<span class="nc bnc" id="L2444" title="All 2 branches missed.">			if (bString.startsWith(&quot;SPELLLISTCLASS&quot;))</span>
+			{
+				// New token syntax |%SPELLLISTCLASS.x| instead of |%SPELLLISTCLASSx|
+				// To remove old syntax, keep the if and remove the else
+<span class="nc bnc" id="L2448" title="All 2 branches missed.">				if (bString.charAt(14) == '.')</span>
+				{
+<span class="nc" id="L2450">					bString = bString.substring(15);</span>
+				}
+				else
+				{
+<span class="nc" id="L2454">					bString = bString.substring(14);</span>
+				}
+
+<span class="nc" id="L2457">				found = true;</span>
+
+<span class="nc" id="L2459">				CDOMObject aObject = aPC.getSpellClassAtIndex(Integer.parseInt(bString));</span>
+<span class="nc bnc" id="L2460" title="All 2 branches missed.">				canWrite = (aObject != null);</span>
+			}
+<span class="nc" id="L2462">		}</span>
+
+<span class="nc bnc" id="L2464" title="All 2 branches missed.">		if (found)</span>
+		{
+<span class="nc" id="L2466">			return 0;</span>
+		}
+<span class="nc" id="L2468">		canWrite = false;</span>
+
+<span class="nc" id="L2470">		Logging.debugPrint(&quot;Return 0 (don't write/no replacement) for an undetermined filter token.&quot;);</span>
+<span class="nc" id="L2471">		return 0;</span>
+	}
+
+	/**
+	 * Helper method to get the equipment merging strategy
+	 * 
+	 * @param aString
+	 * @return merging strategy constant
+	 */
+	private int getEquipmentMergingStrategy(String aString)
+	{
+		// Set how we are merging equipment, default is to merge all
+<span class="nc" id="L2483">		int merge = Constants.MERGE_ALL;</span>
+<span class="nc bnc" id="L2484" title="All 2 branches missed.">		if (aString.indexOf(&quot;MERGENONE&quot;) &gt; 0)</span>
+		{
+<span class="nc" id="L2486">			merge = Constants.MERGE_NONE;</span>
+		}
+
+<span class="nc bnc" id="L2489" title="All 2 branches missed.">		if (aString.indexOf(&quot;MERGELOC&quot;) &gt; 0)</span>
+		{
+<span class="nc" id="L2491">			merge = Constants.MERGE_LOCATION;</span>
+		}
+<span class="nc" id="L2493">		return merge;</span>
+	}
+
+	/**
+	 * Helper method to deal with DFOR token, e.g.
+	 * 
+	 * DFOR.0,(COUNT[SKILLS]+1)/2,1,COUNT[SKILLS],(COUNT[SKILLS]+1)/2,&lt;td&gt;\SKILL%\&lt;/td&gt;
+	 * &lt;td&gt;\SKILL%.TOTAL\&lt;/td&gt;&lt;td&gt;\SKILL%.RANK\&lt;/td&gt;
+	 * &lt;td&gt;\SKILL%.ABILITY\&lt;/td&gt;&lt;td&gt;\SKILL%.MOD\,&lt;tr align=&quot;center&quot;&gt;,&lt;/tr&gt;,0
+	 * 
+	 * Produces a 2 column row table of all skills.
+	 * 
+	 * @param aString String to process
+	 * @param output Output we are writing to
+	 * @param aPC PC we are exporting
+	 */
+	private void replaceTokenForDfor(String aString, BufferedWriter output, PlayerCharacter aPC)
+	{
+		StringTokenizer aTok;
+
+		// Split after DFOR. or DFOR by the ',' delimiter
+<span class="nc bnc" id="L2514" title="All 2 branches missed.">		if (aString.startsWith(&quot;DFOR.&quot;))</span>
+		{
+<span class="nc" id="L2516">			aTok = new StringTokenizer(aString.substring(5), &quot;,&quot;, false);</span>
+		}
+		else
+		{
+<span class="nc" id="L2520">			aTok = new StringTokenizer(aString.substring(4), &quot;,&quot;, false);</span>
+		}
+
+<span class="nc" id="L2523">		int cMin = 0;</span>
+<span class="nc" id="L2524">		int cMax = 100;</span>
+<span class="nc" id="L2525">		int cStep = 1;</span>
+<span class="nc" id="L2526">		int cStepLine = 1;</span>
+<span class="nc" id="L2527">		int cStepLineMax = 0;</span>
+<span class="nc" id="L2528">		String cString = &quot;&quot;;</span>
+<span class="nc" id="L2529">		String cStartLineString = &quot;&quot;;</span>
+<span class="nc" id="L2530">		String cEndLineString = &quot;&quot;;</span>
+<span class="nc" id="L2531">		boolean isDFor = false;</span>
+
+<span class="nc" id="L2533">		int i = 0;</span>
+
+		// While there are more tokens
+<span class="nc bnc" id="L2536" title="All 2 branches missed.">		while (aTok.hasMoreTokens())</span>
+		{
+<span class="nc" id="L2538">			String tokA = aTok.nextToken();</span>
+
+<span class="nc bnc" id="L2540" title="All 8 branches missed.">			switch (i)</span>
+			{
+<span class="nc" id="L2542">				case 0 -&gt; cMin = getVarValue(tokA, aPC);</span>
+<span class="nc" id="L2543">				case 1 -&gt; cMax = getVarValue(tokA, aPC);</span>
+				case 2 -&gt; {
+<span class="nc" id="L2545">					cStep = getVarValue(tokA, aPC);</span>
+<span class="nc bnc" id="L2546" title="All 2 branches missed.">					if (aString.startsWith(&quot;DFOR.&quot;))</span>
+					{
+<span class="nc" id="L2548">						isDFor = true;</span>
+<span class="nc" id="L2549">						cStepLineMax = getVarValue(aTok.nextToken(), aPC);</span>
+<span class="nc" id="L2550">						cStepLine = getVarValue(aTok.nextToken(), aPC);</span>
+					}
+				}
+<span class="nc" id="L2553">				case 3 -&gt; cString = tokA;</span>
+<span class="nc" id="L2554">				case 4 -&gt; cStartLineString = tokA;</span>
+<span class="nc" id="L2555">				case 5 -&gt; cEndLineString = tokA;</span>
+				case 6 -&gt; {
+<span class="nc bnc" id="L2557" title="All 2 branches missed.">					existsOnly = (!&quot;0&quot;.equals(tokA));</span>
+<span class="nc bnc" id="L2558" title="All 2 branches missed.">					if (&quot;2&quot;.equals(tokA))</span>
+					{
+<span class="nc" id="L2560">						checkBefore = true;</span>
+					}
+				}
+<span class="nc" id="L2563">				default -&gt; Logging.errorPrint(&quot;ExportHandler.replaceTokenForDfor can't handle token number &quot; + i</span>
+						+ &quot; this probably means you've passed in too many parameters.&quot;);
+			}
+<span class="nc" id="L2566">			i++;</span>
+<span class="nc" id="L2567">		}</span>
+
+<span class="nc bnc" id="L2569" title="All 2 branches missed.">		if (&quot;COMMA&quot;.equals(cStartLineString))</span>
+		{
+<span class="nc" id="L2571">			cStartLineString = &quot;,&quot;;</span>
+		}
+
+<span class="nc bnc" id="L2574" title="All 2 branches missed.">		if (&quot;COMMA&quot;.equals(cEndLineString))</span>
+		{
+<span class="nc" id="L2576">			cEndLineString = &quot;,&quot;;</span>
+		}
+
+<span class="nc bnc" id="L2579" title="All 2 branches missed.">		if (&quot;NONE&quot;.equals(cStartLineString))</span>
+		{
+<span class="nc" id="L2581">			cStartLineString = &quot;&quot;;</span>
+		}
+
+<span class="nc bnc" id="L2584" title="All 2 branches missed.">		if (&quot;NONE&quot;.equals(cEndLineString))</span>
+		{
+<span class="nc" id="L2586">			cEndLineString = &quot;&quot;;</span>
+		}
+
+<span class="nc bnc" id="L2589" title="All 2 branches missed.">		if (&quot;CRLF&quot;.equals(cStartLineString))</span>
+		{
+<span class="nc" id="L2591">			cStartLineString = Constants.LINE_SEPARATOR;</span>
+		}
+
+<span class="nc bnc" id="L2594" title="All 2 branches missed.">		if (&quot;CRLF&quot;.equals(cEndLineString))</span>
+		{
+<span class="nc" id="L2596">			cEndLineString = Constants.LINE_SEPARATOR;</span>
+		}
+
+<span class="nc" id="L2599">		int iStart = cMin;</span>
+
+<span class="nc" id="L2601">		int x = 0;</span>
+<span class="nc bnc" id="L2602" title="All 2 branches missed.">		while (iStart &lt; cMax)</span>
+		{
+<span class="nc bnc" id="L2604" title="All 2 branches missed.">			if (x == 0)</span>
+			{
+<span class="nc" id="L2606">				FileAccess.write(output, cStartLineString);</span>
+			}
+<span class="nc" id="L2608">			x++;</span>
+
+<span class="nc" id="L2610">			int iNow = iStart;</span>
+
+<span class="nc bnc" id="L2612" title="All 2 branches missed.">			if (!isDFor)</span>
+			{
+<span class="nc" id="L2614">				cStepLineMax = iNow + cStep;</span>
+			}
+
+<span class="nc bnc" id="L2617" title="All 4 branches missed.">			if ((cStepLineMax &gt; cMax) &amp;&amp; !isDFor)</span>
+			{
+<span class="nc" id="L2619">				cStepLineMax = cMax;</span>
+			}
+
+<span class="nc bnc" id="L2622" title="All 6 branches missed.">			while ((iNow &lt; cStepLineMax) || (isDFor &amp;&amp; (iNow &lt; cMax)))</span>
+			{
+<span class="nc" id="L2624">				boolean insideToken = false;</span>
+
+<span class="nc bnc" id="L2626" title="All 2 branches missed.">				if (cString.startsWith(csheetTag2))</span>
+				{
+<span class="nc" id="L2628">					insideToken = true;</span>
+				}
+
+<span class="nc" id="L2631">				aTok = new StringTokenizer(cString, csheetTag2, false);</span>
+
+<span class="nc" id="L2633">				int j = 0;</span>
+
+<span class="nc bnc" id="L2635" title="All 2 branches missed.">				while (aTok.hasMoreTokens())</span>
+				{
+<span class="nc" id="L2637">					String eString = aTok.nextToken();</span>
+<span class="nc" id="L2638">					String gString = &quot;&quot;;</span>
+<span class="nc" id="L2639">					String hString = eString;</span>
+<span class="nc" id="L2640">					int index = 0;</span>
+
+<span class="nc bnc" id="L2642" title="All 2 branches missed.">					while (hString.indexOf('%', index) &gt; 0)</span>
+					{
+<span class="nc" id="L2644">						index = hString.indexOf('%', index);</span>
+
+<span class="nc bnc" id="L2646" title="All 2 branches missed.">						if (index == -1)</span>
+						{
+<span class="nc" id="L2648">							break;</span>
+						}
+
+<span class="nc bnc" id="L2651" title="All 4 branches missed.">						if ((index &lt; (hString.length() - 1)) &amp;&amp; (hString.charAt(index + 1) != '.'))</span>
+						{
+<span class="nc" id="L2653">							index++;</span>
+
+<span class="nc" id="L2655">							continue;</span>
+						}
+
+<span class="nc" id="L2658">						String fString = hString.substring(0, index);</span>
+
+<span class="nc bnc" id="L2660" title="All 2 branches missed.">						if ((index + 1) &lt; eString.length())</span>
+						{
+<span class="nc" id="L2662">							gString = hString.substring(index + 1);</span>
+						}
+
+<span class="nc" id="L2665">						hString = fString + Integer.toString(iNow) + gString;</span>
+<span class="nc" id="L2666">					}</span>
+
+<span class="nc bnc" id="L2668" title="All 4 branches missed.">					if (&quot;%0&quot;.equals(eString) || &quot;%1&quot;.equals(eString))</span>
+					{
+<span class="nc" id="L2670">						final int cInt = iNow + Integer.parseInt(eString.substring(1));</span>
+<span class="nc" id="L2671">						FileAccess.write(output, Integer.toString(cInt));</span>
+<span class="nc" id="L2672">					}</span>
+					else
+					{
+<span class="nc bnc" id="L2675" title="All 2 branches missed.">						if (insideToken)</span>
+						{
+<span class="nc" id="L2677">							replaceToken(hString, output, aPC);</span>
+						}
+						else
+						{
+<span class="nc" id="L2681">							boolean oldSkipMath = skipMath;</span>
+<span class="nc" id="L2682">							skipMath = true;</span>
+<span class="nc" id="L2683">							replaceToken(hString, output, aPC);</span>
+<span class="nc" id="L2684">							skipMath = oldSkipMath;</span>
+						}
+					}
+
+<span class="nc bnc" id="L2688" title="All 4 branches missed.">					if (checkBefore &amp;&amp; noMoreItems)</span>
+					{
+<span class="nc" id="L2690">						iNow = cMax;</span>
+<span class="nc" id="L2691">						iStart = cMax;</span>
+
+<span class="nc bnc" id="L2693" title="All 2 branches missed.">						if (j == 0)</span>
+						{
+<span class="nc" id="L2695">							existsOnly = false;</span>
+						}
+
+						break;
+					}
+
+<span class="nc" id="L2701">					++j;</span>
+<span class="nc bnc" id="L2702" title="All 2 branches missed.">					insideToken = !insideToken;</span>
+<span class="nc" id="L2703">				}</span>
+
+<span class="nc" id="L2705">				iNow += cStepLine;</span>
+
+<span class="nc bnc" id="L2707" title="All 2 branches missed.">				if (cStepLine == 0)</span>
+				{
+<span class="nc" id="L2709">					break;</span>
+				}
+<span class="nc" id="L2711">			}</span>
+
+<span class="nc bnc" id="L2713" title="All 8 branches missed.">			if ((cStepLine &gt; 0) || ((cStepLine == 0) &amp;&amp; (x == cStep)) || (existsOnly == noMoreItems))</span>
+			{
+<span class="nc" id="L2715">				FileAccess.write(output, cEndLineString);</span>
+<span class="nc" id="L2716">				x = 0;</span>
+
+<span class="nc bnc" id="L2718" title="All 4 branches missed.">				if (existsOnly &amp;&amp; noMoreItems)</span>
+				{
+<span class="nc" id="L2720">					return;</span>
+				}
+			}
+
+<span class="nc" id="L2724">			iStart += cStep;</span>
+<span class="nc" id="L2725">		}</span>
+<span class="nc" id="L2726">	}</span>
+
+	/**
+	 * Helper method to parse OIF token, e.g.
+	 * 
+	 * OIF(expr,truepart,falsepart)
+	 * OIF(HASFEAT:Armor Prof (Light), &lt;b&gt;Yes&lt;/b&gt;, &lt;b&gt;No&lt;/b&gt;)
+	 * 
+	 * If the character has the Light Armor proficiency, then returns &quot;Yes&quot;. 
+	 * Otherwise it returns &quot;No&quot;.
+	 * 
+	 * @param aString String to parse
+	 * @param output output to write to
+	 * @param aPC PC we are exporting
+	 */
+	private void replaceTokenOIF(String aString, java.io.Writer output, PlayerCharacter aPC)
+	{
+<span class="nc" id="L2743">		int iParenCount = 0;</span>
+<span class="nc" id="L2744">		final String[] tokenizedString = new String[3];</span>
+<span class="nc" id="L2745">		int iParamCount = 0;</span>
+<span class="nc" id="L2746">		int iStart = 4;</span>
+
+<span class="nc bnc" id="L2748" title="All 2 branches missed.">		for (int i = iStart; i &lt; aString.length(); ++i)</span>
+		{
+<span class="nc bnc" id="L2750" title="All 2 branches missed.">			if (iParamCount == 3)</span>
+			{
+<span class="nc" id="L2752">				break;</span>
+			}
+
+<span class="nc bnc" id="L2755" title="All 4 branches missed.">			switch (aString.charAt(i))</span>
+			{
+				case '(':
+<span class="nc" id="L2758">					iParenCount += 1;</span>
+<span class="nc" id="L2759">					break;</span>
+				case ')':
+<span class="nc" id="L2761">					iParenCount -= 1;</span>
+
+<span class="nc bnc" id="L2763" title="All 2 branches missed.">					if (iParenCount == -1)</span>
+					{
+<span class="nc bnc" id="L2765" title="All 2 branches missed.">						if (iParamCount == 2)</span>
+						{
+<span class="nc" id="L2767">							tokenizedString[iParamCount] = aString.substring(iStart, i).trim();</span>
+<span class="nc" id="L2768">							iParamCount++;</span>
+<span class="nc" id="L2769">							iStart = i + 1;</span>
+						}
+						else
+						{
+<span class="nc" id="L2773">							Logging.errorPrint(&quot;OIF: not enough parameters (&quot; + Integer.toString(iParamCount) + ')');</span>
+<span class="nc bnc" id="L2774" title="All 2 branches missed.">							for (int j = 0; j &lt; iParamCount; ++j)</span>
+							{
+<span class="nc" id="L2776">								Logging.errorPrint(&quot;  &quot; + Integer.toString(j) + ':' + tokenizedString[j]);</span>
+							}
+						}
+					}
+					break;
+				case ',':
+
+<span class="nc bnc" id="L2783" title="All 2 branches missed.">					if (iParenCount == 0)</span>
+					{
+<span class="nc bnc" id="L2785" title="All 2 branches missed.">						if (iParamCount &lt; 2)</span>
+						{
+<span class="nc" id="L2787">							tokenizedString[iParamCount] = aString.substring(iStart, i).trim();</span>
+<span class="nc" id="L2788">							iStart = i + 1;</span>
+						}
+						else
+						{
+<span class="nc" id="L2792">							Logging.errorPrint(&quot;OIF: too many parameters&quot;);</span>
+						}
+
+<span class="nc" id="L2795">						iParamCount += 1;</span>
+					}
+
+					break;
+
+				default:
+					break;
+			}
+		}
+
+<span class="nc" id="L2805">		String remainder = &quot;&quot;;</span>
+
+		// Actually evaluate the expression
+<span class="nc bnc" id="L2808" title="All 2 branches missed.">		if (iParamCount != 3)</span>
+		{
+<span class="nc" id="L2810">			Logging.errorPrint(&quot;OIF: invalid parameter count: &quot; + iParamCount);</span>
+		}
+		else
+		{
+<span class="nc" id="L2814">			remainder = aString.substring(iStart);</span>
+			int i;
+<span class="nc bnc" id="L2816" title="All 2 branches missed.">			if (evaluateExpression(tokenizedString[0], aPC))</span>
+			{
+<span class="nc" id="L2818">				i = 1;</span>
+			}
+			else
+			{
+<span class="nc" id="L2822">				i = 2;</span>
+			}
+
+			// Write out the true or false case
+<span class="nc" id="L2826">			FileAccess.write(output, tokenizedString[i]);</span>
+		}
+
+<span class="nc bnc" id="L2829" title="All 2 branches missed.">		if (!remainder.isEmpty())</span>
+		{
+<span class="nc" id="L2831">			Logging.errorPrint(&quot;OIF: extra characters on line: &quot; + remainder);</span>
+<span class="nc" id="L2832">			FileAccess.write(output, remainder);</span>
+		}
+<span class="nc" id="L2834">	}</span>
+
+	/**
+	 * Helper method to deal with the SpellListBook token
+	 * 
+	 * @param aString
+	 * @param aPC
+	 * @return 0
+	 */
+	private int replaceTokenSpellListBook(String aString, PlayerCharacter aPC)
+	{
+<span class="nc" id="L2845">		int sbookNum = 0;</span>
+
+<span class="nc" id="L2847">		final StringTokenizer aTok = new StringTokenizer(aString, &quot;.&quot;);</span>
+<span class="nc" id="L2848">		final int classNum = Integer.parseInt(aTok.nextToken());</span>
+<span class="nc" id="L2849">		final int levelNum = Integer.parseInt(aTok.nextToken());</span>
+
+		// Get the spell book number
+<span class="nc bnc" id="L2852" title="All 2 branches missed.">		if (aTok.hasMoreTokens())</span>
+		{
+<span class="nc" id="L2854">			sbookNum = Integer.parseInt(aTok.nextToken());</span>
+		}
+
+		// Set the spell book name
+<span class="nc" id="L2858">		String bookName = Globals.getDefaultSpellBook();</span>
+<span class="nc bnc" id="L2859" title="All 2 branches missed.">		if (sbookNum &gt; 0)</span>
+		{
+<span class="nc" id="L2861">			bookName = aPC.getDisplay().getSpellBookNames().get(sbookNum);</span>
+		}
+
+<span class="nc" id="L2864">		canWrite = false;</span>
+<span class="nc" id="L2865">		final PObject aObject = aPC.getSpellClassAtIndex(classNum);</span>
+
+<span class="nc bnc" id="L2867" title="All 2 branches missed.">		if (aObject != null)</span>
+		{
+<span class="nc" id="L2869">			final List&lt;CharacterSpell&gt; aList = aPC.getCharacterSpells(aObject, null, bookName, levelNum);</span>
+<span class="nc bnc" id="L2870" title="All 2 branches missed.">			canWrite = !aList.isEmpty();</span>
+		}
+
+<span class="nc" id="L2873">		return 0;</span>
+	}
+
+	/**
+	 * Helper method for replacing token variables
+	 * 
+	 * @param aString String to process
+	 * @param aPC PC we are exporting
+	 */
+	private void replaceTokenVar(String aString, PlayerCharacter aPC)
+	{
+<span class="nc" id="L2884">		final StringTokenizer aTok = new StringTokenizer(aString.substring(5), &quot;.&quot;, false);</span>
+<span class="nc" id="L2885">		final String varName = aTok.nextToken();</span>
+<span class="nc" id="L2886">		String bString = &quot;EQ&quot;;</span>
+<span class="nc" id="L2887">		boolean intVal = false;</span>
+<span class="nc" id="L2888">		boolean maxVal = true;</span>
+
+<span class="nc bnc" id="L2890" title="All 2 branches missed.">		if (aTok.hasMoreTokens())</span>
+		{
+<span class="nc" id="L2892">			bString = aTok.nextToken();</span>
+		}
+<span class="nc bnc" id="L2894" title="All 4 branches missed.">		while (&quot;INTVAL&quot;.equals(bString) || &quot;MINVAL&quot;.equals(bString))</span>
+		{
+<span class="nc bnc" id="L2896" title="All 2 branches missed.">			if (&quot;INTVAL&quot;.equals(bString))</span>
+			{
+<span class="nc" id="L2898">				intVal = true;</span>
+			}
+			else
+			{
+<span class="nc" id="L2902">				maxVal = false;</span>
+			}
+<span class="nc bnc" id="L2904" title="All 2 branches missed.">			if (aTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L2906">				bString = aTok.nextToken();</span>
+			}
+			else
+			{
+<span class="nc" id="L2910">				Logging.errorPrint(&quot;Missing comparison type in VAR filter &quot; + aString + &quot; assuming NEQ&quot;);</span>
+<span class="nc" id="L2911">				bString = &quot;NEQ&quot;;</span>
+			}
+		}
+
+<span class="nc" id="L2915">		String value = &quot;0&quot;;</span>
+
+<span class="nc bnc" id="L2917" title="All 2 branches missed.">		if (aTok.hasMoreTokens())</span>
+		{
+<span class="nc" id="L2919">			value = aTok.nextToken();</span>
+		}
+
+<span class="nc" id="L2922">		Float varval = aPC.getVariable(varName, maxVal);</span>
+<span class="nc bnc" id="L2923" title="All 2 branches missed.">		if (intVal)</span>
+		{
+<span class="nc" id="L2925">			varval = (float) Math.floor(varval);</span>
+		}
+<span class="nc" id="L2927">		final Float valval = aPC.getVariableValue(value, &quot;&quot;);</span>
+
+<span class="nc bnc" id="L2929" title="All 2 branches missed.">		if (&quot;GTEQ&quot;.equals(bString))</span>
+		{
+<span class="nc bnc" id="L2931" title="All 2 branches missed.">			canWrite = varval.doubleValue() &gt;= valval.doubleValue();</span>
+		}
+<span class="nc bnc" id="L2933" title="All 2 branches missed.">		else if (&quot;GT&quot;.equals(bString))</span>
+		{
+<span class="nc bnc" id="L2935" title="All 2 branches missed.">			canWrite = varval.doubleValue() &gt; valval.doubleValue();</span>
+		}
+<span class="nc bnc" id="L2937" title="All 2 branches missed.">		else if (&quot;LTEQ&quot;.equals(bString))</span>
+		{
+<span class="nc bnc" id="L2939" title="All 2 branches missed.">			canWrite = varval.doubleValue() &lt;= valval.doubleValue();</span>
+		}
+<span class="nc bnc" id="L2941" title="All 2 branches missed.">		else if (&quot;LT&quot;.equals(bString))</span>
+		{
+<span class="nc bnc" id="L2943" title="All 2 branches missed.">			canWrite = varval.doubleValue() &lt; valval.doubleValue();</span>
+		}
+<span class="nc bnc" id="L2945" title="All 2 branches missed.">		else if (&quot;NEQ&quot;.equals(bString))</span>
+		{
+<span class="nc bnc" id="L2947" title="All 2 branches missed.">			canWrite = !CoreUtility.doublesEqual(varval.doubleValue(), valval.doubleValue());</span>
+		}
+		else
+		{
+<span class="nc" id="L2951">			Logging.errorPrint(&quot;Unknown comparison type: &quot; + bString + &quot; in VAR filter &quot; + aString + &quot; assuming NEQ&quot;);</span>
+<span class="nc bnc" id="L2952" title="All 2 branches missed.">			canWrite = !CoreUtility.doublesEqual(varval.doubleValue(), valval.doubleValue());</span>
+		}
+<span class="nc" id="L2954">	}</span>
+
+	/**
+	 * Exports a PlayerCharacter-Party to a Writer
+	 * according to the handler's template
+	 * 
+	 * &lt;br&gt;author: Thomas Behr 13-11-02
+	 *
+	 * @param PCs the PlayerCharacter[] which compromises the Party to write
+	 * @param out the Writer to be written to
+	 */
+	private void write(PlayerCharacter[] PCs, BufferedWriter out)
+	{
+		// Set an output filter based on the type of template in use.
+<span class="nc" id="L2968">		FileAccess.setCurrentOutputFilter(templateFile.getName());</span>
+
+
+<span class="nc" id="L2971">		try (BufferedReader br = new BufferedReader(new InputStreamReader(</span>
+				new FileInputStream(templateFile),
+				StandardCharsets.UTF_8
+		)))
+		{
+<span class="nc" id="L2976">			boolean betweenPipes = false;</span>
+<span class="nc" id="L2977">			StringBuilder textBetweenPipes = new StringBuilder();</span>
+
+			// Starts with pipe pattern
+<span class="nc" id="L2980">			Pattern pat1 = Pattern.compile(&quot;^\\Q|&quot;);</span>
+			// Ends with pipe pattern
+<span class="nc" id="L2982">			Pattern pat2 = Pattern.compile(&quot;\\Q|\\E$&quot;);</span>
+
+<span class="nc" id="L2984">			String aLine = br.readLine();</span>
+
+<span class="nc bnc" id="L2986" title="All 2 branches missed.">			while (aLine != null)</span>
+			{
+<span class="nc" id="L2988">				int lastPipeIndex = aLine.lastIndexOf('|');</span>
+
+				// If not inside a TAG and there is no | character on this line
+<span class="nc bnc" id="L2991" title="All 4 branches missed.">				if (!betweenPipes &amp;&amp; lastPipeIndex == -1)</span>
+				{
+					// If output sheet author controls new lines 
+					// then replace tabs with empty space.
+<span class="nc bnc" id="L2995" title="All 2 branches missed.">					if (manualWhitespace)</span>
+					{
+<span class="nc" id="L2997">						aLine = aLine.replaceAll(&quot;[ \\t]&quot;, &quot;&quot;);</span>
+<span class="nc" id="L2998">						FileAccess.write(out, aLine);</span>
+					}
+					else
+					{
+<span class="nc" id="L3002">						FileAccess.write(out, aLine);</span>
+<span class="nc" id="L3003">						FileAccess.newLine(out);</span>
+					}
+				}
+
+				// Else if we are Inside a tag but we are not at the finish of 
+				// the tag e.g. 
+				//
+				// |
+				// x
+				// |
+				// 
+				// Or we are at the start of a tag that wraps onto the next line e.g. 
+				// 
+				// |x
+				// 
+				// Collect this text (without the pipe)
+				// to be passed for replacement later.
+<span class="nc bnc" id="L3020" title="All 4 branches missed.">				else if (lastPipeIndex == (betweenPipes ? -1 : 0))</span>
+				{
+<span class="nc" id="L3022">					textBetweenPipes.append(aLine.substring(lastPipeIndex + 1));</span>
+<span class="nc" id="L3023">					betweenPipes = true;</span>
+				}
+				// See if we are between pipes or not
+				else
+				{
+<span class="nc" id="L3028">					Matcher mat1 = pat1.matcher(textBetweenPipes);</span>
+<span class="nc" id="L3029">					Matcher mat2 = pat2.matcher(textBetweenPipes);</span>
+<span class="nc" id="L3030">					boolean startsWithPipe = mat1.find();</span>
+<span class="nc" id="L3031">					boolean endsWithPipe = mat2.find();</span>
+
+					// not currently in a pipe enclosed section, but first
+					// char starts one.
+<span class="nc bnc" id="L3035" title="All 4 branches missed.">					if (!betweenPipes &amp;&amp; startsWithPipe)</span>
+					{
+<span class="nc" id="L3037">						betweenPipes = true;</span>
+					}
+
+<span class="nc" id="L3040">					betweenPipes = processPipedLine(PCs, aLine, textBetweenPipes, out, betweenPipes);</span>
+
+<span class="nc bnc" id="L3042" title="All 4 branches missed.">					if (betweenPipes &amp;&amp; endsWithPipe)</span>
+					{
+<span class="nc" id="L3044">						betweenPipes = false;</span>
+					}
+				}
+
+<span class="nc" id="L3048">				aLine = br.readLine();</span>
+<span class="nc" id="L3049">			}</span>
+<span class="nc" id="L3050">		} catch (IOException exc)</span>
+		{
+<span class="nc" id="L3052">			Logging.errorPrint(&quot;Error in ExportHandler::write&quot;, exc);</span>
+<span class="nc" id="L3053">		}</span>
+<span class="nc" id="L3054">	}</span>
+
+	/**
+	 * Helper method to process a line that begins with a | (and may end with a |)
+	 * 
+	 * @param PCs List of PCs to output
+	 * @param aLine Line to parse
+	 * @param buf 
+	 * @param out character sheet we are building up
+	 * @param between Whether we are processing a line between pipes
+	 * @return true if we processed successfully
+	 */
+	private boolean processPipedLine(PlayerCharacter[] PCs, String aLine, StringBuilder buf, BufferedWriter out,
+		boolean between)
+	{
+<span class="nc" id="L3069">		final StringTokenizer aTok = new StringTokenizer(aLine, &quot;|&quot;, false);</span>
+
+<span class="nc" id="L3071">		boolean noPipes = false;</span>
+<span class="nc bnc" id="L3072" title="All 2 branches missed.">		if (aTok.countTokens() == 1)</span>
+		{
+<span class="nc" id="L3074">			noPipes = true;</span>
+		}
+
+<span class="nc" id="L3077">		boolean betweenPipes = between;</span>
+
+<span class="nc bnc" id="L3079" title="All 2 branches missed.">		while (aTok.hasMoreTokens())</span>
+		{
+<span class="nc" id="L3081">			String tok = aTok.nextToken();</span>
+
+			// If we're not between pipes then just write to the output 
+			// removing tab characters if asked to do so
+<span class="nc bnc" id="L3085" title="All 2 branches missed.">			if (!betweenPipes)</span>
+			{
+<span class="nc bnc" id="L3087" title="All 2 branches missed.">				if (manualWhitespace)</span>
+				{
+<span class="nc" id="L3089">					tok = tok.replaceAll(&quot;[ \\t]&quot;, &quot;&quot;);</span>
+				}
+<span class="nc" id="L3091">				FileAccess.write(out, tok);</span>
+			}
+
+			// Guaranteed to be between pipes here
+<span class="nc bnc" id="L3095" title="All 4 branches missed.">			else if (!noPipes &amp;&amp; !aTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L3097">				buf.append(tok);</span>
+			}
+
+			else
+			{
+<span class="nc" id="L3102">				buf.append(tok);</span>
+<span class="nc" id="L3103">				String aString = buf.toString();</span>
+
+				// We have finished dealing with section
+				// between the pipe characters so clear out the
+				// StringBuilder
+<span class="nc" id="L3108">				int l = buf.length();</span>
+<span class="nc" id="L3109">				buf.delete(0, l);</span>
+
+<span class="nc bnc" id="L3111" title="All 2 branches missed.">				if (aString.startsWith(&quot;FOR.&quot;))</span>
+				{
+<span class="nc" id="L3113">					doPartyForToken(PCs, out, aString);</span>
+				}
+				else
+				{
+
+<span class="nc" id="L3118">					Matcher mat = Pattern.compile(&quot;^(\\d+)&quot;).matcher(aString);</span>
+<span class="nc bnc" id="L3119" title="All 2 branches missed.">					int charNum = mat.matches() ? Integer.parseInt(mat.group()) : -1;</span>
+
+					// This seems bizarre since we haven't stripped the 
+					// integer from the front of this string which means
+					// that it will not be recognised as a token and will
+					// just be written to the output verbatim
+<span class="nc bnc" id="L3125" title="All 4 branches missed.">					if ((charNum &gt;= 0) &amp;&amp; (charNum &lt; Globals.getPCList().size()))</span>
+					{
+<span class="nc" id="L3127">						PlayerCharacter currPC = PCs[charNum];</span>
+<span class="nc" id="L3128">						replaceToken(aString, out, currPC);</span>
+<span class="nc" id="L3129">					}</span>
+<span class="nc bnc" id="L3130" title="All 2 branches missed.">					else if (aString.startsWith(&quot;EXPORT&quot;))</span>
+					{
+						// We can safely do EXPORT tags with no PC
+<span class="nc" id="L3133">						replaceToken(aString, out, null);</span>
+					}
+				}
+			}
+
+<span class="nc bnc" id="L3138" title="All 4 branches missed.">			if (aTok.hasMoreTokens() || noPipes)</span>
+			{
+<span class="nc bnc" id="L3140" title="All 2 branches missed.">				betweenPipes = !betweenPipes;</span>
+			}
+<span class="nc" id="L3142">		}</span>
+<span class="nc" id="L3143">		return betweenPipes;</span>
+	}
+
+	/**
+	 * Deal with the FOR. token, but at a party level
+	 * 
+	 * @param PCs The PCs to export
+	 * @param out The Output we are writing to
+	 * @param tokenString The token string to process
+	 */
+	private void doPartyForToken(PlayerCharacter[] PCs, BufferedWriter out, String tokenString)
+	{
+<span class="nc" id="L3155">		PartyForParser forParser = new PartyForParser(tokenString, PCs.length);</span>
+
+<span class="nc" id="L3157">		int x = 0;</span>
+<span class="nc bnc" id="L3158" title="All 2 branches missed.">		for (int i = forParser.min(); i &lt; forParser.max(); i++)</span>
+		{
+<span class="nc bnc" id="L3160" title="All 2 branches missed.">			if (x == 0)</span>
+			{
+<span class="nc" id="L3162">				FileAccess.write(out, forParser.startOfLine());</span>
+			}
+
+<span class="nc bnc" id="L3165" title="All 4 branches missed.">			PlayerCharacter currPC = ((i &gt;= 0) &amp;&amp; (i &lt; PCs.length)) ? PCs[i] : null;</span>
+
+<span class="nc" id="L3167">			String[] tokens = forParser.tokenString().split(&quot;\\\\\\\\&quot;);</span>
+
+<span class="nc bnc" id="L3169" title="All 2 branches missed.">			for (String tok : tokens)</span>
+			{
+<span class="nc bnc" id="L3171" title="All 2 branches missed.">				if (tok.startsWith(&quot;%.&quot;))</span>
+				{
+<span class="nc bnc" id="L3173" title="All 2 branches missed.">					if (currPC != null)</span>
+					{
+<span class="nc" id="L3175">						replaceToken(tok.substring(2), out, currPC);</span>
+					}
+				}
+				else
+				{
+<span class="nc" id="L3180">					FileAccess.write(out, tok);</span>
+				}
+			}
+
+			// Note: This was changed from == to &amp;&amp; since I can't see how
+			// == could possibly be correct behaviour.  If we were not
+			// just printing characters that exist the loop would
+			// terminate after printing one character. 
+<span class="nc bnc" id="L3188" title="All 4 branches missed.">			boolean breakloop = (forParser.existsOnly() &amp;&amp; (currPC == null));</span>
+
+<span class="nc" id="L3190">			++x;</span>
+<span class="nc bnc" id="L3191" title="All 4 branches missed.">			if (x == forParser.step() || breakloop)</span>
+			{
+<span class="nc" id="L3193">				x = 0;</span>
+<span class="nc" id="L3194">				FileAccess.write(out, forParser.endOfLine());</span>
+
+<span class="nc bnc" id="L3196" title="All 2 branches missed.">				if (breakloop)</span>
+				{
+<span class="nc" id="L3198">					break;</span>
+				}
+			}
+		}
+<span class="nc" id="L3202">	}</span>
+
+	/*
+	 * ##########################################################################
+	 * various getters and setters
+	 * ##########################################################################
+	 */
+
+	/**
+	 * @param canWrite The canWrite flag to set.
+	 */
+	public void setCanWrite(boolean canWrite)
+	{
+<span class="nc" id="L3215">		this.canWrite = canWrite;</span>
+<span class="nc" id="L3216">	}</span>
+
+	/**
+	 * @return Returns the checkBefore flag.
+	 */
+	public boolean getCheckBefore()
+	{
+<span class="nc" id="L3223">		return checkBefore;</span>
+	}
+
+	/**
+	 * @return Returns the existsOnly flag.
+	 */
+	public boolean getExistsOnly()
+	{
+<span class="nc" id="L3231">		return existsOnly;</span>
+	}
+
+	/**
+	 * @param noMoreItems The noMoreItems flag to set.
+	 */
+	public void setNoMoreItems(boolean noMoreItems)
+	{
+<span class="nc" id="L3239">		this.noMoreItems = noMoreItems;</span>
+<span class="nc" id="L3240">	}</span>
+
+	/**
+	 * @param manualWhitespace Set the manualWhitespace flag.
+	 */
+	public void setManualWhitespace(boolean manualWhitespace)
+	{
+<span class="nc" id="L3247">		this.manualWhitespace = manualWhitespace;</span>
+<span class="nc" id="L3248">	}</span>
+
+	/**
+	 * Get the token string
+	 * 
+	 * @param aPC the PC being exported
+	 * @param aString The token string to convert
+	 * @return token string
+	 */
+	public static String getTokenString(final PlayerCharacter aPC, final String aString)
+	{
+<span class="nc" id="L3259">		final StringTokenizer tok = new StringTokenizer(aString, &quot;.,&quot;, false);</span>
+<span class="nc" id="L3260">		final String firstToken = tok.nextToken();</span>
+
+		// Make sure the token list has been populated
+<span class="nc" id="L3263">		populateTokenMap();</span>
+
+<span class="nc" id="L3265">		final Token token = TOKEN_MAP.get(firstToken);</span>
+<span class="nc bnc" id="L3266" title="All 2 branches missed.">		if (token != null)</span>
+		{
+<span class="nc" id="L3268">			return token.getToken(aString, aPC, null);</span>
+		}
+<span class="nc" id="L3270">		return &quot;&quot;;</span>
+	}
+
+	/*
+	 * ######################################################
+	 * inner classes
+	 * ######################################################
+	 */
+
+	/**
+	 * {@code PStringTokenizer}
+	 */
+	private static final class PStringTokenizer
+	{
+		private String _andThat;
+		private String _delimiter;
+		private String _forThisString;
+		private String _ignoreBetweenThis;
+
+		PStringTokenizer(String forThisString, String delimiter, String ignoreBetweenThis, String andThat)
+<span class="nc" id="L3290">		{</span>
+<span class="nc" id="L3291">			_forThisString = forThisString;</span>
+<span class="nc" id="L3292">			_delimiter = delimiter;</span>
+<span class="nc" id="L3293">			_ignoreBetweenThis = ignoreBetweenThis;</span>
+<span class="nc" id="L3294">			_andThat = andThat;</span>
+<span class="nc" id="L3295">		}</span>
+
+		/**
+		 * Return true if we have more tokens
+		 * @return true if we have
+		 */
+		public boolean hasMoreTokens()
+		{
+<span class="nc bnc" id="L3303" title="All 2 branches missed.">			return (!_forThisString.isEmpty());</span>
+		}
+
+		/**
+		 * Return the next token
+		 * @return next token
+		 */
+		public String nextToken()
+		{
+			String aString;
+
+<span class="nc bnc" id="L3314" title="All 2 branches missed.">			if (_forThisString.lastIndexOf(_delimiter) == -1)</span>
+			{
+<span class="nc" id="L3316">				aString = _forThisString;</span>
+<span class="nc" id="L3317">				_forThisString = &quot;&quot;;</span>
+			}
+			else
+			{
+				int i;
+<span class="nc" id="L3322">				final StringBuilder b = new StringBuilder();</span>
+
+<span class="nc" id="L3324">				int ignores = 0;</span>
+<span class="nc bnc" id="L3325" title="All 2 branches missed.">				for (i = 0; i &lt; _forThisString.length(); i++)</span>
+				{
+<span class="nc bnc" id="L3327" title="All 4 branches missed.">					if (_forThisString.substring(i).startsWith(_delimiter) &amp;&amp; (ignores == 0))</span>
+					{
+<span class="nc" id="L3329">						break;</span>
+					}
+
+<span class="nc bnc" id="L3332" title="All 4 branches missed.">					if (_forThisString.substring(i).startsWith(_ignoreBetweenThis) &amp;&amp; (ignores == 0))</span>
+					{
+<span class="nc" id="L3334">						ignores = 1;</span>
+					}
+<span class="nc bnc" id="L3336" title="All 2 branches missed.">					else if (_forThisString.substring(i).startsWith(_andThat))</span>
+					{
+<span class="nc" id="L3338">						ignores = 0;</span>
+					}
+
+<span class="nc" id="L3341">					b.append(_forThisString, i, i + 1);</span>
+				}
+
+<span class="nc" id="L3344">				aString = b.toString();</span>
+<span class="nc" id="L3345">				_forThisString = _forThisString.substring(i + 1);</span>
+			}
+
+<span class="nc" id="L3348">			return aString;</span>
+		}
+	}
+
+	private static final class PartyForParser
+	{
+		final PStringTokenizer pTok;
+
+		private final Integer cMin;
+		private final Integer cMax;
+		private final Integer cStep;
+
+		private final String tokenString;
+		private final String stringForStartOfLine;
+		private final String stringForEndOfLine;
+
+		private final boolean existsOnly;
+
+		private PartyForParser(String aString, final Integer numOfPCs)
+<span class="nc" id="L3367">		{</span>
+<span class="nc" id="L3368">			pTok = new PStringTokenizer(aString.substring(4), &quot;,&quot;, &quot;\\\\&quot;, &quot;\\\\&quot;);</span>
+
+<span class="nc bnc" id="L3370" title="All 2 branches missed.">			cMin = pTok.hasMoreTokens() ? Delta.decode(pTok.nextToken()) : 0;</span>
+
+<span class="nc bnc" id="L3372" title="All 2 branches missed.">			int max = pTok.hasMoreTokens() ? Delta.decode(pTok.nextToken()) : 100;</span>
+
+<span class="nc bnc" id="L3374" title="All 2 branches missed.">			cStep = pTok.hasMoreTokens() ? Delta.decode(pTok.nextToken()) : 1;</span>
+
+<span class="nc bnc" id="L3376" title="All 2 branches missed.">			tokenString = pTok.hasMoreTokens() ? pTok.nextToken() : &quot;&quot;;</span>
+
+<span class="nc bnc" id="L3378" title="All 2 branches missed.">			stringForStartOfLine = pTok.hasMoreTokens() ? pTok.nextToken() : &quot;&quot;;</span>
+
+<span class="nc bnc" id="L3380" title="All 2 branches missed.">			stringForEndOfLine = pTok.hasMoreTokens() ? pTok.nextToken() : &quot;&quot;;</span>
+
+<span class="nc bnc" id="L3382" title="All 4 branches missed.">			existsOnly = pTok.hasMoreTokens() &amp;&amp; !(&quot;0&quot;.equals(pTok.nextToken()));</span>
+
+<span class="nc bnc" id="L3384" title="All 4 branches missed.">			cMax = (max &gt;= numOfPCs) &amp;&amp; existsOnly ? numOfPCs : max;</span>
+
+<span class="nc bnc" id="L3386" title="All 2 branches missed.">			if (pTok.hasMoreTokens())</span>
+			{
+<span class="nc" id="L3388">				String log = &quot;In Party.print there is an unhandled case in a &quot;</span>
+<span class="nc" id="L3389">						+ &quot;switch (the value is &quot; + pTok.nextToken()</span>
+						+ &quot;.&quot;;
+<span class="nc" id="L3391">				Logging.errorPrint(log);</span>
+			}
+<span class="nc" id="L3393">		}</span>
+
+		public Integer min()
+		{
+<span class="nc" id="L3397">			return cMin;</span>
+		}
+
+		public Integer max()
+		{
+<span class="nc" id="L3402">			return cMax;</span>
+		}
+
+		public Integer step()
+		{
+<span class="nc" id="L3407">			return cStep;</span>
+		}
+
+		private String tokenString()
+		{
+<span class="nc" id="L3412">			return tokenString;</span>
+		}
+
+		private String startOfLine()
+		{
+<span class="nc" id="L3417">			return stringForStartOfLine;</span>
+		}
+
+		private String endOfLine()
+		{
+<span class="nc" id="L3422">			return stringForEndOfLine;</span>
+		}
+
+		private boolean existsOnly()
+		{
+<span class="nc" id="L3427">			return existsOnly;</span>
+		}
+	}
+
+	public static void clear()
+	{
+<span class="fc" id="L3433">		TOKEN_MAP.clear();</span>
+<span class="fc" id="L3434">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

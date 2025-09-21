@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreSkillSitTester.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">plugin.pretokens.test</a> &gt; <span class="el_source">PreSkillSitTester.java</span></div><h1>PreSkillSitTester.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2014 (C) Thomas Parker &lt;thpr@users.sourceforge.net&gt;
+ * 
+ * This library is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This library is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package plugin.pretokens.test;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import pcgen.cdom.base.CDOMObject;
+import pcgen.cdom.base.CDOMReference;
+import pcgen.cdom.enumeration.ListKey;
+import pcgen.core.PlayerCharacter;
+import pcgen.core.Skill;
+import pcgen.core.analysis.SkillRankControl;
+import pcgen.core.display.CharacterDisplay;
+import pcgen.core.prereq.AbstractPrerequisiteTest;
+import pcgen.core.prereq.Prerequisite;
+import pcgen.core.prereq.PrerequisiteOperator;
+import pcgen.core.prereq.PrerequisiteTest;
+import pcgen.system.LanguageBundle;
+
+<span class="nc" id="L38">public class PreSkillSitTester extends AbstractPrerequisiteTest implements PrerequisiteTest</span>
+{
+
+	@Override
+	public int passes(final Prerequisite prereq, final PlayerCharacter character, CDOMObject source)
+	{
+<span class="nc" id="L44">		CharacterDisplay display = character.getDisplay();</span>
+<span class="nc" id="L45">		final int requiredRanks = Integer.parseInt(prereq.getOperand());</span>
+
+		// Compute the skill name from the Prerequisite
+<span class="nc" id="L48">		String requiredSkill = prereq.getCategoryName();</span>
+<span class="nc" id="L49">		String situation = prereq.getKey();</span>
+
+<span class="nc" id="L51">		Map&lt;Skill, Set&lt;Skill&gt;&gt; serveAsSkills = getImitators(display);</span>
+
+<span class="nc" id="L53">		int runningTotal = 0;</span>
+
+<span class="nc" id="L55">		boolean foundMatch = false;</span>
+<span class="nc" id="L56">		boolean foundSkill = false;</span>
+
+<span class="nc bnc" id="L58" title="All 2 branches missed.">		for (Skill aSkill : display.getSkillSet())</span>
+		{
+<span class="nc" id="L60">			final String aSkillKey = aSkill.getKeyName().toUpperCase();</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">			if (aSkillKey.equals(requiredSkill))</span>
+			{
+<span class="nc" id="L63">				foundMatch = true;</span>
+<span class="nc" id="L64">				foundSkill = true;</span>
+<span class="nc" id="L65">				runningTotal =</span>
+<span class="nc" id="L66">						getRunningTotal(aSkill, character, prereq, true, runningTotal, requiredRanks, situation);</span>
+			}
+
+<span class="nc bnc" id="L69" title="All 4 branches missed.">			if (prereq.isCountMultiples() || prereq.isTotalValues())</span>
+			{
+				// For counted totals we want to count all occurances, not just the first
+<span class="nc" id="L72">				foundMatch = false;</span>
+			}
+<span class="nc bnc" id="L74" title="All 2 branches missed.">			if (foundMatch)</span>
+			{
+<span class="nc" id="L76">				break;</span>
+			}
+<span class="nc" id="L78">		}</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">		if (!foundSkill)</span>
+		{
+<span class="nc bnc" id="L81" title="All 2 branches missed.">			for (final Map.Entry&lt;Skill, Set&lt;Skill&gt;&gt; entry : serveAsSkills.entrySet())</span>
+			{
+<span class="nc" id="L83">				Set&lt;Skill&gt; targets = entry.getValue();</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">				for (Skill target : targets)</span>
+				{
+<span class="nc bnc" id="L86" title="All 2 branches missed.">					if (foundSkill)</span>
+					{
+<span class="nc" id="L88">						break;</span>
+					}
+<span class="nc" id="L90">					final String aSkillKey = target.getKeyName().toUpperCase();</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">					if (aSkillKey.equals(requiredSkill))</span>
+					{
+<span class="nc" id="L93">						foundSkill = true;</span>
+<span class="nc" id="L94">                        int theTotal = getRunningTotal(</span>
+
+<span class="nc" id="L96">								entry.getKey(), character, prereq, true, runningTotal, requiredRanks,</span>
+							situation);
+<span class="nc" id="L98">						runningTotal += theTotal;</span>
+
+					}
+<span class="nc" id="L101">				}</span>
+<span class="nc" id="L102">			}</span>
+		}
+
+		// If we are looking for a negative test i.e. !PRESKILL and the PC
+		// doesn't have the skill we have to return a match
+<span class="nc bnc" id="L107" title="All 2 branches missed.">		if (!foundSkill)</span>
+		{
+<span class="nc bnc" id="L109" title="All 2 branches missed.">			if (prereq.getOperator() == PrerequisiteOperator.LT)</span>
+			{
+<span class="nc" id="L111">				runningTotal++;</span>
+			}
+		}
+<span class="nc" id="L114">		return countedTotal(prereq, runningTotal);</span>
+	}
+
+	private Map&lt;Skill, Set&lt;Skill&gt;&gt; getImitators(CharacterDisplay display)
+	{
+<span class="nc" id="L119">		HashMap&lt;Skill, Set&lt;Skill&gt;&gt; serveAsSkills = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L120">		Set&lt;Skill&gt; skillSet = new HashSet&lt;&gt;(display.getSkillSet());</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">		for (Skill aSkill : skillSet)</span>
+		{
+<span class="nc" id="L123">			Set&lt;Skill&gt; servesAs = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">			for (CDOMReference&lt;Skill&gt; ref : aSkill.getSafeListFor(ListKey.SERVES_AS_SKILL))</span>
+			{
+<span class="nc" id="L126">				servesAs.addAll(ref.getContainedObjects());</span>
+<span class="nc" id="L127">			}</span>
+
+<span class="nc bnc" id="L129" title="All 2 branches missed.">			if (!servesAs.isEmpty())</span>
+			{
+<span class="nc" id="L131">				serveAsSkills.put(aSkill, servesAs);</span>
+			}
+<span class="nc" id="L133">		}</span>
+<span class="nc" id="L134">		return serveAsSkills;</span>
+	}
+
+	/**
+	 * Get the type of prerequisite handled by this token.
+	 * 
+	 * @return the type of prerequisite handled by this token.
+	 */
+	@Override
+	public String kindHandled()
+	{
+<span class="nc" id="L145">		return &quot;SKILLSIT&quot;; //$NON-NLS-1$</span>
+	}
+
+	@Override
+	public String toHtmlString(final Prerequisite prereq)
+	{
+<span class="nc" id="L151">		String skillName = prereq.getKey();</span>
+<span class="nc bnc" id="L152" title="All 4 branches missed.">		if (prereq.getSubKey() != null &amp;&amp; !prereq.getSubKey().equals(&quot;&quot;)) //$NON-NLS-1$</span>
+		{
+<span class="nc" id="L154">			skillName += &quot; (&quot; + prereq.getSubKey() + ')'; //$NON-NLS-1$ </span>
+
+		}
+
+<span class="nc" id="L158">		return LanguageBundle.getFormattedString(&quot;PreSkill.toHtml&quot;, //$NON-NLS-1$</span>
+<span class="nc" id="L159">			prereq.getOperator().toDisplayString(), prereq.getOperand(), skillName);</span>
+	}
+
+	private int getRunningTotal(Skill aSkill, PlayerCharacter character, Prerequisite prereq, boolean foundMatch,
+		int runningTotal, int requiredRanks, String situation)
+	{
+<span class="nc bnc" id="L165" title="All 2 branches missed.">		if (foundMatch)</span>
+		{
+<span class="nc" id="L167">			int rank = SkillRankControl.getTotalRank(character, aSkill).intValue();</span>
+<span class="nc" id="L168">			rank += character.getTotalBonusTo(&quot;SITUATION&quot;, aSkill.getKeyName() + '=' + situation);</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">			if (prereq.isTotalValues())</span>
+			{
+<span class="nc" id="L171">				runningTotal += rank;</span>
+			}
+			else
+			{
+<span class="nc bnc" id="L175" title="All 2 branches missed.">				if (prereq.getOperator().compare(rank, requiredRanks) &gt; 0)</span>
+				{
+<span class="nc" id="L177">					runningTotal++;</span>
+				}
+			}
+		}
+<span class="nc" id="L181">		return runningTotal;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

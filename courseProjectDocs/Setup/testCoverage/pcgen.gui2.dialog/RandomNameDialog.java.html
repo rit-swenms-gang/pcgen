@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RandomNameDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui2.dialog</a> &gt; <span class="el_source">RandomNameDialog.java</span></div><h1>RandomNameDialog.java</h1><pre class="source lang-java linenums">/*
+ * Copyright James Dempsey, 2010
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.gui2.dialog;
+
+import java.awt.BorderLayout;
+import java.io.File;
+
+import javax.swing.JDialog;
+import javax.swing.JFrame;
+import javax.swing.WindowConstants;
+
+import pcgen.core.SettingsHandler;
+import pcgen.gui2.doomsdaybook.NameGenPanel;
+import pcgen.gui2.tools.Utility;
+import pcgen.gui3.GuiUtility;
+import pcgen.gui3.component.OKCloseButtonBar;
+import pcgen.system.LanguageBundle;
+
+import javafx.scene.control.ButtonBar;
+import org.apache.commons.lang3.StringUtils;
+
+/**
+ * The Class {@code RandomNameDialog} is a dialog in which the user can
+ * generate a random name for their character.
+ */
+public final class RandomNameDialog extends JDialog
+{
+	private final NameGenPanel nameGenPanel;
+	private boolean cancelled;
+
+	/**
+	 * Create a new Random Name Dialog
+	 * @param frame The parent frame. The dialog will be centred on this frame
+	 * @param gender The current gender of the character.
+	 */
+	public RandomNameDialog(JFrame frame, String gender)
+	{
+<span class="nc" id="L53">		super(frame, LanguageBundle.getString(&quot;in_rndNameTitle&quot;), true); //$NON-NLS-1$</span>
+<span class="nc" id="L54">		nameGenPanel = new NameGenPanel(new File(getDataDir()));</span>
+<span class="nc" id="L55">		nameGenPanel.setGender(gender);</span>
+<span class="nc" id="L56">		initUserInterface();</span>
+<span class="nc" id="L57">		pack();</span>
+<span class="nc" id="L58">		setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);</span>
+<span class="nc" id="L59">		this.setLocationRelativeTo(frame);</span>
+<span class="nc" id="L60">		cancelled = false;</span>
+
+<span class="nc" id="L62">		Utility.installEscapeCloseOperation(this);</span>
+<span class="nc" id="L63">	}</span>
+
+	private void initUserInterface()
+	{
+<span class="nc" id="L67">		getContentPane().setLayout(new BorderLayout());</span>
+
+<span class="nc" id="L69">		getContentPane().add(nameGenPanel, BorderLayout.CENTER);</span>
+
+<span class="nc" id="L71">		ButtonBar buttonBar = new OKCloseButtonBar(</span>
+<span class="nc" id="L72">				evt -&gt; okButtonActionPerformed(),</span>
+<span class="nc" id="L73">				evt -&gt; cancelButtonActionPerformed()</span>
+		);
+
+<span class="nc" id="L76">		getContentPane().add(GuiUtility.wrapParentAsJFXPanel(buttonBar), BorderLayout.PAGE_END);</span>
+<span class="nc" id="L77">	}</span>
+
+	private void okButtonActionPerformed()
+	{
+<span class="nc" id="L81">		setVisible(false);</span>
+<span class="nc" id="L82">	}</span>
+
+	private void cancelButtonActionPerformed()
+	{
+<span class="nc" id="L86">		cancelled = true;</span>
+<span class="nc" id="L87">		setVisible(false);</span>
+<span class="nc" id="L88">	}</span>
+
+	/**
+	 * @return The directory where the random name data is held
+	 */
+	private String getDataDir()
+	{
+<span class="nc" id="L95">		String pluginDirectory = SettingsHandler.getGmgenPluginDir().toString();</span>
+
+<span class="nc" id="L97">		return pluginDirectory + File.separator + &quot;Random Names&quot;;</span>
+	}
+
+	/**
+	 * @return The name the user generated.
+	 */
+	public String getChosenName()
+	{
+<span class="nc bnc" id="L105" title="All 2 branches missed.">		if (cancelled)</span>
+		{
+<span class="nc" id="L107">			return StringUtils.EMPTY;</span>
+		}
+<span class="nc" id="L109">		return nameGenPanel.getChosenName();</span>
+	}
+
+	/**
+	 * @return the gender
+	 */
+	public String getGender()
+	{
+<span class="nc bnc" id="L117" title="All 2 branches missed.">		if (cancelled)</span>
+		{
+<span class="nc" id="L119">			return StringUtils.EMPTY;</span>
+		}
+<span class="nc" id="L121">		return nameGenPanel.getGender();</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

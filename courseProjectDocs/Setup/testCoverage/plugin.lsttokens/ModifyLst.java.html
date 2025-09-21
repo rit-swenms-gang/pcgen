@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModifyLst.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">plugin.lsttokens</a> &gt; <span class="el_source">ModifyLst.java</span></div><h1>ModifyLst.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2014-18 (C) Thomas Parker &lt;thpr@users.sourceforge.net&gt;
+ * 
+ * This library is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This library is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package plugin.lsttokens;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+import pcgen.base.calculation.FormulaModifier;
+import pcgen.base.formula.base.FormulaManager;
+import pcgen.base.formula.base.FunctionLibrary;
+import pcgen.base.lang.StringUtil;
+import pcgen.base.text.ParsingSeparator;
+import pcgen.base.util.CaseInsensitiveMap;
+import pcgen.base.util.FormatManager;
+import pcgen.cdom.base.Constants;
+import pcgen.cdom.base.VarContainer;
+import pcgen.cdom.base.VarHolder;
+import pcgen.cdom.content.VarModifier;
+import pcgen.cdom.formula.local.DefinedWrappingLibrary;
+import pcgen.cdom.formula.scope.PCGenScope;
+import pcgen.rules.context.LoadContext;
+import pcgen.rules.persistence.token.AbstractNonEmptyToken;
+import pcgen.rules.persistence.token.CDOMInterfaceToken;
+import pcgen.rules.persistence.token.ParseResult;
+
+/**
+ * The MODIFY token defined by ModifyLst defines a calculation to be performed in the
+ * (new) formula system.
+ */
+<span class="fc" id="L49">public class ModifyLst extends AbstractNonEmptyToken&lt;VarHolder&gt;</span>
+		implements CDOMInterfaceToken&lt;VarContainer, VarHolder&gt;
+{
+
+	@Override
+	public String getTokenName()
+	{
+<span class="fc" id="L56">		return &quot;MODIFY&quot;;</span>
+	}
+
+	@Override
+	public ParseResult parseNonEmptyToken(LoadContext context, VarHolder obj, String value)
+	{
+		try
+		{
+<span class="fc" id="L64">			PCGenScope scope = context.getActiveScope();</span>
+<span class="fc" id="L65">			VarModifier&lt;?&gt; varModifier = parseModifyInfo(context, value, scope,</span>
+<span class="fc" id="L66">				generateFormulaManager(context, scope), getTokenName(), 0);</span>
+<span class="fc" id="L67">			obj.addModifier(varModifier);</span>
+		}
+<span class="fc" id="L69">		catch (ModifyException e)</span>
+		{
+<span class="fc" id="L71">			return new ParseResult.Fail(e.getMessage());</span>
+<span class="fc" id="L72">		}</span>
+<span class="fc" id="L73">		return ParseResult.SUCCESS;</span>
+	}
+
+	/**
+	 * Parses the 3 arguments plus associations that are part of a token doing a
+	 * modification.
+	 * 
+	 * @param context
+	 *            The LoadContext for processing
+	 * @param value
+	 *            The instructions of the modification
+	 * @param scope
+	 *            The scope in which the modification should be analyzed
+	 * @param tokenName
+	 *            The token name asking for this process (used for error messages)
+	 * @param argsConsumed
+	 *            The number of arguments consumed before delegating to this method
+	 * @return a VarModifier containing the information in the given instructions
+	 * @throws ModifyException
+	 *             if the parsing failed. The message contains information about the error
+	 */
+	public static VarModifier&lt;?&gt; parseModifyInfo(LoadContext context,
+		String value, PCGenScope scope, FormulaManager formulaManager,
+		String tokenName, int argsConsumed) throws ModifyException
+	{
+		/*
+		 * TODO CODE-3299 Need to check the object type of the VarHolder to make sure it
+		 * is legal. Note it's a proxy, so a @ReadOnly method needs to be used to support
+		 * the analysis.
+		 */
+<span class="fc" id="L103">		ParsingSeparator sep = new ParsingSeparator(value, '|');</span>
+<span class="fc" id="L104">		sep.addGroupingPair('[', ']');</span>
+<span class="fc" id="L105">		sep.addGroupingPair('(', ')');</span>
+
+<span class="fc bfc" id="L107" title="All 2 branches covered.">		if (!sep.hasNext())</span>
+		{
+<span class="fc" id="L109">			throw new ModifyException(tokenName + &quot; may not be empty&quot;);</span>
+		}
+
+<span class="fc" id="L112">		String varName = sep.next();</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">		if (!context.getVariableContext().isLegalVariableID(scope, varName))</span>
+		{
+<span class="fc" id="L115">			throw new ModifyException(tokenName + &quot; found invalid var name: &quot; + varName</span>
+<span class="fc" id="L116">				+ &quot;(scope: &quot; + scope.getName() + &quot;)&quot;);</span>
+		}
+<span class="fc bfc" id="L118" title="All 2 branches covered.">		if (!sep.hasNext())</span>
+		{
+<span class="fc" id="L120">			throw new ModifyException(</span>
+				tokenName + &quot; needed argument #&quot; + (argsConsumed + 2) + &quot;: &quot; + value);
+		}
+<span class="fc" id="L123">		String modIdentification = sep.next();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">		if (!sep.hasNext())</span>
+		{
+<span class="fc" id="L126">			throw new ModifyException(</span>
+				tokenName + &quot; needed argument # &quot; + (argsConsumed + 3) + &quot;: &quot; + value);
+		}
+<span class="fc" id="L129">		String modInstructions = sep.next();</span>
+		FormulaModifier&lt;?&gt; modifier;
+		try
+		{
+<span class="fc" id="L133">			FormatManager&lt;?&gt; format = context.getVariableContext().getVariableFormat(scope, varName);</span>
+<span class="fc" id="L134">			modifier =</span>
+<span class="fc" id="L135">					context.getVariableContext().getModifier(modIdentification,</span>
+						modInstructions, formulaManager, scope, format);
+		}
+<span class="fc" id="L138">		catch (IllegalArgumentException e)</span>
+		{
+<span class="fc" id="L140">			throw new ModifyException(</span>
+				tokenName + &quot; Modifier &quot; + modIdentification + &quot; had value &quot;
+<span class="fc" id="L142">					+ modInstructions + &quot; but it was not valid: &quot; + e.getMessage(), e);</span>
+<span class="fc" id="L143">		}</span>
+
+<span class="fc" id="L145">		Set&lt;Object&gt; associationsVisited = Collections.newSetFromMap(new CaseInsensitiveMap&lt;&gt;());</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">		while (sep.hasNext())</span>
+		{
+<span class="fc" id="L148">			String assoc = sep.next();</span>
+<span class="fc" id="L149">			int equalLoc = assoc.indexOf('=');</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">			if (equalLoc == -1)</span>
+			{
+<span class="fc" id="L152">				throw new ModifyException(</span>
+					tokenName + &quot; was expecting = in an ASSOCIATION but got &quot; + assoc
+						+ &quot; in &quot; + value);
+			}
+<span class="fc" id="L156">			String assocName = assoc.substring(0, equalLoc);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">			if (associationsVisited.contains(assocName))</span>
+			{
+<span class="nc" id="L159">				throw new ModifyException(tokenName</span>
+					+ &quot; does not allow multiple asspociations with the same name.  &quot;
+					+ &quot;Found multiple: &quot; + assocName + &quot; in &quot; + value);
+			}
+<span class="fc" id="L163">			associationsVisited.add(assocName);</span>
+<span class="fc" id="L164">			modifier.addAssociation(assoc);</span>
+<span class="fc" id="L165">		}</span>
+<span class="fc" id="L166">		return new VarModifier&lt;&gt;(varName, scope, modifier);</span>
+	}
+
+	private final FormulaManager generateFormulaManager(LoadContext context, PCGenScope scope)
+	{
+<span class="fc" id="L171">		FormulaManager formulaManager =</span>
+<span class="fc" id="L172">				context.getVariableContext().getFormulaManager();</span>
+<span class="fc" id="L173">		Optional&lt;FormatManager&lt;?&gt;&gt; formatManager = scope.getFormatManager(context);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">		if (formatManager.isEmpty())</span>
+		{
+			//Okay, we won't add this()
+<span class="fc" id="L177">			return formulaManager;</span>
+		}
+		//Note: Passing new Object() as DefinedValue is a dummy
+<span class="nc" id="L180">		FunctionLibrary functionLibrary = new DefinedWrappingLibrary(</span>
+<span class="nc" id="L181">			formulaManager.get(FormulaManager.FUNCTION), &quot;this&quot;, new Object(),</span>
+<span class="nc" id="L182">			formatManager.get());</span>
+<span class="nc" id="L183">		return formulaManager.getWith(FormulaManager.FUNCTION, functionLibrary);</span>
+	}
+
+	@Override
+	public String[] unparse(LoadContext context, VarContainer obj)
+	{
+<span class="fc" id="L189">		List&lt;String&gt; modifiers = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">		for (VarModifier&lt;?&gt; vm : obj.getModifierArray())</span>
+		{
+<span class="fc" id="L192">			String sb = vm.getVarName()</span>
+					+ Constants.PIPE
+<span class="fc" id="L194">					+ unparseModifier(vm);</span>
+<span class="fc" id="L195">			modifiers.add(sb);</span>
+		}
+<span class="fc bfc" id="L197" title="All 2 branches covered.">		if (modifiers.isEmpty())</span>
+		{
+			//Legal
+<span class="fc" id="L200">			return null;</span>
+		}
+<span class="fc" id="L202">		return modifiers.toArray(new String[0]);</span>
+	}
+
+	/**
+	 * Unparses a VarModifier into the string of instructions used to produce it.
+	 * 
+	 * @param varModifier
+	 *            The VarModifier to be unparsed
+	 * @return The string of instructions for the given VarModifier
+	 */
+	public static String unparseModifier(VarModifier&lt;?&gt; varModifier)
+	{
+<span class="fc" id="L214">		FormulaModifier&lt;?&gt; modifier = varModifier.getModifier();</span>
+<span class="fc" id="L215">		String type = modifier.getIdentification();</span>
+<span class="fc" id="L216">		StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L217">		sb.append(type);</span>
+<span class="fc" id="L218">		sb.append(Constants.PIPE);</span>
+<span class="fc" id="L219">		sb.append(modifier.getInstructions());</span>
+<span class="fc" id="L220">		Collection&lt;String&gt; assocs = modifier.getAssociationInstructions();</span>
+<span class="pc bpc" id="L221" title="1 of 4 branches missed.">		if (assocs != null &amp;&amp; !assocs.isEmpty())</span>
+		{
+<span class="fc" id="L223">			sb.append(Constants.PIPE);</span>
+<span class="fc" id="L224">			sb.append(StringUtil.join(assocs, Constants.PIPE));</span>
+		}
+<span class="fc" id="L226">		return sb.toString();</span>
+	}
+
+	@Override
+	public Class&lt;VarHolder&gt; getTokenClass()
+	{
+<span class="fc" id="L232">		return VarHolder.class;</span>
+	}
+
+	@Override
+	public Class&lt;VarContainer&gt; getReadInterface()
+	{
+<span class="fc" id="L238">		return VarContainer.class;</span>
+	}
+
+	/**
+	 * Exception to indicate something went wrong in the static processing of the 3
+	 * arguments + associations on a modification token.
+	 */
+	static final class ModifyException extends Exception
+	{
+
+		/**
+		 * Constructs a new ModifyException with the given message
+		 * 
+		 * @param message
+		 *            The message indicating the error encountered
+		 */
+		private ModifyException(String message)
+		{
+<span class="fc" id="L256">			super(message);</span>
+<span class="fc" id="L257">		}</span>
+
+		private ModifyException(String message, Throwable cause)
+		{
+<span class="fc" id="L261">			super(message, cause);</span>
+<span class="fc" id="L262">		}</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

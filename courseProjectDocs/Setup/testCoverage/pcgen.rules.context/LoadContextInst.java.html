@@ -1,0 +1,880 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LoadContextInst.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.rules.context</a> &gt; <span class="el_source">LoadContextInst.java</span></div><h1>LoadContextInst.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007 (C) Tom Parker &lt;thpr@users.sourceforge.net&gt;
+ * 
+ * This library is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This library is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.rules.context;
+
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+import pcgen.base.formula.inst.NEPFormula;
+import pcgen.base.proxy.DeferredMethodController;
+import pcgen.base.text.ParsingSeparator;
+import pcgen.base.util.FormatManager;
+import pcgen.cdom.base.CDOMObject;
+import pcgen.cdom.base.CDOMReference;
+import pcgen.cdom.base.GroupDefinition;
+import pcgen.cdom.base.Loadable;
+import pcgen.cdom.base.PrimitiveCollection;
+import pcgen.cdom.enumeration.DataSetID;
+import pcgen.cdom.facet.DataSetInitializationFacet;
+import pcgen.cdom.facet.FacetInitialization;
+import pcgen.cdom.facet.FacetLibrary;
+import pcgen.cdom.formula.scope.GlobalPCScope;
+import pcgen.cdom.formula.scope.PCGenScope;
+import pcgen.cdom.grouping.GroupingCollection;
+import pcgen.cdom.grouping.GroupingInfo;
+import pcgen.cdom.grouping.GroupingInfoFactory;
+import pcgen.cdom.grouping.GroupingInfoFactory.GroupingStateException;
+import pcgen.cdom.inst.ObjectCache;
+import pcgen.cdom.reference.ReferenceManufacturer;
+import pcgen.cdom.reference.SelectionCreator;
+import pcgen.core.Campaign;
+import pcgen.core.prereq.Prerequisite;
+import pcgen.persistence.PersistenceLayerException;
+import pcgen.persistence.lst.CampaignSourceEntry;
+import pcgen.persistence.lst.output.prereq.PrerequisiteWriter;
+import pcgen.rules.persistence.ChoiceSetLoadUtilities;
+import pcgen.rules.persistence.TokenLibrary;
+import pcgen.rules.persistence.TokenSupport;
+import pcgen.rules.persistence.token.DeferredToken;
+import pcgen.rules.persistence.token.ParseResult;
+import pcgen.rules.persistence.token.PostDeferredToken;
+import pcgen.rules.persistence.token.PostValidationToken;
+import pcgen.util.Logging;
+
+abstract class LoadContextInst implements LoadContext
+{
+
+<span class="fc" id="L67">	private static final PrerequisiteWriter PREREQ_WRITER = new PrerequisiteWriter();</span>
+
+<span class="fc" id="L69">	private final DataSetID datasetID = DataSetID.getID();</span>
+
+	private final AbstractListContext list;
+
+	private final AbstractObjectContext obj;
+
+	private final AbstractReferenceContext ref;
+
+	private final VariableContext var;
+
+<span class="fc" id="L79">	private final List&lt;Campaign&gt; campaignList = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L81">	private int writeMessageCount = 0;</span>
+
+<span class="fc" id="L83">	private final TokenSupport support = new TokenSupport();</span>
+
+<span class="fc" id="L85">	private final List&lt;Object&gt; dontForget = new ArrayList&lt;&gt;();</span>
+
+	/**
+	 * The List of CommitTask objects for this LoadContext.
+	 */
+<span class="fc" id="L90">	private final List&lt;DeferredMethodController&lt;?&gt;&gt; commitTasks = new ArrayList&lt;&gt;();</span>
+
+	//Per file
+	private URI sourceURI;
+
+	//Per file
+	private CDOMObject stateful;
+
+	/**
+	 * The current PCGenScope for this LoadContext.
+	 */
+<span class="fc" id="L101">	private PCGenScope legalScope = null;</span>
+
+	static
+	{
+<span class="fc" id="L105">		FacetInitialization.initialize();</span>
+<span class="fc" id="L106">	}</span>
+
+	public LoadContextInst(AbstractReferenceContext rc, AbstractListContext lc, AbstractObjectContext oc)
+<span class="fc" id="L109">	{</span>
+<span class="fc" id="L110">		Objects.requireNonNull(rc, &quot;ReferenceContext cannot be null&quot;);</span>
+<span class="fc" id="L111">		Objects.requireNonNull(lc, &quot;ListContext cannot be null&quot;);</span>
+<span class="fc" id="L112">		Objects.requireNonNull(oc, &quot;ObjectContext cannot be null&quot;);</span>
+<span class="fc" id="L113">		ref = rc;</span>
+<span class="fc" id="L114">		list = lc;</span>
+<span class="fc" id="L115">		obj = oc;</span>
+<span class="fc" id="L116">		var = new VariableContext(new PCGenManagerFactory(this));</span>
+<span class="fc" id="L117">	}</span>
+
+	@Override
+	public void addWriteMessage(String string)
+	{
+<span class="fc" id="L122">		Logging.errorPrint(&quot;!!&quot; + string);</span>
+		/*
+		 * TODO Need to find a better solution for what happens during write...
+		 */
+<span class="fc" id="L126">		writeMessageCount++;</span>
+<span class="fc" id="L127">	}</span>
+
+	@Override
+	public int getWriteMessageCount()
+	{
+<span class="fc" id="L132">		return writeMessageCount;</span>
+	}
+
+	/**
+	 * Sets the extract URI. This is a shortcut for setting the URI on both the
+	 * graph and obj members.
+	 * 
+	 * @param extractURI
+	 */
+	@Override
+	public void setExtractURI(URI extractURI)
+	{
+<span class="fc" id="L144">		getObjectContext().setExtractURI(extractURI);</span>
+<span class="fc" id="L145">		getReferenceContext().setExtractURI(extractURI);</span>
+<span class="fc" id="L146">		getListContext().setExtractURI(extractURI);</span>
+<span class="fc" id="L147">	}</span>
+
+	/**
+	 * Sets the source URI. This is a shortcut for setting the URI on both the
+	 * graph and obj members.
+	 * 
+	 * @param sourceURI
+	 */
+	@Override
+	public void setSourceURI(URI sourceURI)
+	{
+<span class="fc" id="L158">		this.sourceURI = sourceURI;</span>
+<span class="fc" id="L159">		getObjectContext().setSourceURI(sourceURI);</span>
+<span class="fc" id="L160">		getReferenceContext().setSourceURI(sourceURI);</span>
+<span class="fc" id="L161">		getListContext().setSourceURI(sourceURI);</span>
+<span class="fc" id="L162">		clearStatefulInformation();</span>
+<span class="fc" id="L163">		Logging.debugPrint(&quot;Starting Load of &quot; + sourceURI);</span>
+<span class="fc" id="L164">	}</span>
+
+	@Override
+	public URI getSourceURI()
+	{
+<span class="fc" id="L169">		return sourceURI;</span>
+	}
+
+	/*
+	 * Get the type of context we're running in (either Editor or Runtime)
+	 */
+	public abstract String getContextType();
+
+	@Override
+	public AbstractObjectContext getObjectContext()
+	{
+<span class="fc" id="L180">		return obj;</span>
+	}
+
+	@Override
+	public AbstractListContext getListContext()
+	{
+<span class="fc" id="L186">		return list;</span>
+	}
+
+	@Override
+	public VariableContext getVariableContext()
+	{
+<span class="fc" id="L192">		return var;</span>
+	}
+
+	@Override
+	public void commit()
+	{
+<span class="fc" id="L198">		getListContext().commit();</span>
+<span class="fc" id="L199">		getObjectContext().commit();</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">		for (DeferredMethodController&lt;?&gt; task : commitTasks)</span>
+		{
+<span class="fc" id="L202">			task.run();</span>
+<span class="fc" id="L203">		}</span>
+<span class="fc" id="L204">		commitTasks.clear();</span>
+<span class="fc" id="L205">	}</span>
+
+	@Override
+	public void rollback()
+	{
+<span class="fc" id="L210">		getListContext().rollback();</span>
+<span class="fc" id="L211">		getObjectContext().rollback();</span>
+<span class="fc" id="L212">		commitTasks.clear();</span>
+<span class="fc" id="L213">	}</span>
+
+	@Override
+	public void resolveDeferredTokens()
+	{
+<span class="fc bfc" id="L218" title="All 2 branches covered.">		for (DeferredToken&lt;? extends Loadable&gt; token : support.getDeferredTokens())</span>
+		{
+<span class="fc" id="L220">			processRes(token);</span>
+<span class="fc" id="L221">		}</span>
+<span class="fc" id="L222">		commit();</span>
+<span class="fc" id="L223">	}</span>
+
+	private &lt;T extends Loadable&gt; void processRes(DeferredToken&lt;T&gt; token)
+	{
+<span class="fc" id="L227">		Class&lt;T&gt; cl = token.getDeferredTokenClass();</span>
+<span class="fc" id="L228">		Collection&lt;? extends ReferenceManufacturer&lt;?&gt;&gt; mfgs = getReferenceContext().getAllManufacturers();</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">		for (ReferenceManufacturer&lt;?&gt; rm : mfgs)</span>
+		{
+<span class="fc bfc" id="L231" title="All 2 branches covered.">			if (cl.isAssignableFrom(rm.getReferenceClass()))</span>
+			{
+				@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L234">				ReferenceManufacturer&lt;? extends T&gt; trm = (ReferenceManufacturer&lt;? extends T&gt;) rm;</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">				for (T po : trm.getAllObjects())</span>
+				{
+<span class="fc" id="L237">					token.process(this, po);</span>
+<span class="fc" id="L238">				}</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">				for (T po : trm.getDerivativeObjects())</span>
+				{
+<span class="nc" id="L241">					token.process(this, po);</span>
+<span class="nc" id="L242">				}</span>
+			}
+<span class="fc" id="L244">		}</span>
+<span class="fc" id="L245">	}</span>
+
+	@Override
+	public void resolvePostDeferredTokens()
+	{
+<span class="fc" id="L250">		Collection&lt;? extends ReferenceManufacturer&lt;?&gt;&gt; mfgs = getReferenceContext().getAllManufacturers();</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">		for (PostDeferredToken&lt;? extends Loadable&gt; token : TokenLibrary.getPostDeferredTokens())</span>
+		{
+<span class="fc" id="L253">			processPostRes(token, mfgs);</span>
+<span class="fc" id="L254">		}</span>
+<span class="fc" id="L255">	}</span>
+
+	private &lt;T extends Loadable&gt; void processPostRes(PostDeferredToken&lt;T&gt; token,
+		Collection&lt;? extends ReferenceManufacturer&lt;?&gt;&gt; mfgs)
+	{
+<span class="fc" id="L260">		Class&lt;T&gt; cl = token.getDeferredTokenClass();</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">		for (ReferenceManufacturer&lt;?&gt; rm : mfgs)</span>
+		{
+<span class="fc bfc" id="L263" title="All 2 branches covered.">			if (cl.isAssignableFrom(rm.getReferenceClass()))</span>
+			{
+				@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L266">				ReferenceManufacturer&lt;? extends T&gt; trm = (ReferenceManufacturer&lt;? extends T&gt;) rm;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">				for (T po : trm.getAllObjects())</span>
+				{
+<span class="fc" id="L269">					this.setSourceURI(po.getSourceURI());</span>
+<span class="fc" id="L270">					token.process(this, po);</span>
+<span class="fc" id="L271">				}</span>
+			}
+<span class="fc" id="L273">		}</span>
+<span class="fc" id="L274">	}</span>
+
+	@Override
+	public void resolvePostValidationTokens()
+	{
+<span class="fc" id="L279">		Collection&lt;? extends ReferenceManufacturer&lt;?&gt;&gt; mfgs = getReferenceContext().getAllManufacturers();</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">		for (PostValidationToken&lt;? extends Loadable&gt; token : TokenLibrary.getPostValidationTokens())</span>
+		{
+<span class="fc" id="L282">			processPostVal(token, mfgs);</span>
+<span class="fc" id="L283">		}</span>
+<span class="fc" id="L284">	}</span>
+
+	private &lt;T extends Loadable&gt; void processPostVal(PostValidationToken&lt;T&gt; token,
+		Collection&lt;? extends ReferenceManufacturer&gt; mfgs)
+	{
+<span class="fc" id="L289">		Class&lt;T&gt; cl = token.getValidationTokenClass();</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">		for (ReferenceManufacturer&lt;? extends T&gt; rm : mfgs)</span>
+		{
+<span class="fc bfc" id="L292" title="All 2 branches covered.">			if (cl.isAssignableFrom(rm.getReferenceClass()))</span>
+			{
+<span class="fc" id="L294">				setSourceURI(null);</span>
+<span class="fc" id="L295">				token.process(this, rm.getAllObjects());</span>
+			}
+<span class="fc" id="L297">		}</span>
+<span class="fc" id="L298">	}</span>
+
+	@Override
+	public &lt;T extends CDOMObject&gt; PrimitiveCollection&lt;T&gt; getChoiceSet(SelectionCreator&lt;T&gt; sc, String value)
+	{
+		try
+		{
+<span class="fc" id="L305">			return ChoiceSetLoadUtilities.getChoiceSet(this, sc, value);</span>
+		}
+<span class="fc" id="L307">		catch (ParsingSeparator.GroupingMismatchException e)</span>
+		{
+<span class="fc" id="L309">			Logging.errorPrint(&quot;Group Mismatch in getting ChoiceSet: &quot; + e.getMessage());</span>
+<span class="fc" id="L310">			return null;</span>
+		}
+	}
+
+	@Override
+	public &lt;T extends CDOMObject&gt; PrimitiveCollection&lt;T&gt; getPrimitiveChoiceFilter(SelectionCreator&lt;T&gt; sc, String key)
+	{
+<span class="fc" id="L317">		return ChoiceSetLoadUtilities.getPrimitive(this, sc, key);</span>
+	}
+
+	@Override
+	public &lt;T&gt; ParseResult processSubToken(T cdo, String tokenName, String key, String value)
+	{
+<span class="fc" id="L323">		return support.processSubToken(this, cdo, tokenName, key, value);</span>
+	}
+
+	@Override
+	public &lt;T extends Loadable&gt; boolean processToken(T derivative, String typeStr, String argument)
+	{
+<span class="fc" id="L329">		return support.processToken(this, derivative, typeStr, argument);</span>
+	}
+
+	@Override
+	public &lt;T extends Loadable&gt; void unconditionallyProcess(T cdo, String key, String value)
+	{
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">		if (processToken(cdo, key, value))</span>
+		{
+<span class="fc" id="L337">			commit();</span>
+		}
+		else
+		{
+<span class="nc" id="L341">			rollback();</span>
+<span class="nc" id="L342">			Logging.replayParsedMessages();</span>
+		}
+<span class="fc" id="L344">		Logging.clearParseMessages();</span>
+<span class="fc" id="L345">	}</span>
+
+	/**
+	 * Produce the LST code for any occurrences of subtokens of the parent token.
+	 *  
+	 * @param &lt;T&gt; The type of object to be processed, generally a CDOMObject.
+	 * @param cdo The object to be partially unparsed
+	 * @param tokenName The name of the parent token
+	 * @return An array of LST code 'fields' all of which are subtokens of the parent token.
+	 */
+	@Override
+	public &lt;T&gt; String[] unparseSubtoken(T cdo, String tokenName)
+	{
+<span class="fc" id="L358">		return support.unparseSubtoken(this, cdo, tokenName);</span>
+	}
+
+	@Override
+	public &lt;T extends Loadable&gt; Collection&lt;String&gt; unparse(T cdo)
+	{
+<span class="fc" id="L364">		return support.unparse(this, cdo);</span>
+	}
+
+	@Override
+	public &lt;T extends CDOMObject&gt; T cloneConstructedCDOMObject(T cdo, String newName)
+	{
+<span class="nc" id="L370">		T newObj = getObjectContext().cloneConstructedCDOMObject(cdo, newName);</span>
+<span class="nc" id="L371">		getReferenceContext().importObject(newObj);</span>
+<span class="nc" id="L372">		return newObj;</span>
+	}
+
+	/**
+	 * Create a copy of a CDOMObject duplicating any references to the old 
+	 * object. (e.g. Spell, Domain etc)
+	 * 
+	 * Package protected rather than private for testing only
+	 *  
+	 * @param cdo The original object being copied. 
+	 * @param newName The name that should be given to the new object.
+	 * @return The newly created CDOMObject.
+	 */
+	@SuppressWarnings(&quot;unchecked&quot;)
+	&lt;T extends CDOMObject&gt; T cloneInMasterLists(T cdo, String newName)
+	{
+		T newObj;
+		try
+		{
+<span class="nc" id="L391">			newObj = (T) cdo.clone();</span>
+<span class="nc" id="L392">			newObj.setName(newName);</span>
+<span class="nc" id="L393">			getListContext().cloneInMasterLists(cdo, newObj);</span>
+		}
+<span class="nc" id="L395">		catch (CloneNotSupportedException e)</span>
+		{
+<span class="nc" id="L397">			Logging.errorPrint(&quot;Failed to clone &quot; + cdo, e);</span>
+<span class="nc" id="L398">			return null;</span>
+<span class="nc" id="L399">		}</span>
+<span class="nc" id="L400">		return newObj;</span>
+	}
+
+	@Override
+	public String getPrerequisiteString(Collection&lt;Prerequisite&gt; prereqs)
+	{
+		try
+		{
+<span class="fc" id="L408">			return PREREQ_WRITER.getPrerequisiteString(prereqs);</span>
+		}
+<span class="nc" id="L410">		catch (PersistenceLayerException e)</span>
+		{
+<span class="nc" id="L412">			addWriteMessage(&quot;Error writing Prerequisite: &quot; + e);</span>
+<span class="nc" id="L413">			return null;</span>
+		}
+	}
+
+	@Override
+	public CampaignSourceEntry getCampaignSourceEntry(Campaign source, String value)
+	{
+<span class="fc" id="L420">		return CampaignSourceEntry.getNewCSE(source, sourceURI, value);</span>
+	}
+
+	@Override
+	public void clearStatefulInformation()
+	{
+<span class="fc" id="L426">		stateful = null;</span>
+<span class="fc" id="L427">	}</span>
+
+	@Override
+	public boolean addStatefulToken(String s)
+	{
+<span class="nc" id="L432">		int colonLoc = s.indexOf(':');</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">		if (colonLoc == -1)</span>
+		{
+<span class="nc" id="L435">			Logging.errorPrint(&quot;Found invalid stateful token: &quot; + s);</span>
+<span class="nc" id="L436">			return false;</span>
+		}
+<span class="nc bnc" id="L438" title="All 2 branches missed.">		if (stateful == null)</span>
+		{
+<span class="nc" id="L440">			stateful = new ObjectCache();</span>
+		}
+<span class="nc" id="L442">		return processToken(stateful, s.substring(0, colonLoc), s.substring(colonLoc + 1));</span>
+	}
+
+	@Override
+	public void addStatefulInformation(CDOMObject target)
+	{
+<span class="nc bnc" id="L448" title="All 2 branches missed.">		if (stateful != null)</span>
+		{
+<span class="nc" id="L450">			target.overlayCDOMObject(stateful);</span>
+		}
+<span class="nc" id="L452">	}</span>
+
+	@Override
+	public void setLoaded(List&lt;Campaign&gt; campaigns)
+	{
+<span class="nc" id="L457">		campaignList.clear();</span>
+<span class="nc" id="L458">		campaignList.addAll(campaigns);</span>
+<span class="nc" id="L459">	}</span>
+
+	@Override
+	public abstract boolean consolidate();
+
+	@Override
+	public DataSetID getDataSetID()
+	{
+<span class="fc" id="L467">		return datasetID;</span>
+	}
+
+	@Override
+	public void loadCampaignFacets()
+	{
+<span class="fc" id="L473">		FacetLibrary.getFacet(DataSetInitializationFacet.class).initialize(this);</span>
+<span class="fc" id="L474">	}</span>
+
+	@Override
+	public void forgetMeNot(CDOMReference&lt;?&gt; cdr)
+	{
+<span class="nc" id="L479">		dontForget.add(cdr);</span>
+<span class="nc" id="L480">	}</span>
+
+	@Override
+	public AbstractReferenceContext getReferenceContext()
+	{
+<span class="fc" id="L485">		return ref;</span>
+	}
+
+	@Override
+	public List&lt;Campaign&gt; getLoadedCampaigns()
+	{
+<span class="fc" id="L491">		return Collections.unmodifiableList(campaignList);</span>
+	}
+
+	@Override
+	public ReferenceManufacturer&lt;? extends Loadable&gt; getManufacturer(String firstToken)
+	{
+<span class="fc" id="L497">		return ReferenceContextUtilities.getManufacturer(getReferenceContext(), firstToken);</span>
+	}
+
+	@Override
+	public &lt;T extends CDOMObject&gt; T performCopy(T object, String copyName)
+	{
+<span class="nc" id="L503">		T copy = ref.performCopy(object, copyName);</span>
+<span class="nc" id="L504">		list.cloneInMasterLists(object, copy);</span>
+<span class="nc" id="L505">		return copy;</span>
+	}
+
+	@Override
+	public void loadLocalToken(Object token)
+	{
+<span class="fc" id="L511">		support.loadLocalToken(token);</span>
+<span class="fc" id="L512">	}</span>
+
+	@Override
+	public &lt;T&gt; GroupDefinition&lt;T&gt; getGroup(Class&lt;T&gt; cl, String s)
+	{
+<span class="fc" id="L517">		return support.getGroup(cl, s);</span>
+	}
+
+	@Override
+	public PCGenScope getActiveScope()
+	{
+<span class="fc bfc" id="L523" title="All 2 branches covered.">		if (legalScope == null)</span>
+		{
+<span class="fc" id="L525">			legalScope = var.getScope(GlobalPCScope.GLOBAL_SCOPE_NAME);</span>
+		}
+<span class="fc" id="L527">		return legalScope;</span>
+	}
+
+	@Override
+	public LoadContext dropIntoContext(String scope)
+	{
+<span class="fc" id="L533">		PCGenScope subScope = var.getScope(scope);</span>
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">		if (subScope == null)</span>
+		{
+<span class="nc" id="L536">			throw new IllegalArgumentException(&quot;LegalVariableScope &quot; + scope + &quot; does not exist&quot;);</span>
+		}
+<span class="fc" id="L538">		return dropIntoContext(subScope);</span>
+	}
+
+	@Override
+	public void addDeferredMethodController(DeferredMethodController&lt;?&gt; commitTask)
+	{
+<span class="fc" id="L544">		commitTasks.add(commitTask);</span>
+<span class="fc" id="L545">	}</span>
+
+	private LoadContext dropIntoContext(PCGenScope lvs)
+	{
+<span class="fc" id="L549">		Optional&lt;PCGenScope&gt; parent = lvs.getParentScope();</span>
+<span class="fc bfc" id="L550" title="All 2 branches covered.">		if (!parent.isPresent())</span>
+		{
+			//is Global
+<span class="fc" id="L553">			return this;</span>
+		}
+<span class="fc" id="L555">		LoadContext parentLC = dropIntoContext(parent.get());</span>
+<span class="fc" id="L556">		return new DerivedLoadContext(parentLC, lvs);</span>
+	}
+
+	@Override
+	public &lt;T&gt; NEPFormula&lt;T&gt; getValidFormula(FormatManager&lt;T&gt; formatManager, String instructions)
+	{
+<span class="nc" id="L562">		return var.getValidFormula(getActiveScope(), formatManager, instructions);</span>
+	}
+
+	@Override
+	public GroupingCollection&lt;?&gt; getGrouping(PCGenScope scope, String groupingName)
+	{
+		try
+		{
+<span class="fc" id="L570">			GroupingInfo&lt;?&gt; info = new GroupingInfoFactory().process(scope, groupingName);</span>
+<span class="fc" id="L571">			return ChoiceSetLoadUtilities.getDynamicGroup(this, info);</span>
+		}
+<span class="nc" id="L573">		catch (GroupingStateException e)</span>
+		{
+<span class="nc" id="L575">			Logging.errorPrint(&quot;Error in parsing Group: &quot; + e.getMessage());</span>
+<span class="nc" id="L576">			return null;</span>
+		}
+	}
+
+	/**
+	 * A DerivedLoadContext holds an inner scope, but serves the same functions (via
+	 * delegation) as the original parent.
+	 */
+	private class DerivedLoadContext implements LoadContext
+	{
+
+		/**
+		 * The parent LoadContext for this DerivedLoadContext
+		 */
+		private final LoadContext parent;
+
+		/**
+		 * The derived Scope for this DerivedLoadContext
+		 */
+		private final PCGenScope derivedScope;
+
+		/**
+		 * Constructs a new LoadContext derived from the given LoadContext
+		 */
+		public DerivedLoadContext(LoadContext parent, PCGenScope scope)
+<span class="fc" id="L601">		{</span>
+<span class="fc" id="L602">			this.derivedScope = scope;</span>
+<span class="fc" id="L603">			this.parent = parent;</span>
+<span class="fc" id="L604">		}</span>
+
+		@Override
+		public void setExtractURI(URI extractURI)
+		{
+<span class="nc" id="L609">			parent.setExtractURI(extractURI);</span>
+<span class="nc" id="L610">		}</span>
+
+		@Override
+		public void setSourceURI(URI sourceURI)
+		{
+<span class="nc" id="L615">			parent.setSourceURI(sourceURI);</span>
+<span class="nc" id="L616">		}</span>
+
+		@Override
+		public URI getSourceURI()
+		{
+<span class="nc" id="L621">			return parent.getSourceURI();</span>
+		}
+
+		@Override
+		public DataSetID getDataSetID()
+		{
+<span class="nc" id="L627">			return parent.getDataSetID();</span>
+		}
+
+		@Override
+		public AbstractReferenceContext getReferenceContext()
+		{
+<span class="nc" id="L633">			return parent.getReferenceContext();</span>
+		}
+
+		@Override
+		public AbstractObjectContext getObjectContext()
+		{
+<span class="nc" id="L639">			return parent.getObjectContext();</span>
+		}
+
+		@Override
+		public AbstractListContext getListContext()
+		{
+<span class="nc" id="L645">			return parent.getListContext();</span>
+		}
+
+		@Override
+		public boolean consolidate()
+		{
+<span class="nc" id="L651">			return parent.consolidate();</span>
+		}
+
+		@Override
+		public VariableContext getVariableContext()
+		{
+<span class="fc" id="L657">			return parent.getVariableContext();</span>
+		}
+
+		@Override
+		public void commit()
+		{
+<span class="nc" id="L663">			parent.commit();</span>
+<span class="nc" id="L664">		}</span>
+
+		@Override
+		public void rollback()
+		{
+<span class="nc" id="L669">			parent.rollback();</span>
+<span class="nc" id="L670">		}</span>
+
+		@Override
+		public void resolveDeferredTokens()
+		{
+<span class="nc" id="L675">			parent.resolveDeferredTokens();</span>
+<span class="nc" id="L676">		}</span>
+
+		@Override
+		public void resolvePostDeferredTokens()
+		{
+<span class="nc" id="L681">			parent.resolvePostDeferredTokens();</span>
+<span class="nc" id="L682">		}</span>
+
+		@Override
+		public &lt;T extends CDOMObject&gt; PrimitiveCollection&lt;T&gt; getChoiceSet(SelectionCreator&lt;T&gt; sc, String value)
+		{
+<span class="nc" id="L687">			return parent.getChoiceSet(sc, value);</span>
+		}
+
+		@Override
+		public &lt;T extends CDOMObject&gt; PrimitiveCollection&lt;T&gt; getPrimitiveChoiceFilter(SelectionCreator&lt;T&gt; sc,
+			String key)
+		{
+<span class="nc" id="L694">			return parent.getPrimitiveChoiceFilter(sc, key);</span>
+		}
+
+		@Override
+		public String getPrerequisiteString(Collection&lt;Prerequisite&gt; prereqs)
+		{
+<span class="nc" id="L700">			return parent.getPrerequisiteString(prereqs);</span>
+		}
+
+		@Override
+		public ReferenceManufacturer&lt;? extends Loadable&gt; getManufacturer(String firstToken)
+		{
+<span class="nc" id="L706">			return parent.getManufacturer(firstToken);</span>
+		}
+
+		@Override
+		public void forgetMeNot(CDOMReference&lt;?&gt; cdr)
+		{
+<span class="nc" id="L712">			parent.forgetMeNot(cdr);</span>
+<span class="nc" id="L713">		}</span>
+
+		@Override
+		public &lt;T extends CDOMObject&gt; T cloneConstructedCDOMObject(T cdo, String newName)
+		{
+<span class="nc" id="L718">			return parent.cloneConstructedCDOMObject(cdo, newName);</span>
+		}
+
+		@Override
+		public CampaignSourceEntry getCampaignSourceEntry(Campaign source, String value)
+		{
+<span class="nc" id="L724">			return parent.getCampaignSourceEntry(source, value);</span>
+		}
+
+		@Override
+		public void clearStatefulInformation()
+		{
+<span class="nc" id="L730">			parent.clearStatefulInformation();</span>
+<span class="nc" id="L731">		}</span>
+
+		@Override
+		public boolean addStatefulToken(String s) throws PersistenceLayerException
+		{
+<span class="nc" id="L736">			return parent.addStatefulToken(s);</span>
+		}
+
+		@Override
+		public void addStatefulInformation(CDOMObject target)
+		{
+<span class="nc" id="L742">			parent.addStatefulInformation(target);</span>
+<span class="nc" id="L743">		}</span>
+
+		@Override
+		public void setLoaded(List&lt;Campaign&gt; campaigns)
+		{
+<span class="nc" id="L748">			parent.setLoaded(campaigns);</span>
+<span class="nc" id="L749">		}</span>
+
+		@Override
+		public List&lt;Campaign&gt; getLoadedCampaigns()
+		{
+<span class="nc" id="L754">			return parent.getLoadedCampaigns();</span>
+		}
+
+		@Override
+		public void loadCampaignFacets()
+		{
+<span class="nc" id="L760">			parent.loadCampaignFacets();</span>
+<span class="nc" id="L761">		}</span>
+
+		@Override
+		public &lt;T extends CDOMObject&gt; T performCopy(T object, String copyName)
+		{
+<span class="nc" id="L766">			return parent.performCopy(object, copyName);</span>
+		}
+
+		@Override
+		public &lt;T&gt; ParseResult processSubToken(T cdo, String tokenName, String key, String value)
+		{
+<span class="nc" id="L772">			return support.processSubToken(this, cdo, tokenName, key, value);</span>
+		}
+
+		@Override
+		public &lt;T extends Loadable&gt; boolean processToken(T derivative, String typeStr, String argument)
+		{
+<span class="nc" id="L778">			return support.processToken(this, derivative, typeStr, argument);</span>
+		}
+
+		@Override
+		public &lt;T extends Loadable&gt; void unconditionallyProcess(T cdo, String key, String value)
+		{
+<span class="nc" id="L784">			parent.unconditionallyProcess(cdo, key, value);</span>
+<span class="nc" id="L785">		}</span>
+
+		@Override
+		public &lt;T&gt; String[] unparseSubtoken(T cdo, String tokenName)
+		{
+<span class="nc" id="L790">			return support.unparseSubtoken(this, cdo, tokenName);</span>
+		}
+
+		@Override
+		public &lt;T extends Loadable&gt; Collection&lt;String&gt; unparse(T cdo)
+		{
+<span class="nc" id="L796">			return support.unparse(this, cdo);</span>
+		}
+
+		@Override
+		public void addWriteMessage(String string)
+		{
+<span class="nc" id="L802">			parent.addWriteMessage(string);</span>
+<span class="nc" id="L803">		}</span>
+
+		@Override
+		public int getWriteMessageCount()
+		{
+<span class="nc" id="L808">			return parent.getWriteMessageCount();</span>
+		}
+
+		@Override
+		public PCGenScope getActiveScope()
+		{
+<span class="fc" id="L814">			return derivedScope;</span>
+		}
+
+		@Override
+		public LoadContext dropIntoContext(String scope)
+		{
+<span class="nc" id="L820">			PCGenScope toScope = var.getScope(scope);</span>
+<span class="nc bnc" id="L821" title="All 2 branches missed.">			if (toScope == null)</span>
+			{
+<span class="nc" id="L823">				throw new IllegalArgumentException(&quot;LegalVariableScope &quot; + scope + &quot; does not exist&quot;);</span>
+			}
+<span class="nc bnc" id="L825" title="All 2 branches missed.">			if (derivedScope.equals(toScope))</span>
+			{
+<span class="nc" id="L827">				return this;</span>
+			}
+<span class="nc bnc" id="L829" title="All 2 branches missed.">			else if (!toScope.getParentScope().isPresent())</span>
+			{
+				//No parent is global
+<span class="nc" id="L832">				return parent;</span>
+			}
+<span class="nc bnc" id="L834" title="All 2 branches missed.">			else if (toScope.getParentScope().get().equals(derivedScope))</span>
+			{
+				//Direct drop from this
+<span class="nc" id="L837">				return new DerivedLoadContext(this, toScope);</span>
+			}
+			//Random jump to somewhere else...
+<span class="nc" id="L840">			return LoadContextInst.this.dropIntoContext(toScope);</span>
+		}
+
+		@Override
+		public void loadLocalToken(Object token)
+		{
+<span class="nc" id="L846">			parent.loadLocalToken(token);</span>
+<span class="nc" id="L847">		}</span>
+
+		@Override
+		public &lt;T&gt; GroupDefinition&lt;T&gt; getGroup(Class&lt;T&gt; cl, String s)
+		{
+<span class="nc" id="L852">			return parent.getGroup(cl, s);</span>
+		}
+
+		@Override
+		public void resolvePostValidationTokens()
+		{
+<span class="nc" id="L858">			parent.resolvePostValidationTokens();</span>
+<span class="nc" id="L859">		}</span>
+
+		@Override
+		public &lt;T&gt; NEPFormula&lt;T&gt; getValidFormula(FormatManager&lt;T&gt; formatManager, String instructions)
+		{
+<span class="nc" id="L864">			return parent.getValidFormula(formatManager, instructions);</span>
+		}
+
+		@Override
+		public void addDeferredMethodController(DeferredMethodController&lt;?&gt; controller)
+		{
+<span class="nc" id="L870">			parent.addDeferredMethodController(controller);</span>
+<span class="nc" id="L871">		}</span>
+
+		@Override
+		public GroupingCollection&lt;?&gt; getGrouping(PCGenScope scope, String groupingName)
+		{
+<span class="fc" id="L876">			return parent.getGrouping(scope, groupingName);</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

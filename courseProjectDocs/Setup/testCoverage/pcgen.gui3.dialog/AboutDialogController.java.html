@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AboutDialogController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui3.dialog</a> &gt; <span class="el_source">AboutDialogController.java</span></div><h1>AboutDialogController.java</h1><pre class="source lang-java linenums">/* * Copyright 2019 (C) Eitan Adler &lt;lists@eitanadler.com&gt;
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.     See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+
+package pcgen.gui3.dialog;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+import pcgen.gui2.tools.DesktopBrowserLauncher;
+import pcgen.system.LanguageBundle;
+import pcgen.system.PCGenPropBundle;
+import pcgen.util.Logging;
+
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.Labeled;
+import javafx.scene.control.TextArea;
+import javafx.scene.text.Text;
+import org.apache.commons.lang3.StringUtils;
+
+/**
+ * Controller for about panel.
+ * Much of this logic can be removed and replaced with property references
+ * if we build our property bundles correctly.
+ */
+<span class="fc" id="L44">public class AboutDialogController</span>
+{
+	@FXML
+	private TextArea licenseArea;
+	@FXML
+	private Button mailingList;
+	@FXML
+	private Button wwwSite;
+	@FXML
+	private TextArea monkeyList_code;
+	@FXML
+	private TextArea monkeyList_list;
+	@FXML
+	private TextArea monkeyList_test;
+	@FXML
+	private TextArea monkeyList_eng;
+	@FXML
+	private Text projectLead;
+	@FXML
+	private Text javaVersion;
+	@FXML
+	private TextArea librariesArea;
+	@FXML
+	private Text releaseDate;
+	@FXML
+	private Text pcgenVersion;
+
+	private void initLicenseArea()
+	{
+<span class="fc" id="L73">		URL lgpl = getClass().getResource(&quot;LICENSE&quot;); //$NON-NLS-1$</span>
+
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">		if (lgpl != null)</span>
+		{
+			try
+			{
+<span class="nc" id="L79">				licenseArea.setText(Files.readString(Paths.get(lgpl.getPath())));</span>
+			}
+<span class="nc" id="L81">			catch (IOException ioe)</span>
+			{
+<span class="nc" id="L83">				Logging.errorPrint(&quot;lgpl is not null but error occurred&quot;, ioe);</span>
+<span class="nc" id="L84">				licenseArea.setText(LanguageBundle.getString(&quot;in_abt_license_read_err1&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L85">			}</span>
+		}
+		else
+		{
+<span class="fc" id="L89">			Logging.errorPrint(&quot;lgpl is null&quot;);</span>
+<span class="fc" id="L90">			licenseArea.setText(LanguageBundle.getString(&quot;in_abt_license_read_err2&quot;)); //$NON-NLS-1$</span>
+		}
+<span class="fc" id="L92">	}</span>
+
+	/**
+	 * Utility method opens a textual URI in a browser
+	 * @param uri String that can be converted to a URI
+	 */
+	private static void openUriInBrowser(String uri)
+	{
+		try
+		{
+<span class="nc" id="L102">			DesktopBrowserLauncher.viewInBrowser(URI.create(uri));</span>
+<span class="nc" id="L103">		} catch (IOException ioe)</span>
+		{
+<span class="nc" id="L105">			Logging.errorPrint(LanguageBundle.getString(&quot;in_err_browser_err&quot;), ioe); //$NON-NLS-1$</span>
+<span class="nc" id="L106">		}</span>
+<span class="nc" id="L107">	}</span>
+
+	private void initButtons()
+	{
+<span class="fc" id="L111">		this.mailingList.setText(PCGenPropBundle.getMailingList());</span>
+<span class="fc" id="L112">		this.wwwSite.setText(PCGenPropBundle.getWWWHome());</span>
+<span class="fc" id="L113">	}</span>
+
+	private void initMonkies()
+	{
+<span class="fc" id="L117">		monkeyList_code.setText(PCGenPropBundle.getCodeMonkeys());</span>
+<span class="fc" id="L118">		monkeyList_list.setText(PCGenPropBundle.getListMonkeys());</span>
+<span class="fc" id="L119">		monkeyList_test.setText(PCGenPropBundle.getTestMonkeys());</span>
+<span class="fc" id="L120">		monkeyList_eng.setText(PCGenPropBundle.getEngineeringMonkeys());</span>
+<span class="fc" id="L121">	}</span>
+
+	private void initText()
+	{
+<span class="fc" id="L125">		projectLead.setText(PCGenPropBundle.getHeadCodeMonkey());</span>
+<span class="fc" id="L126">		javaVersion</span>
+<span class="fc" id="L127">				.setText(String.format(</span>
+						&quot;%s (%s)&quot;,
+<span class="fc" id="L129">						System.getProperty(&quot;java.runtime.version&quot;),</span>
+<span class="fc" id="L130">						System.getProperty(&quot;java.vm.vendor&quot;)</span>
+				));
+
+<span class="fc" id="L133">		String s = LanguageBundle.getString(&quot;in_abt_lib_apache&quot;); //$NON-NLS-1$</span>
+<span class="fc" id="L134">		s += LanguageBundle.getString(&quot;in_abt_lib_jdom&quot;); //$NON-NLS-1$</span>
+<span class="fc" id="L135">		librariesArea.setText(s);</span>
+
+<span class="fc" id="L137">		String releaseDateStr = PCGenPropBundle.getReleaseDate();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">		if (StringUtils.isNotBlank(PCGenPropBundle.getAutobuildDate()))</span>
+		{
+<span class="nc" id="L140">			releaseDateStr = PCGenPropBundle.getAutobuildDate();</span>
+		}
+<span class="fc" id="L142">		releaseDate.setText(releaseDateStr);</span>
+
+<span class="fc" id="L144">		String versionNum = PCGenPropBundle.getVersionNumber();</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">		if (StringUtils.isNotBlank(PCGenPropBundle.getAutobuildNumber()))</span>
+		{
+<span class="nc" id="L147">			versionNum += &quot; autobuild #&quot; + PCGenPropBundle.getAutobuildNumber();</span>
+		}
+<span class="fc" id="L149">		pcgenVersion.setText(versionNum);</span>
+
+<span class="fc" id="L151">	}</span>
+
+	@FXML
+	void initialize()
+	{
+<span class="fc" id="L156">		initText();</span>
+<span class="fc" id="L157">		initMonkies();</span>
+<span class="fc" id="L158">		initButtons();</span>
+<span class="fc" id="L159">		initLicenseArea();</span>
+<span class="fc" id="L160">	}</span>
+
+	@FXML
+	private void openInBrowser(final ActionEvent actionEvent)
+	{
+<span class="nc" id="L165">		Labeled source = (Button) actionEvent.getSource();</span>
+<span class="nc" id="L166">		openUriInBrowser(source.getText());</span>
+<span class="nc" id="L167">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BatchExporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.system</a> &gt; <span class="el_source">BatchExporter.java</span></div><h1>BatchExporter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright James Dempsey, 2012
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
+ *
+ */
+package pcgen.system;
+
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+
+import pcgen.cdom.base.Constants;
+import pcgen.core.SettingsHandler;
+import pcgen.core.utils.MessageType;
+import pcgen.core.utils.ShowMessageDelegate;
+import pcgen.facade.core.CharacterFacade;
+import pcgen.facade.core.PartyFacade;
+import pcgen.facade.core.SourceSelectionFacade;
+import pcgen.facade.core.UIDelegate;
+import pcgen.gui2.UIPropertyContext;
+import pcgen.io.ExportException;
+import pcgen.io.ExportHandler;
+import pcgen.io.ExportUtilities;
+import pcgen.io.PCGFile;
+import pcgen.persistence.SourceFileLoader;
+import pcgen.util.Logging;
+import pcgen.util.fop.FopTask;
+
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.output.TeeOutputStream;
+import org.apache.commons.lang3.StringUtils;
+
+/**
+ * The Class {@code BatchExporter} manages character sheet output to a
+ * file. It is capable of outputting either a single character or a party 
+ * to an output file based on a suitable export template.
+ * &lt;p&gt;
+ * BatchExporter is intended to be used for both batch export of characters 
+ * and as a library for other code to easily provide output capability. When
+ * used in batch mode an instance should be created for the template and 
+ * one of the export methods called. When used as a library the static methods
+ * should be used and supplied with preloaded characters.  
+ *
+ * 
+ */
+public class BatchExporter
+{
+
+	private final String exportTemplateFilename;
+	private final UIDelegate uiDelegate;
+	private final boolean isPdf;
+
+	/**
+	 * Create a new instance of BatchExporter for use with a particular export
+	 * template.
+	 *   
+	 * @param exportTemplateFilename The path to the export template.
+	 * @param uiDelegate The object through which to report any issues to the user.
+	 */
+	BatchExporter(String exportTemplateFilename, UIDelegate uiDelegate)
+<span class="nc" id="L84">	{</span>
+<span class="nc" id="L85">		this.exportTemplateFilename = exportTemplateFilename;</span>
+<span class="nc" id="L86">		this.uiDelegate = uiDelegate;</span>
+
+<span class="nc" id="L88">		isPdf = ExportUtilities.isPdfTemplate(exportTemplateFilename);</span>
+<span class="nc" id="L89">	}</span>
+
+	/**
+	 * Export a character sheet for the character to the output file using the 
+	 * pre-registered template. If the output file is null then a default file 
+	 * will be used based on the character file name and the type of export 
+	 * template in use. If the output file exists it will be overwritten.
+	 * &lt;p&gt;
+	 * This method will load the required data for the character, load the 
+	 * character and then export the character sheet.
+	 * 
+	 * @param characterFilename The path to the character PCG file.
+	 * @param outputFile The path to the output file to be created. May be null.
+	 * @return true if the export was successful, false if it failed in some way.
+	 */
+	boolean exportCharacter(String characterFilename, String outputFile)
+	{
+<span class="nc" id="L106">		File file = new File(characterFilename);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">		if (!PCGFile.isPCGenCharacterFile(file))</span>
+		{
+<span class="nc" id="L109">			Logging.errorPrint(&quot;Invalid character file specified: &quot; + file.getAbsolutePath());</span>
+<span class="nc" id="L110">			return false;</span>
+		}
+<span class="nc" id="L112">		String outFilename = outputFile;</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">		if (outFilename == null)</span>
+		{
+<span class="nc" id="L115">			outFilename = generateOutputFilename(characterFilename);</span>
+		}
+<span class="nc" id="L117">		Logging.log(Logging.INFO,</span>
+<span class="nc" id="L118">			&quot;Started export of &quot; + file.getAbsolutePath() + &quot; using &quot; + exportTemplateFilename + &quot; to &quot; + outFilename);</span>
+
+		// Load data
+<span class="nc" id="L121">		SourceSelectionFacade sourcesForCharacter = CharacterManager.getRequiredSourcesForCharacter(file, uiDelegate);</span>
+<span class="nc" id="L122">		Logging.log(Logging.INFO, &quot;Loading sources &quot; + sourcesForCharacter.getCampaigns() + &quot; using game mode &quot;</span>
+<span class="nc" id="L123">			+ sourcesForCharacter.getGameMode());</span>
+<span class="nc" id="L124">		SourceFileLoader loader = new SourceFileLoader(uiDelegate, sourcesForCharacter.getCampaigns(), sourcesForCharacter.getGameMode().get().getName());</span>
+<span class="nc" id="L125">		loader.run();</span>
+
+		// Load character
+<span class="nc" id="L128">		CharacterFacade character = CharacterManager.openCharacter(file, uiDelegate, loader.getDataSetFacade());</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">		if (character == null)</span>
+		{
+<span class="nc" id="L131">			return false;</span>
+		}
+
+		// Export character
+<span class="nc" id="L135">		File templateFile = new File(exportTemplateFilename);</span>
+<span class="nc" id="L136">		File outFile = new File(outFilename);</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">		if (isPdf)</span>
+		{
+<span class="nc" id="L139">			return exportCharacterToPDF(character, outFile, templateFile);</span>
+		}
+		else
+		{
+<span class="nc" id="L143">			return exportCharacterToNonPDF(character, outFile, templateFile);</span>
+		}
+	}
+
+	/**
+	 * Export a party sheet for the party to the output file using the 
+	 * pre-registered template. If the output file is null then a default file 
+	 * will be used based on the party file name and the type of export 
+	 * template in use. If the output file exists it will be overwritten.
+	 * &lt;p&gt;
+	 * This method will load the required data for the party, load the characters 
+	 * in the party and then export the party sheet.
+	 * 
+	 * @param partyFilename The path to the party PCP file.
+	 * @param outputFile The path to the output file to be created. May be null.
+	 * @return true if the export was successful, false if it failed in some way.
+	 */
+	boolean exportParty(String partyFilename, String outputFile)
+	{
+<span class="nc" id="L162">		File file = new File(partyFilename);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">		if (!PCGFile.isPCGenPartyFile(file))</span>
+		{
+<span class="nc" id="L165">			Logging.errorPrint(&quot;Invalid party file specified: &quot; + file.getAbsolutePath());</span>
+<span class="nc" id="L166">			return false;</span>
+		}
+<span class="nc" id="L168">		String outFilename = outputFile;</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">		if (outFilename == null)</span>
+		{
+<span class="nc" id="L171">			outFilename = generateOutputFilename(partyFilename);</span>
+		}
+<span class="nc" id="L173">		Logging.log(Logging.INFO, &quot;Started export of party &quot; + file.getAbsolutePath() + &quot; using &quot;</span>
+			+ exportTemplateFilename + &quot; to &quot; + outFilename);
+
+		// Load data
+<span class="nc" id="L177">		SourceSelectionFacade sourcesForCharacter = CharacterManager.getRequiredSourcesForParty(file, uiDelegate);</span>
+<span class="nc" id="L178">		SourceFileLoader loader = new SourceFileLoader(uiDelegate, sourcesForCharacter.getCampaigns(), sourcesForCharacter.getGameMode().get().getName());</span>
+<span class="nc" id="L179">		loader.run();</span>
+
+		// Load party
+<span class="nc" id="L182">		PartyFacade party = CharacterManager.openParty(file, uiDelegate, loader.getDataSetFacade());</span>
+
+		// Export party
+<span class="nc" id="L185">		File templateFile = new File(exportTemplateFilename);</span>
+<span class="nc" id="L186">		File outFile = new File(outFilename);</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">		if (isPdf)</span>
+		{
+<span class="nc" id="L189">			return exportPartyToPDF(party, outFile, templateFile);</span>
+		}
+		else
+		{
+<span class="nc" id="L193">			return exportPartyToNonPDF(party, outFile, templateFile);</span>
+		}
+	}
+
+	/**
+	 * Write a PDF character sheet for the character to the output file. The 
+	 * character sheet will be built according to the template file. If the 
+	 * output file exists it will be overwritten.
+	 *    
+	 * @param character The already loaded character to be output.
+	 * @param outFile The file to which the character sheet is to be written. 
+	 * @param templateFile The file that has the export template definition.  
+	 * @return true if the export was successful, false if it failed in some way.
+	 */
+	public static boolean exportCharacterToPDF(CharacterFacade character, File outFile, File templateFile)
+	{
+
+<span class="nc" id="L210">		String templateExtension = FilenameUtils.getExtension(templateFile.getName());</span>
+
+<span class="nc" id="L212">		boolean isTransformTemplate =</span>
+<span class="nc bnc" id="L213" title="All 4 branches missed.">				&quot;xslt&quot;.equalsIgnoreCase(templateExtension) || &quot;xsl&quot;.equalsIgnoreCase(templateExtension);</span>
+
+<span class="nc" id="L215">		boolean useTempFile =</span>
+<span class="nc" id="L216">				PCGenSettings.OPTIONS_CONTEXT.initBoolean(PCGenSettings.OPTION_GENERATE_TEMP_FILE_WITH_PDF, false);</span>
+<span class="nc" id="L217">		String outFileName = FilenameUtils.removeExtension(outFile.getAbsolutePath());</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">		File tempFile = new File(outFileName + (isTransformTemplate ? &quot;.xml&quot; : &quot;.fo&quot;));</span>
+<span class="nc" id="L219">		try (OutputStream fileStream = new BufferedOutputStream(new FileOutputStream(outFile));</span>
+<span class="nc" id="L220">		     ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">		     OutputStream exportOutput = useTempFile</span>
+					//Output to both the byte stream and to the temp file.
+<span class="nc" id="L223">					? new TeeOutputStream(byteOutputStream, new FileOutputStream(tempFile)) : byteOutputStream)</span>
+		{
+			FopTask task;
+<span class="nc bnc" id="L226" title="All 2 branches missed.">			if (isTransformTemplate)</span>
+			{
+<span class="nc" id="L228">				exportCharacter(character, exportOutput);</span>
+<span class="nc" id="L229">				InputStream inputStream = new ByteArrayInputStream(byteOutputStream.toByteArray());</span>
+<span class="nc" id="L230">				task = FopTask.newFopTask(inputStream, templateFile, fileStream);</span>
+<span class="nc" id="L231">			}</span>
+			else
+			{
+<span class="nc" id="L234">				exportCharacter(character, templateFile, exportOutput);</span>
+<span class="nc" id="L235">				InputStream inputStream = new ByteArrayInputStream(byteOutputStream.toByteArray());</span>
+<span class="nc" id="L236">				task = FopTask.newFopTask(inputStream, null, fileStream);</span>
+			}
+<span class="nc" id="L238">			character.setDefaultOutputSheet(true, templateFile);</span>
+<span class="nc" id="L239">			task.run();</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">			if (StringUtils.isNotBlank(task.getErrorMessages()))</span>
+			{
+<span class="nc" id="L242">				Logging.errorPrint(&quot;BatchExporter.exportCharacterToPDF failed: &quot; //$NON-NLS-1$</span>
+<span class="nc" id="L243">					+ task.getErrorMessages());</span>
+<span class="nc" id="L244">				return false;</span>
+			}
+<span class="nc bnc" id="L246" title="All 2 branches missed.">		}</span>
+<span class="nc" id="L247">		catch (final IOException | ExportException e)</span>
+		{
+<span class="nc" id="L249">			Logging.errorPrint(&quot;BatchExporter.exportCharacterToPDF failed&quot;, e); //$NON-NLS-1$</span>
+<span class="nc" id="L250">			return false;</span>
+<span class="nc" id="L251">		}</span>
+<span class="nc" id="L252">		return true;</span>
+	}
+
+	/**
+	 * Write a non PDF (e.g. html, text) character sheet for the character to 
+	 * the output file. The character sheet will be built according to the 
+	 * template file. If the output file exists it will be overwritten.
+	 *    
+	 * @param character The already loaded character to be output.
+	 * @param outFile The file to which the character sheet is to be written. 
+	 * @param templateFile The file that has the export template definition.  
+	 * @return true if the export was successful, false if it failed in some way.
+	 */
+	public static boolean exportCharacterToNonPDF(CharacterFacade character, File outFile, File templateFile)
+	{
+<span class="nc" id="L267">		try (BufferedWriter bw = new BufferedWriter(</span>
+				new OutputStreamWriter(
+						new FileOutputStream(outFile),
+					StandardCharsets.UTF_8)
+		))
+		{
+<span class="nc" id="L273">			character.export(ExportHandler.createExportHandler(templateFile), bw);</span>
+<span class="nc" id="L274">			character.setDefaultOutputSheet(false, templateFile);</span>
+<span class="nc" id="L275">			return true;</span>
+<span class="nc" id="L276">		} catch (final IOException e)</span>
+		{
+<span class="nc" id="L278">			Logging.errorPrint(&quot;Unable to create output file &quot; + outFile.getAbsolutePath(), e);</span>
+<span class="nc" id="L279">			return false;</span>
+<span class="nc" id="L280">		} catch (final ExportException e)</span>
+		{
+			// Error will already be reported to the log
+<span class="nc" id="L283">			return false;</span>
+		}
+	}
+
+	/**
+	 * Get a temporary file name for outputting a character using a particular
+	 * output template.
+	 * @param templateFile The output template that will be used.
+	 * @return The temporary file, or null if it could not be created.
+	 */
+	public static File getTempOutputFilename(File templateFile)
+	{
+<span class="nc" id="L295">		String extension =</span>
+<span class="nc" id="L296">				ExportUtilities.getOutputExtension(templateFile.getName(), ExportUtilities.isPdfTemplate(templateFile));</span>
+
+		try
+		{
+			// create a temporary file to view the character output
+<span class="nc" id="L301">			return File.createTempFile(Constants.TEMPORARY_FILE_NAME, '.' + extension, SettingsHandler.getTempPath());</span>
+		}
+<span class="nc" id="L303">		catch (final IOException ioe)</span>
+		{
+<span class="nc" id="L305">			ShowMessageDelegate.showMessageDialog(&quot;Could not create temporary preview file.&quot;, &quot;PCGen&quot;,</span>
+				MessageType.ERROR);
+<span class="nc" id="L307">			Logging.errorPrint(&quot;Could not create temporary preview file.&quot;, ioe);</span>
+<span class="nc" id="L308">			return null;</span>
+		}
+
+	}
+
+	/**
+	 * Write a PDF party sheet for the characters in the party to the output 
+	 * file. The party sheet will be built according to the template file. If  
+	 * the output file exists it will be overwritten.
+	 *    
+	 * @param party The already loaded party of characters to be output.
+	 * @param outFile The file to which the party sheet is to be written. 
+	 * @param templateFile The file that has the export template definition.  
+	 * @return true if the export was successful, false if it failed in some way.
+	 */
+	public static boolean exportPartyToPDF(PartyFacade party, File outFile, File templateFile)
+	{
+		// We want the non pdf extension here for the intermediate file.
+<span class="nc" id="L326">		String templateExtension = ExportUtilities.getOutputExtension(templateFile.getName(), false);</span>
+<span class="nc" id="L327">		boolean isTransformTemplate =</span>
+<span class="nc bnc" id="L328" title="All 4 branches missed.">				&quot;xslt&quot;.equalsIgnoreCase(templateExtension) || &quot;xsl&quot;.equalsIgnoreCase(templateExtension);</span>
+
+<span class="nc" id="L330">		boolean useTempFile =</span>
+<span class="nc" id="L331">				PCGenSettings.OPTIONS_CONTEXT.initBoolean(PCGenSettings.OPTION_GENERATE_TEMP_FILE_WITH_PDF, false);</span>
+<span class="nc" id="L332">		String outFileName = FilenameUtils.removeExtension(outFile.getAbsolutePath());</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">		File tempFile = new File(outFileName + (isTransformTemplate ? &quot;.xml&quot; : &quot;.fo&quot;));</span>
+<span class="nc" id="L334">		try (BufferedOutputStream fileStream = new BufferedOutputStream(new FileOutputStream(outFile));</span>
+<span class="nc" id="L335">				ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();</span>
+<span class="nc bnc" id="L336" title="All 2 branches missed.">				OutputStream exportOutput = useTempFile</span>
+					//Output to both the byte stream and to the temp file.
+<span class="nc" id="L338">					? new TeeOutputStream(byteOutputStream, new FileOutputStream(tempFile)) : byteOutputStream)</span>
+		{
+			FopTask task;
+<span class="nc bnc" id="L341" title="All 2 branches missed.">			if (isTransformTemplate)</span>
+			{
+<span class="nc" id="L343">				exportParty(party, exportOutput);</span>
+<span class="nc" id="L344">				ByteArrayInputStream inputStream = new ByteArrayInputStream(byteOutputStream.toByteArray());</span>
+<span class="nc" id="L345">				task = FopTask.newFopTask(inputStream, templateFile, fileStream);</span>
+<span class="nc" id="L346">			}</span>
+			else
+			{
+<span class="nc" id="L349">				SettingsHandler.setSelectedPartyPDFOutputSheet(templateFile.getAbsolutePath());</span>
+
+<span class="nc" id="L351">				exportParty(party, templateFile, exportOutput);</span>
+<span class="nc" id="L352">				ByteArrayInputStream inputStream = new ByteArrayInputStream(byteOutputStream.toByteArray());</span>
+<span class="nc" id="L353">				task = FopTask.newFopTask(inputStream, null, fileStream);</span>
+			}
+<span class="nc" id="L355">			task.run();</span>
+		}
+<span class="nc" id="L357">		catch (final IOException | ExportException e)</span>
+		{
+<span class="nc" id="L359">			Logging.errorPrint(&quot;BatchExporter.exportPartyToPDF failed&quot;, e);</span>
+<span class="nc" id="L360">			return false;</span>
+<span class="nc" id="L361">		}</span>
+<span class="nc" id="L362">		return true;</span>
+	}
+
+	/**
+	 * Write a non PDF (e.g. html, text) party sheet for the characters in the 
+	 * party to the output file. The party sheet will be built according to the 
+	 * template file. If the output file exists it will be overwritten.
+	 *    
+	 * @param party The already loaded party of characters to be output.
+	 * @param outFile The file to which the party sheet is to be written. 
+	 * @param templateFile The file that has the export template definition.  
+	 * @return true if the export was successful, false if it failed in some way.
+	 */
+	public static boolean exportPartyToNonPDF(PartyFacade party, File outFile, File templateFile)
+	{
+<span class="nc" id="L377">		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile), &quot;UTF-8&quot;)))</span>
+		{
+<span class="nc" id="L379">			party.export(ExportHandler.createExportHandler(templateFile), bw);</span>
+<span class="nc" id="L380">			return true;</span>
+		}
+<span class="nc" id="L382">		catch (final IOException e)</span>
+		{
+<span class="nc" id="L384">			Logging.errorPrint(&quot;Unable to create output file &quot; + outFile.getAbsolutePath(), e);</span>
+<span class="nc" id="L385">			return false;</span>
+		}
+	}
+
+	/**
+	 * Write a party sheet for the characters in the party to the outputStream. The party sheet will
+	 * be selected based on the selected game mode and pcgen preferences.
+	 *
+	 * @param party the party to be output
+	 * @param outputStream the stream to output the party sheet to.
+	 * @throws IOException
+	 * @throws ExportException
+	 */
+	private static void exportParty(PartyFacade party, OutputStream outputStream) throws IOException, ExportException
+	{
+<span class="nc" id="L400">		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(outputStream, &quot;UTF-8&quot;)))</span>
+		{
+<span class="nc bnc" id="L402" title="All 2 branches missed.">			for (final CharacterFacade character : party)</span>
+			{
+<span class="nc" id="L404">				File templateFile = getXMLTemplate(character);</span>
+<span class="nc" id="L405">				character.export(ExportHandler.createExportHandler(templateFile), bw);</span>
+<span class="nc" id="L406">			}</span>
+		}
+<span class="nc" id="L408">	}</span>
+
+	/**
+	 * Write a party sheet for the characters in the party to the ouputstream. The party sheet will
+	 * be built according to the template file.
+	 *
+	 * @param party the party to be output
+	 * @param templateFile The file that has the export template definition.
+	 * @param outputStream the stream to output the party sheet to.
+	 * @throws IOException
+	 * @throws ExportException
+	 */
+	private static void exportParty(PartyFacade party, File templateFile, OutputStream outputStream)
+		throws IOException, ExportException
+	{
+<span class="nc" id="L423">		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(outputStream, &quot;UTF-8&quot;)))</span>
+		{
+<span class="nc bnc" id="L425" title="All 2 branches missed.">			for (final CharacterFacade character : party)</span>
+			{
+<span class="nc" id="L427">				character.export(ExportHandler.createExportHandler(templateFile), bw);</span>
+<span class="nc" id="L428">			}</span>
+		}
+<span class="nc" id="L430">	}</span>
+
+	/**
+	 * Remove any temporary xml files produced while outputting characters. 
+	 */
+	static void removeTemporaryFiles()
+	{
+<span class="nc" id="L437">		final boolean cleanUp = UIPropertyContext.getInstance().initBoolean(UIPropertyContext.CLEANUP_TEMP_FILES, true);</span>
+
+<span class="nc bnc" id="L439" title="All 2 branches missed.">		if (!cleanUp)</span>
+		{
+<span class="nc" id="L441">			return;</span>
+		}
+
+<span class="nc" id="L444">		final String aDirectory = SettingsHandler.getTempPath() + File.separator;</span>
+<span class="nc" id="L445">		new File(aDirectory).list((aFile, aString) -&gt; {</span>
+			try
+			{
+<span class="nc bnc" id="L448" title="All 2 branches missed.">				if (aString.startsWith(Constants.TEMPORARY_FILE_NAME))</span>
+				{
+<span class="nc" id="L450">					final File tf = new File(aFile, aString);</span>
+<span class="nc" id="L451">					tf.delete();</span>
+				}
+			}
+<span class="nc" id="L454">			catch (final Exception e)</span>
+			{
+<span class="nc" id="L456">				Logging.errorPrint(&quot;removeTemporaryFiles&quot;, e);</span>
+<span class="nc" id="L457">			}</span>
+
+<span class="nc" id="L459">			return false;</span>
+		});
+<span class="nc" id="L461">	}</span>
+
+	/**
+	 * Exports a character to an OuputStream using the default template for the character's game
+	 * mode. This is more generic
+	 * method than writing to a file and the same effect can be achieved by passing in a
+	 * FileOutputStream.
+	 *
+	 * @param character the loaded CharacterFacade to export
+	 * @param outputStream the OutputStream that the character will be exported to
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 * @throws ExportException if there is an export exception
+	 */
+	public static void exportCharacter(CharacterFacade character, OutputStream outputStream)
+		throws IOException, ExportException
+	{
+<span class="nc" id="L477">		exportCharacter(character, getXMLTemplate(character), outputStream);</span>
+<span class="nc" id="L478">	}</span>
+
+	/**
+	 * Exports a character to an OutputStream using the given template file. The template file is
+	 * used to determine the type of character sheet that will be generated. This is more generic
+	 * method than writing to a file and the same effect can be achieved by passing in a
+	 * FileOutputStream.
+	 *
+	 * @param character the loaded CharacterFacade to export
+	 * @param templateFile the export template file for the ExportHandler to use
+	 * @param outputStream the OutputStream that the character will be exported to
+	 * @throws IOException
+	 * @throws ExportException
+	 */
+	private static void exportCharacter(CharacterFacade character, File templateFile, OutputStream outputStream)
+		throws IOException, ExportException
+	{
+<span class="nc" id="L495">		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(outputStream, &quot;UTF-8&quot;)))</span>
+		{
+<span class="nc" id="L497">			character.export(ExportHandler.createExportHandler(templateFile), bw);</span>
+		}
+<span class="nc" id="L499">	}</span>
+
+	private static File getXMLTemplate(CharacterFacade character)
+	{
+<span class="nc" id="L503">		Path path = Path.of(ConfigurationSettings.getSystemsDir(), &quot;gameModes&quot;,</span>
+<span class="nc" id="L504">				character.getDataSet().getGameMode().getName(), &quot;base.xml.ftl&quot;);</span>
+<span class="nc" id="L505">		File template = new File(path.toUri());</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">		if (!template.exists())</span>
+		{
+<span class="nc" id="L508">			template = new File(ConfigurationSettings.getOutputSheetsDir(), &quot;base.xml.ftl&quot;);</span>
+		}
+<span class="nc" id="L510">		return template;</span>
+	}
+
+	/**
+	 * Create a default character sheet output file name based on the export
+	 * template type and the character file name. The output file will be 
+	 * in the same folder as the character file.
+	 * 
+	 * @param characterFilename The path to the character PCG file.
+	 * @return The default output file name.
+	 */
+	private String generateOutputFilename(String characterFilename)
+	{
+<span class="nc" id="L523">		File charFile = new File(characterFilename);</span>
+<span class="nc" id="L524">		String charname = charFile.getName();</span>
+<span class="nc" id="L525">		String extension = ExportUtilities.getOutputExtension(exportTemplateFilename, isPdf);</span>
+<span class="nc" id="L526">		String outputName = charname.substring(0, charname.lastIndexOf('.')) + '.' + extension;</span>
+<span class="nc" id="L527">		return new File(charFile.getParent(), outputName).getAbsolutePath();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

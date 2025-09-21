@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VariableHashMap.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.core.doomsdaybook</a> &gt; <span class="el_source">VariableHashMap.java</span></div><h1>VariableHashMap.java</h1><pre class="source lang-java linenums">/*
+ *  RPGeneration - A role playing utility generate interesting things
+ *  Copyright (C) 2002 Devon Jones
+ *
+ *  This library is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public
+ *  License as published by the Free Software Foundation; either
+ *  version 2.1 of the License, or (at your option) any later version.
+ *
+ *  This library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  Lesser General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Lesser General Public
+ *  License along with this library; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.core.doomsdaybook;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * {@code VariableHashMap} is a collection of variables (key/value
+ * pairs) and DataElements optimised for quick lookup and updating. Note
+ * there are three structures here, the principle map of variables, a
+ * secondary map of DataElement objects and a list of Operation objects.
+ */
+public class VariableHashMap extends HashMap&lt;String, String&gt;
+{
+<span class="nc" id="L34">	private final Collection&lt;Operation&gt; initialize = new ArrayList&lt;&gt;();</span>
+	private final Map&lt;String, DataElement&gt; dataElements;
+
+	/** Creates a new instance of VariableHashMap */
+	public VariableHashMap()
+<span class="nc" id="L39">	{</span>
+<span class="nc" id="L40">		this.dataElements = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L41">	}</span>
+
+	/**
+	 * Retrieve the data element for the given key. If no entry is 
+	 * present for the key an exception will be thrown.
+	 * 
+	 * @param key The key of the element to be retrieved. 
+	 * @return The data element. 
+	 * @throws Exception When no entry exists for the supplied key.
+	 */
+	public DataElement getDataElement(String key) throws Exception
+	{
+<span class="nc" id="L53">		DataElement de = dataElements.get(key);</span>
+
+<span class="nc bnc" id="L55" title="All 2 branches missed.">		if (de == null)</span>
+		{
+<span class="nc" id="L57">			throw new Exception(&quot;Data Set &quot; + key + &quot; Does Not Exist&quot;);</span>
+		}
+
+<span class="nc" id="L60">		return de;</span>
+	}
+
+	/**
+	 * Retrieve the variable value for the given key. If no entry is 
+	 * present for the key an exception will be thrown.
+	 * 
+	 * @param key The key of the variable to be retrieved. 
+	 * @return The value fo the variable.
+	 * @throws variableException When no entry exists for the supplied key.
+	 */
+	String getVal(String key) throws variableException
+	{
+<span class="nc" id="L73">		String value = get(key);</span>
+
+<span class="nc bnc" id="L75" title="All 2 branches missed.">		if (value == null)</span>
+		{
+<span class="nc" id="L77">			throw new variableException(&quot;Variable &quot; + key + &quot; does not exist, cannot get value&quot;);</span>
+		}
+
+<span class="nc" id="L80">		return value;</span>
+	}
+
+	/**
+	 * Set the value for an existing variable. If no entry is 
+	 * present for the key, an exception will be thrown.
+	 * 
+	 * @param key The key of the variable to be set.
+	 * @param value The new value for the variable
+	 * @throws variableException When no entry exists for the supplied key.
+	 */
+	private void setVar(String key, String value) throws variableException
+	{
+<span class="nc bnc" id="L93" title="All 2 branches missed.">		if (get(key) == null)</span>
+		{
+<span class="nc" id="L95">			throw new variableException(&quot;Variable &quot; + key + &quot; does not exist, cannot set value&quot;);</span>
+		}
+
+<span class="nc" id="L98">		put(key, value);</span>
+<span class="nc" id="L99">	}</span>
+
+	/**
+	 * Add a new DataElement to the map of DataElement objects. 
+	 * The dataElement's Id will be used as the key for the map.
+	 * 
+	 * @param dataElement The DataElement object to be added.
+	 */
+	public void addDataElement(DataElement dataElement)
+	{
+<span class="nc" id="L109">		String key = dataElement.getId();</span>
+<span class="nc" id="L110">		dataElements.put(key, dataElement);</span>
+<span class="nc" id="L111">	}</span>
+
+	/**
+	 * Add an amount to an existing variable. If no entry is 
+	 * present for the key, an exception will be thrown.
+	 * 
+	 * @param key The key of the variable to be updated.
+	 * @param add The amount to add to the variable.
+	 * @return The new value of the variable.
+	 * @throws variableException When no entry exists for the supplied key.
+	 */
+	private String addVar(String key, int add) throws variableException
+	{
+<span class="nc" id="L124">		String value = get(key);</span>
+
+<span class="nc bnc" id="L126" title="All 2 branches missed.">		if (value == null)</span>
+		{
+<span class="nc" id="L128">			throw new variableException(&quot;Variable &quot; + key + &quot; does not exist, cannot add to value&quot;);</span>
+		}
+
+		int val;
+
+<span class="nc bnc" id="L133" title="All 2 branches missed.">		if (value.isEmpty())</span>
+		{
+<span class="nc" id="L135">			val = 0;</span>
+		}
+		else
+		{
+<span class="nc" id="L139">			val = Integer.parseInt(get(key));</span>
+		}
+
+<span class="nc" id="L142">		return put(key, Integer.toString(val + add));</span>
+	}
+
+	/**
+	 * Divide the value of an existing variable by an amount. If no entry is 
+	 * present for the key, an exception will be thrown. NB: Integer divison 
+	 * is used.
+	 * 
+	 * @param key The key of the variable to be updated.
+	 * @param divide The amount to divide the variable's value by.
+	 * @return The new value of the variable.
+	 * @throws variableException When no entry exists for the supplied key.
+	 */
+	private String divideVar(String key, int divide) throws variableException
+	{
+<span class="nc" id="L157">		String value = get(key);</span>
+
+<span class="nc bnc" id="L159" title="All 2 branches missed.">		if (value == null)</span>
+		{
+<span class="nc" id="L161">			throw new variableException(&quot;Variable &quot; + key + &quot; does not exist, cannot divide by value&quot;);</span>
+		}
+
+		int val;
+
+<span class="nc bnc" id="L166" title="All 2 branches missed.">		if (value.isEmpty())</span>
+		{
+<span class="nc" id="L168">			val = 0;</span>
+		}
+		else
+		{
+<span class="nc" id="L172">			val = Integer.parseInt(get(key));</span>
+		}
+
+<span class="nc" id="L175">		return put(key, Integer.toString(val / divide));</span>
+	}
+
+	/**
+	 * Perform the supplied Operations in sequence.
+	 * 
+	 * @param ops The Operations to be performed.
+	 * @throws variableException When no entry exists for an Operation's key.
+	 */
+	private void doOperation(Collection&lt;? extends Operation&gt; ops) throws variableException
+	{
+<span class="nc bnc" id="L186" title="All 2 branches missed.">		for (Operation op : ops)</span>
+		{
+<span class="nc" id="L188">			doOperation(op);</span>
+<span class="nc" id="L189">		}</span>
+<span class="nc" id="L190">	}</span>
+
+	/**
+	 * Perform the Operation. The Operation defines, the action, the variable 
+	 * to be affected and the value to be used in the operation. If no entry is 
+	 * present for the key expected by the Operation, an exception will be 
+	 * thrown.
+	 * 
+	 * @param op The Operation to be performed.
+	 * @throws variableException When no entry exists for the Operation's key.
+	 */
+	private void doOperation(Operation op) throws variableException
+	{
+<span class="nc" id="L203">		String type = op.getType();</span>
+<span class="nc" id="L204">		String key = op.getKey();</span>
+<span class="nc" id="L205">		String value = op.getValue();</span>
+
+<span class="nc bnc" id="L207" title="All 6 branches missed.">		switch (type)</span>
+		{
+			case &quot;Set&quot; -&gt; {
+<span class="nc" id="L210">				value = parse(value);</span>
+<span class="nc" id="L211">				setVar(key, value);</span>
+<span class="nc" id="L212">			}</span>
+			case &quot;Add&quot; -&gt; {
+<span class="nc" id="L214">				int val = Integer.parseInt(parse(value));</span>
+<span class="nc" id="L215">				addVar(key, val);</span>
+<span class="nc" id="L216">				break;</span>
+			}
+			case &quot;Subtract&quot; -&gt; {
+<span class="nc" id="L219">				int val = Integer.parseInt(parse(value));</span>
+<span class="nc" id="L220">				subtractVar(key, val);</span>
+<span class="nc" id="L221">				break;</span>
+			}
+			case &quot;Multiply&quot; -&gt; {
+<span class="nc" id="L224">				int val = Integer.parseInt(parse(value));</span>
+<span class="nc" id="L225">				multiplyVar(key, val);</span>
+<span class="nc" id="L226">				break;</span>
+			}
+			case &quot;Divide&quot; -&gt; {
+<span class="nc" id="L229">				int val = Integer.parseInt(parse(value));</span>
+<span class="nc" id="L230">				divideVar(key, val);</span>
+<span class="nc" id="L231">				break;</span>
+			}
+		}
+<span class="nc" id="L234">	}</span>
+
+	/**
+	 * Perform the initialization Operations in sequence.
+	 * 
+	 * @throws variableException When no entry exists for an Operation's key.
+	 */
+	public void initialize() throws variableException
+	{
+<span class="nc" id="L243">		doOperation(initialize);</span>
+<span class="nc" id="L244">	}</span>
+
+	/**
+	 * Multiply the value of an existing variable by an amount. If no entry is 
+	 * present for the key, an exception will be thrown. NB: Integer divison 
+	 * is used.
+	 * 
+	 * @param key The key of the variable to be updated.
+	 * @param multiply The amount to multiply the variable's value by.
+	 * @return The new value of the variable.
+	 * @throws variableException When no entry exists for the supplied key.
+	 */
+	private String multiplyVar(String key, int multiply) throws variableException
+	{
+<span class="nc" id="L258">		String value = get(key);</span>
+
+<span class="nc bnc" id="L260" title="All 2 branches missed.">		if (value == null)</span>
+		{
+<span class="nc" id="L262">			throw new variableException(&quot;Variable &quot; + key + &quot; does not exist, cannot multiply by value&quot;);</span>
+		}
+
+		int val;
+
+<span class="nc bnc" id="L267" title="All 2 branches missed.">		if (value.isEmpty())</span>
+		{
+<span class="nc" id="L269">			val = 0;</span>
+		}
+		else
+		{
+<span class="nc" id="L273">			val = Integer.parseInt(get(key));</span>
+		}
+
+<span class="nc" id="L276">		return put(key, Integer.toString(val * multiply));</span>
+	}
+
+	/**
+	 * Parse a value substituting the first variable referred to as 
+	 * ${varname} with the variable's value.
+	 *  
+	 * @param val The value to be parsed
+	 * @return The parsed value.
+	 */
+	private String parse(String val)
+	{
+<span class="nc" id="L288">		String retString = val;</span>
+
+<span class="nc bnc" id="L290" title="All 2 branches missed.">		if (val.matches(&quot;\\$\\{.*?}.*&quot;))</span>
+		{
+<span class="nc" id="L292">			String var = val.substring(val.indexOf(&quot;${&quot;) + 2, val.indexOf('}'));</span>
+<span class="nc" id="L293">			String value = get(var);</span>
+
+<span class="nc bnc" id="L295" title="All 2 branches missed.">			if (value == null)</span>
+			{
+<span class="nc" id="L297">				value = &quot;&quot;;</span>
+			}
+
+<span class="nc" id="L300">			retString = val.replaceFirst(&quot;\\$\\{.*?}&quot;, value);</span>
+		}
+
+<span class="nc" id="L303">		return retString;</span>
+	}
+
+	/**
+	 * Subtract an amount to an existing variable. If no entry is 
+	 * present for the key, an exception will be thrown.
+	 * 
+	 * @param key The key of the variable to be updated.
+	 * @param subtract The amount to subtract from the variable.
+	 * @return The new value of the variable.
+	 * @throws variableException When no entry exists for the supplied key.
+	 */
+	private String subtractVar(String key, int subtract) throws variableException
+	{
+<span class="nc" id="L317">		String value = get(key);</span>
+
+<span class="nc bnc" id="L319" title="All 2 branches missed.">		if (value == null)</span>
+		{
+<span class="nc" id="L321">			throw new variableException(&quot;Variable &quot; + key + &quot; does not exist, cannot subtract from value&quot;);</span>
+		}
+
+		int val;
+
+<span class="nc bnc" id="L326" title="All 2 branches missed.">		if (value.isEmpty())</span>
+		{
+<span class="nc" id="L328">			val = 0;</span>
+		}
+		else
+		{
+<span class="nc" id="L332">			val = Integer.parseInt(get(key));</span>
+		}
+
+<span class="nc" id="L335">		return put(key, Integer.toString(val - subtract));</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,1006 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NameGenPanel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui2.doomsdaybook</a> &gt; <span class="el_source">NameGenPanel.java</span></div><h1>NameGenPanel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2003 (C) Devon Jones
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.gui2.doomsdaybook;
+
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.Insets;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.ActionEvent;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.Vector;
+
+import javax.swing.BoxLayout;
+import javax.swing.ComboBoxModel;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JSeparator;
+import javax.swing.JTextField;
+
+import pcgen.core.doomsdaybook.CRRule;
+import pcgen.core.doomsdaybook.DataElement;
+import pcgen.core.doomsdaybook.DataElementComperator;
+import pcgen.core.doomsdaybook.DataValue;
+import pcgen.core.doomsdaybook.HyphenRule;
+import pcgen.core.doomsdaybook.Rule;
+import pcgen.core.doomsdaybook.RuleSet;
+import pcgen.core.doomsdaybook.SpaceRule;
+import pcgen.core.doomsdaybook.VariableHashMap;
+import pcgen.core.doomsdaybook.WeightedDataValue;
+import pcgen.gui2.tools.Icons;
+import pcgen.gui2.util.FontManipulation;
+import pcgen.system.LanguageBundle;
+import pcgen.util.Logging;
+
+import org.jdom2.DataConversionException;
+import org.jdom2.DocType;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.input.SAXBuilder;
+import org.xml.sax.EntityResolver;
+import org.xml.sax.InputSource;
+
+/**
+ * Main panel of the random name generator.
+ */
+@SuppressWarnings({&quot;UseOfObsoleteCollectionType&quot;, &quot;PMD.ReplaceVectorWithList&quot;, &quot;PMD.UseArrayListInsteadOfVector&quot;})
+public class NameGenPanel extends JPanel
+{
+<span class="nc" id="L81">	private final Map&lt;String, List&lt;RuleSet&gt;&gt; categories = new HashMap&lt;&gt;();</span>
+	private JButton generateButton;
+	private JButton jButton1;
+	private JCheckBox chkStructure;
+	private JComboBox&lt;RuleSet&gt; cbCatalog;
+	private JComboBox&lt;String&gt; cbCategory;
+	private JComboBox&lt;String&gt; cbGender;
+	private JComboBox&lt;DataElement&gt; cbStructure;
+	private JLabel jLabel1;
+	private JLabel jLabel2;
+	private JLabel jLabel3;
+
+	private JLabel jLabel4;
+	private JLabel jLabel5;
+	private JLabel jLabel6;
+	private JLabel meaning;
+	private JLabel pronounciation;
+	private JPanel buttonPanel;
+	private JPanel genCtrlPanel;
+	private JPanel jPanel10;
+	private JPanel jPanel11;
+	private JPanel jPanel12;
+	private JPanel jPanel13;
+	private JPanel jPanel14;
+	private JPanel nameDisplayPanel;
+	private JPanel namePanel;
+	private JPanel jPanel4;
+	private JPanel nameSubInfoPanel;
+	private JPanel nameActionPanel;
+	private JPanel jPanel7;
+	private JPanel jPanel8;
+	private JPanel jPanel9;
+	private JSeparator jSeparator1;
+	private JSeparator jSeparator2;
+	private JSeparator jSeparator3;
+	private JSeparator jSeparator4;
+	private JTextField name;
+<span class="nc" id="L118">	private final VariableHashMap allVars = new VariableHashMap();</span>
+
+<span class="nc" id="L120">	private Rule lastRule = null;</span>
+
+	/** Creates new form NameGenPanel */
+	public NameGenPanel()
+	{
+<span class="nc" id="L125">		this(new File(&quot;.&quot;));</span>
+<span class="nc" id="L126">	}</span>
+
+	/**
+	 * Constructs a NameGenPanel given a dataPath
+	 * 
+	 * @param dataPath The path to the random name data files.
+	 */
+	public NameGenPanel(File dataPath)
+<span class="nc" id="L134">	{</span>
+<span class="nc" id="L135">		initComponents();</span>
+<span class="nc" id="L136">		loadData(dataPath);</span>
+<span class="nc" id="L137">	}</span>
+
+	/**
+	 * Generate a Rule
+	 * @return new Rule
+	 */
+	public Rule generate()
+	{
+		try
+		{
+			Rule rule;
+
+<span class="nc bnc" id="L149" title="All 2 branches missed.">			if (chkStructure.isSelected())</span>
+			{
+<span class="nc" id="L151">				RuleSet rs = (RuleSet) cbCatalog.getSelectedItem();</span>
+<span class="nc" id="L152">				rule = rs.getRule();</span>
+<span class="nc" id="L153">			}</span>
+			else
+			{
+<span class="nc" id="L156">				rule = (Rule) cbStructure.getSelectedItem();</span>
+			}
+
+<span class="nc" id="L159">			List&lt;DataValue&gt; aName = rule.getData();</span>
+<span class="nc" id="L160">			setNameText(aName);</span>
+<span class="nc" id="L161">			setMeaningText(aName);</span>
+<span class="nc" id="L162">			setPronounciationText(aName);</span>
+
+<span class="nc" id="L164">			return rule;</span>
+		}
+<span class="nc" id="L166">		catch (Exception e)</span>
+		{
+<span class="nc" id="L168">			Logging.errorPrint(e.getMessage(), e);</span>
+
+<span class="nc" id="L170">			return null;</span>
+		}
+	}
+
+	private void setMeaningText(String meaning)
+	{
+<span class="nc" id="L176">		this.meaning.setText(meaning);</span>
+<span class="nc" id="L177">	}</span>
+
+	private void setMeaningText(Iterable&lt;DataValue&gt; data)
+	{
+<span class="nc" id="L181">		StringBuilder meaningBuffer = new StringBuilder();</span>
+
+<span class="nc bnc" id="L183" title="All 2 branches missed.">		for (DataValue val : data)</span>
+		{
+<span class="nc" id="L185">			String aMeaning = val.getSubValue(&quot;meaning&quot;); //$NON-NLS-1$ // XML attribute no translation</span>
+
+<span class="nc bnc" id="L187" title="All 2 branches missed.">			if (aMeaning == null)</span>
+			{
+<span class="nc" id="L189">				aMeaning = val.getValue();</span>
+			}
+
+<span class="nc" id="L192">			meaningBuffer.append(aMeaning);</span>
+<span class="nc" id="L193">		}</span>
+
+<span class="nc" id="L195">		setMeaningText(meaningBuffer.toString());</span>
+<span class="nc" id="L196">	}</span>
+
+	private void setNameText(String name)
+	{
+<span class="nc" id="L200">		this.name.setText(name);</span>
+<span class="nc" id="L201">	}</span>
+
+	private void setNameText(Iterable&lt;DataValue&gt; data)
+	{
+<span class="nc" id="L205">		StringBuilder nameBuffer = new StringBuilder();</span>
+
+<span class="nc bnc" id="L207" title="All 2 branches missed.">		for (DataValue val : data)</span>
+		{
+<span class="nc" id="L209">			nameBuffer.append(val.getValue());</span>
+<span class="nc" id="L210">		}</span>
+
+<span class="nc" id="L212">		setNameText(nameBuffer.toString());</span>
+<span class="nc" id="L213">	}</span>
+
+	private void setPronounciationText(String pronounciation)
+	{
+<span class="nc" id="L217">		this.pronounciation.setText(pronounciation);</span>
+<span class="nc" id="L218">	}</span>
+
+	private void setPronounciationText(Iterable&lt;DataValue&gt; data)
+	{
+<span class="nc" id="L222">		StringBuilder proBuffer = new StringBuilder();</span>
+
+<span class="nc bnc" id="L224" title="All 2 branches missed.">		for (DataValue val : data)</span>
+		{
+<span class="nc" id="L226">			String aPronounciation = val.getSubValue(&quot;pronounciation&quot;);</span>
+
+<span class="nc bnc" id="L228" title="All 2 branches missed.">			if (aPronounciation == null)</span>
+			{
+<span class="nc" id="L230">				aPronounciation = val.getValue();</span>
+			}
+
+<span class="nc" id="L233">			proBuffer.append(aPronounciation);</span>
+<span class="nc" id="L234">		}</span>
+
+<span class="nc" id="L236">		setPronounciationText(proBuffer.toString());</span>
+<span class="nc" id="L237">	}</span>
+
+	private void NameButtonActionPerformed(ActionEvent evt)
+	{
+		try
+		{
+<span class="nc" id="L243">			NameButton nb = (NameButton) evt.getSource();</span>
+<span class="nc" id="L244">			DataElement element = nb.getDataElement();</span>
+<span class="nc" id="L245">			element.getData();</span>
+
+<span class="nc" id="L247">			Rule rule = this.lastRule;</span>
+
+<span class="nc bnc" id="L249" title="All 2 branches missed.">			if (rule == null)</span>
+			{
+<span class="nc bnc" id="L251" title="All 2 branches missed.">				if (chkStructure.isSelected())</span>
+				{
+<span class="nc" id="L253">					RuleSet rs = (RuleSet) cbCatalog.getSelectedItem();</span>
+<span class="nc" id="L254">					rule = rs.getLastRule();</span>
+<span class="nc" id="L255">				}</span>
+				else
+				{
+<span class="nc" id="L258">					rule = (Rule) cbStructure.getSelectedItem();</span>
+				}
+
+<span class="nc" id="L261">				this.lastRule = rule;</span>
+			}
+
+<span class="nc" id="L264">			List&lt;DataValue&gt; aName = rule.getLastData();</span>
+
+<span class="nc" id="L266">			setNameText(aName);</span>
+<span class="nc" id="L267">			setMeaningText(aName);</span>
+<span class="nc" id="L268">			setPronounciationText(aName);</span>
+		}
+<span class="nc" id="L270">		catch (Exception e)</span>
+		{
+<span class="nc" id="L272">			Logging.errorPrint(e.getMessage(), e);</span>
+<span class="nc" id="L273">		}</span>
+<span class="nc" id="L274">	}</span>
+
+	private void cbCatalogActionPerformed(ActionEvent evt)
+	{ //GEN-FIRST:event_cbCatalogActionPerformed
+<span class="nc" id="L278">		loadStructureDD();</span>
+<span class="nc" id="L279">		this.clearButtons();</span>
+<span class="nc" id="L280">	}</span>
+
+	//GEN-LAST:event_cbCatalogActionPerformed
+
+	private void cbStructureActionPerformed(ActionEvent evt)
+	{ //GEN-FIRST:event_cbStructureActionPerformed
+<span class="nc" id="L286">		this.clearButtons();</span>
+<span class="nc" id="L287">	}</span>
+
+	//GEN-LAST:event_cbStructureActionPerformed
+
+	private void cbCategoryActionPerformed(ActionEvent evt)
+	{ //GEN-FIRST:event_cbCategoryActionPerformed
+<span class="nc" id="L293">		this.loadGenderDD();</span>
+<span class="nc" id="L294">		loadCatalogDD();</span>
+<span class="nc" id="L295">		loadStructureDD();</span>
+<span class="nc" id="L296">		this.clearButtons();</span>
+<span class="nc" id="L297">	}</span>
+
+	//GEN-LAST:event_cbCategoryActionPerformed
+
+	private void cbGenderActionPerformed(ActionEvent evt)
+	{ //GEN-FIRST:event_cbGenderActionPerformed
+<span class="nc" id="L303">		loadCatalogDD();</span>
+<span class="nc" id="L304">		loadStructureDD();</span>
+<span class="nc" id="L305">		this.clearButtons();</span>
+<span class="nc" id="L306">	}</span>
+
+	//GEN-LAST:event_cbGenderActionPerformed
+
+	private void chkStructureActionPerformed(ActionEvent evt)
+	{ //GEN-FIRST:event_chkStructureActionPerformed
+<span class="nc" id="L312">		loadStructureDD();</span>
+<span class="nc" id="L313">	}</span>
+
+	//GEN-LAST:event_chkStructureActionPerformed
+
+	private void clearButtons()
+	{
+<span class="nc" id="L319">		buttonPanel.removeAll();</span>
+<span class="nc" id="L320">		buttonPanel.repaint();</span>
+<span class="nc" id="L321">	}</span>
+
+	private void displayButtons(Rule rule)
+	{
+<span class="nc" id="L325">		clearButtons();</span>
+
+<span class="nc bnc" id="L327" title="All 2 branches missed.">		for (String key : rule)</span>
+		{
+			try
+			{
+<span class="nc" id="L331">				DataElement ele = allVars.getDataElement(key);</span>
+
+<span class="nc bnc" id="L333" title="All 2 branches missed.">				if (ele.getTitle() != null)</span>
+				{
+<span class="nc" id="L335">					NameButton nb = new NameButton(ele);</span>
+<span class="nc" id="L336">					nb.addActionListener(this::NameButtonActionPerformed);</span>
+<span class="nc" id="L337">					buttonPanel.add(nb);</span>
+				}
+			}
+<span class="nc" id="L340">			catch (Exception e)</span>
+			{
+<span class="nc" id="L342">				Logging.errorPrint(e.getMessage(), e);</span>
+<span class="nc" id="L343">			}</span>
+<span class="nc" id="L344">		}</span>
+
+<span class="nc" id="L346">		buttonPanel.repaint();</span>
+<span class="nc" id="L347">	}</span>
+
+	private void generateButtonActionPerformed(ActionEvent evt)
+	{ //GEN-FIRST:event_generateButtonActionPerformed
+
+		try
+		{
+<span class="nc" id="L354">			this.lastRule = generate();</span>
+<span class="nc" id="L355">			displayButtons(this.lastRule);</span>
+		}
+<span class="nc" id="L357">		catch (Exception e)</span>
+		{
+<span class="nc" id="L359">			Logging.errorPrint(e.getMessage(), e);</span>
+<span class="nc" id="L360">		}</span>
+<span class="nc" id="L361">	}</span>
+
+	//GEN-LAST:event_generateButtonActionPerformed
+
+	/**
+	 * This method is called from within the constructor to
+	 * initialize the form.
+	 */
+	private void initComponents()
+	{
+<span class="nc" id="L371">		genCtrlPanel = new JPanel();</span>
+<span class="nc" id="L372">		jPanel4 = new JPanel();</span>
+<span class="nc" id="L373">		jPanel13 = new JPanel();</span>
+<span class="nc" id="L374">		jPanel10 = new JPanel();</span>
+<span class="nc" id="L375">		jLabel4 = new JLabel();</span>
+<span class="nc" id="L376">		cbCatalog = new JComboBox&lt;&gt;();</span>
+<span class="nc" id="L377">		jPanel8 = new JPanel();</span>
+<span class="nc" id="L378">		jLabel1 = new JLabel();</span>
+<span class="nc" id="L379">		cbCategory = new JComboBox&lt;&gt;();</span>
+<span class="nc" id="L380">		jPanel14 = new JPanel();</span>
+<span class="nc" id="L381">		jPanel11 = new JPanel();</span>
+<span class="nc" id="L382">		generateButton = new JButton();</span>
+<span class="nc" id="L383">		jPanel9 = new JPanel();</span>
+<span class="nc" id="L384">		jLabel5 = new JLabel();</span>
+<span class="nc" id="L385">		cbGender = new JComboBox&lt;&gt;();</span>
+<span class="nc" id="L386">		jPanel7 = new JPanel();</span>
+<span class="nc" id="L387">		jSeparator4 = new JSeparator();</span>
+<span class="nc" id="L388">		jPanel12 = new JPanel();</span>
+<span class="nc" id="L389">		jLabel6 = new JLabel();</span>
+<span class="nc" id="L390">		cbStructure = new JComboBox&lt;&gt;();</span>
+<span class="nc" id="L391">		chkStructure = new JCheckBox();</span>
+<span class="nc" id="L392">		buttonPanel = new JPanel();</span>
+<span class="nc" id="L393">		nameDisplayPanel = new JPanel();</span>
+<span class="nc" id="L394">		nameSubInfoPanel = new JPanel();</span>
+<span class="nc" id="L395">		jSeparator2 = new JSeparator();</span>
+<span class="nc" id="L396">		jLabel2 = new JLabel();</span>
+<span class="nc" id="L397">		meaning = new JLabel();</span>
+<span class="nc" id="L398">		jSeparator1 = new JSeparator();</span>
+<span class="nc" id="L399">		jLabel3 = new JLabel();</span>
+<span class="nc" id="L400">		pronounciation = new JLabel();</span>
+<span class="nc" id="L401">		jSeparator3 = new JSeparator();</span>
+<span class="nc" id="L402">		namePanel = new JPanel();</span>
+<span class="nc" id="L403">		name = new JTextField();</span>
+<span class="nc" id="L404">		nameActionPanel = new JPanel();</span>
+<span class="nc" id="L405">		jButton1 = new JButton();</span>
+
+<span class="nc" id="L407">		setLayout(new BorderLayout(0, 5));</span>
+
+<span class="nc" id="L409">		genCtrlPanel.setLayout(new BorderLayout());</span>
+
+<span class="nc" id="L411">		jPanel4.setLayout(new BoxLayout(jPanel4, BoxLayout.X_AXIS));</span>
+
+<span class="nc" id="L413">		jPanel13.setLayout(new BorderLayout());</span>
+
+<span class="nc" id="L415">		jPanel10.setLayout(new FlowLayout(FlowLayout.LEFT));</span>
+
+<span class="nc" id="L417">		jLabel4.setText(LanguageBundle.getString(&quot;in_rndNameCatalog&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L418">		jPanel10.add(jLabel4);</span>
+
+<span class="nc" id="L420">		cbCatalog.addActionListener(this::cbCatalogActionPerformed);</span>
+
+<span class="nc" id="L422">		jPanel10.add(cbCatalog);</span>
+
+<span class="nc" id="L424">		jPanel13.add(jPanel10, BorderLayout.CENTER);</span>
+
+<span class="nc" id="L426">		jPanel8.setLayout(new FlowLayout(FlowLayout.LEFT));</span>
+
+<span class="nc" id="L428">		jLabel1.setText(LanguageBundle.getString(&quot;in_rndNameCategory&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L429">		jPanel8.add(jLabel1);</span>
+
+<span class="nc" id="L431">		cbCategory.addActionListener(this::cbCategoryActionPerformed);</span>
+
+<span class="nc" id="L433">		jPanel8.add(cbCategory);</span>
+
+<span class="nc" id="L435">		jPanel13.add(jPanel8, BorderLayout.NORTH);</span>
+
+<span class="nc" id="L437">		jPanel4.add(jPanel13);</span>
+
+<span class="nc" id="L439">		jPanel14.setLayout(new BorderLayout());</span>
+
+<span class="nc" id="L441">		jPanel11.setLayout(new FlowLayout(FlowLayout.LEFT));</span>
+
+<span class="nc" id="L443">		generateButton.setText(LanguageBundle.getString(&quot;in_rndNameGenerate&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L444">		generateButton.addActionListener(this::generateButtonActionPerformed);</span>
+
+<span class="nc" id="L446">		jPanel11.add(generateButton);</span>
+
+<span class="nc" id="L448">		jPanel14.add(jPanel11, BorderLayout.CENTER);</span>
+
+<span class="nc" id="L450">		jPanel9.setLayout(new FlowLayout(FlowLayout.LEFT));</span>
+
+<span class="nc" id="L452">		jLabel5.setText(LanguageBundle.getString(&quot;in_rndNameSex&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L453">		jPanel9.add(jLabel5);</span>
+
+<span class="nc" id="L455">		cbGender.addActionListener(this::cbGenderActionPerformed);</span>
+
+<span class="nc" id="L457">		jPanel9.add(cbGender);</span>
+
+<span class="nc" id="L459">		jPanel14.add(jPanel9, BorderLayout.NORTH);</span>
+
+<span class="nc" id="L461">		jPanel4.add(jPanel14);</span>
+
+<span class="nc" id="L463">		genCtrlPanel.add(jPanel4, BorderLayout.NORTH);</span>
+
+<span class="nc" id="L465">		jPanel7.setLayout(new BorderLayout());</span>
+
+<span class="nc" id="L467">		jPanel7.add(jSeparator4, BorderLayout.NORTH);</span>
+
+<span class="nc" id="L469">		jPanel12.setLayout(new FlowLayout(FlowLayout.LEFT));</span>
+
+<span class="nc" id="L471">		jLabel6.setText(LanguageBundle.getString(&quot;in_rndNameStructure&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L472">		jPanel12.add(jLabel6);</span>
+
+<span class="nc" id="L474">		cbStructure.setEnabled(false);</span>
+<span class="nc" id="L475">		cbStructure.addActionListener(this::cbStructureActionPerformed);</span>
+<span class="nc" id="L476">		jPanel12.add(cbStructure);</span>
+
+<span class="nc" id="L478">		chkStructure.setSelected(true);</span>
+<span class="nc" id="L479">		chkStructure.setText(LanguageBundle.getString(&quot;in_randomButton&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L480">		chkStructure.addActionListener(this::chkStructureActionPerformed);</span>
+
+<span class="nc" id="L482">		jPanel12.add(chkStructure);</span>
+
+<span class="nc" id="L484">		jPanel7.add(jPanel12, BorderLayout.CENTER);</span>
+<span class="nc" id="L485">		jPanel7.add(new JSeparator(), BorderLayout.SOUTH);</span>
+
+<span class="nc" id="L487">		JPanel adjustNamePanel = new JPanel();</span>
+<span class="nc" id="L488">		adjustNamePanel.setLayout(new BorderLayout());</span>
+
+<span class="nc" id="L490">		JLabel adjNameLabel = new JLabel(LanguageBundle.getString(&quot;in_rndNameAdjust&quot;)); //$NON-NLS-1$</span>
+
+<span class="nc" id="L492">		adjustNamePanel.add(adjNameLabel, BorderLayout.NORTH);</span>
+
+<span class="nc" id="L494">		buttonPanel.setLayout(new FlowLayout(FlowLayout.LEFT));</span>
+		// CODE-2099 Component needed to have correct vertical space available.
+<span class="nc" id="L496">		JLabel nb = new JLabel(&quot; &quot;); //$NON-NLS-1$</span>
+<span class="nc" id="L497">		buttonPanel.add(nb);</span>
+
+<span class="nc" id="L499">		adjustNamePanel.add(buttonPanel, BorderLayout.CENTER);</span>
+
+<span class="nc" id="L501">		add(adjustNamePanel, BorderLayout.SOUTH);</span>
+
+<span class="nc" id="L503">		genCtrlPanel.add(jPanel7, BorderLayout.CENTER);</span>
+
+		// Name display
+<span class="nc" id="L506">		nameDisplayPanel.setLayout(new BorderLayout());</span>
+
+<span class="nc" id="L508">		nameSubInfoPanel.setLayout(new BoxLayout(nameSubInfoPanel, BoxLayout.Y_AXIS));</span>
+
+<span class="nc" id="L510">		nameSubInfoPanel.add(jSeparator2);</span>
+
+<span class="nc" id="L512">		jLabel2.setText(LanguageBundle.getString(&quot;in_rndNameMeaning&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L513">		nameSubInfoPanel.add(jLabel2);</span>
+
+<span class="nc" id="L515">		meaning.setText(LanguageBundle.getString(&quot;in_rndNmDefault&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L516">		nameSubInfoPanel.add(meaning);</span>
+
+<span class="nc" id="L518">		nameSubInfoPanel.add(jSeparator1);</span>
+
+<span class="nc" id="L520">		jLabel3.setText(LanguageBundle.getString(&quot;in_rndNmPronounciation&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L521">		nameSubInfoPanel.add(jLabel3);</span>
+
+<span class="nc" id="L523">		pronounciation.setText(&quot;nAm&quot;);</span>
+<span class="nc" id="L524">		nameSubInfoPanel.add(pronounciation);</span>
+
+<span class="nc" id="L526">		nameSubInfoPanel.add(jSeparator3);</span>
+
+<span class="nc" id="L528">		nameDisplayPanel.add(nameSubInfoPanel, BorderLayout.SOUTH);</span>
+
+<span class="nc" id="L530">		JLabel nameTitleLabel = new JLabel(LanguageBundle.getString(&quot;in_sumName&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L531">		JPanel nameTitlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));</span>
+<span class="nc" id="L532">		nameTitlePanel.add(nameTitleLabel);</span>
+
+<span class="nc" id="L534">		JPanel topPanel = new JPanel();</span>
+<span class="nc" id="L535">		topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));</span>
+
+<span class="nc" id="L537">		namePanel.setLayout(new BoxLayout(namePanel, BoxLayout.X_AXIS));</span>
+
+<span class="nc" id="L539">		FontManipulation.xxlarge(name);</span>
+<span class="nc" id="L540">		name.setText(LanguageBundle.getString(&quot;in_nameLabel&quot;)); //$NON-NLS-1$</span>
+<span class="nc" id="L541">		namePanel.add(name);</span>
+
+<span class="nc" id="L543">		nameActionPanel.setLayout(new FlowLayout(FlowLayout.RIGHT));</span>
+
+<span class="nc" id="L545">		jButton1.setIcon(Icons.Copy16.getImageIcon());</span>
+<span class="nc" id="L546">		jButton1.setAlignmentY(0.0F);</span>
+<span class="nc" id="L547">		jButton1.setIconTextGap(0);</span>
+<span class="nc" id="L548">		jButton1.setMargin(new Insets(2, 2, 2, 2));</span>
+<span class="nc" id="L549">		jButton1.addActionListener(this::jButton1ActionPerformed);</span>
+<span class="nc" id="L550">		nameActionPanel.add(jButton1);</span>
+
+<span class="nc" id="L552">		namePanel.add(nameActionPanel);</span>
+
+<span class="nc" id="L554">		topPanel.add(genCtrlPanel);</span>
+<span class="nc" id="L555">		topPanel.add(nameTitlePanel);</span>
+<span class="nc" id="L556">		topPanel.add(namePanel);</span>
+<span class="nc" id="L557">		topPanel.add(nameDisplayPanel);</span>
+<span class="nc" id="L558">		add(topPanel, BorderLayout.NORTH);</span>
+<span class="nc" id="L559">	}</span>
+
+	//GEN-END:initComponents
+
+	private void jButton1ActionPerformed(ActionEvent evt)
+	{ //GEN-FIRST:event_jButton1ActionPerformed
+<span class="nc" id="L565">		Clipboard cb = getToolkit().getSystemClipboard();</span>
+<span class="nc" id="L566">		StringSelection ss = new StringSelection(name.getText());</span>
+<span class="nc" id="L567">		cb.setContents(ss, ss);</span>
+<span class="nc" id="L568">	}</span>
+
+	//GEN-LAST:event_jButton1ActionPerformed
+
+	private void loadCatalogDD()
+	{
+		try
+		{
+<span class="nc" id="L576">			String catKey = (String) cbCategory.getSelectedItem();</span>
+<span class="nc" id="L577">			String genderKey = (String) cbGender.getSelectedItem();</span>
+<span class="nc" id="L578">			RuleSet oldRS = (RuleSet) cbCatalog.getSelectedItem();</span>
+<span class="nc" id="L579">			String catalogKey = &quot;&quot;;</span>
+
+<span class="nc bnc" id="L581" title="All 2 branches missed.">			if (oldRS != null)</span>
+			{
+<span class="nc" id="L583">				catalogKey = oldRS.getTitle();</span>
+			}
+
+<span class="nc" id="L586">			List&lt;RuleSet&gt; cats = categories.get(catKey);</span>
+<span class="nc" id="L587">			List&lt;RuleSet&gt; genders = categories.get(&quot;Sex: &quot; + genderKey);</span>
+<span class="nc" id="L588">			List&lt;RuleSet&gt; join = new ArrayList&lt;&gt;(cats);</span>
+<span class="nc" id="L589">			join.retainAll(genders);</span>
+<span class="nc" id="L590">			join.sort(new DataElementComperator());</span>
+
+<span class="nc" id="L592">			Vector&lt;RuleSet&gt; catalogs = new Vector&lt;&gt;();</span>
+<span class="nc" id="L593">			int oldSelected = -1;</span>
+<span class="nc" id="L594">			int n = 0;</span>
+
+<span class="nc bnc" id="L596" title="All 2 branches missed.">			for (final RuleSet rs : join)</span>
+			{
+<span class="nc bnc" id="L598" title="All 2 branches missed.">				if (rs.getUsage().equals(&quot;final&quot;))</span>
+				{
+<span class="nc" id="L600">					catalogs.add(rs);</span>
+
+<span class="nc bnc" id="L602" title="All 2 branches missed.">					if (rs.getTitle().equals(catalogKey))</span>
+					{
+<span class="nc" id="L604">						oldSelected = n;</span>
+					}
+
+<span class="nc" id="L607">					n++;</span>
+				}
+<span class="nc" id="L609">			}</span>
+
+<span class="nc" id="L611">			ComboBoxModel&lt;RuleSet&gt; catalogModel = new DefaultComboBoxModel&lt;&gt;(catalogs);</span>
+<span class="nc" id="L612">			cbCatalog.setModel(catalogModel);</span>
+<span class="nc bnc" id="L613" title="All 2 branches missed.">			if (oldSelected &gt;= 0)</span>
+			{
+<span class="nc" id="L615">				cbCatalog.setSelectedIndex(oldSelected);</span>
+			}
+		}
+<span class="nc" id="L618">		catch (Exception e)</span>
+		{
+<span class="nc" id="L620">			Logging.errorPrint(e.getMessage(), e);</span>
+<span class="nc" id="L621">		}</span>
+<span class="nc" id="L622">	}</span>
+
+	//	Get a list of all the gender categories in the category map
+	private Vector&lt;String&gt; getGenderCategoryNames()
+	{
+<span class="nc" id="L627">		Vector&lt;String&gt; genders = new Vector&lt;&gt;();</span>
+<span class="nc" id="L628">		Set&lt;String&gt; keySet = categories.keySet();</span>
+
+		//	Loop through the keys in the categories
+<span class="nc bnc" id="L631" title="All 2 branches missed.">		for (final String key : keySet)</span>
+		{
+			//	if the key starts with &quot;Sex&quot; then save it
+<span class="nc bnc" id="L634" title="All 2 branches missed.">			if (key.startsWith(&quot;Sex:&quot;))</span>
+			{
+<span class="nc" id="L636">				genders.add(key.substring(5));</span>
+			}
+<span class="nc" id="L638">		}</span>
+
+		//	Return all the found gender types
+<span class="nc" id="L641">		return genders;</span>
+	}
+
+	//	Load the gender drop dowd
+	private void loadGenderDD()
+	{
+<span class="nc" id="L647">		List&lt;String&gt; genders = getGenderCategoryNames();</span>
+<span class="nc" id="L648">		Vector&lt;String&gt; selectable = new Vector&lt;&gt;();</span>
+<span class="nc" id="L649">		String gender = (String) cbGender.getSelectedItem();</span>
+
+		//	Get the selected category name
+<span class="nc" id="L652">		String category = (String) cbCategory.getSelectedItem();</span>
+
+		//	Get the set of rules for selected category
+<span class="nc" id="L655">		List&lt;RuleSet&gt; categoryRules = categories.get(category);</span>
+
+		//	we need to determine if the selected category is supported by the 
+		//	available genders
+		//	loop through the available genders
+<span class="nc bnc" id="L660" title="All 2 branches missed.">		for (String genderString : genders)</span>
+		{
+			//	Get the list of rules for the current gender
+<span class="nc" id="L663">			List&lt;RuleSet&gt; genderRules = categories.get(&quot;Sex: &quot; + genderString);</span>
+
+			//	now loop through all the rules from the selected category
+<span class="nc bnc" id="L666" title="All 2 branches missed.">			for (RuleSet categoryRule : categoryRules)</span>
+			{
+				//	if the category rule is in the list of gender rules
+				//	add the current gender to the selectable gender list
+				//	we can stop processing the list once we find a match
+<span class="nc bnc" id="L671" title="All 2 branches missed.">				if (genderRules.contains(categoryRule))</span>
+				{
+<span class="nc" id="L673">					selectable.add(genderString);</span>
+<span class="nc" id="L674">					break;</span>
+				}
+<span class="nc" id="L676">			}</span>
+<span class="nc" id="L677">		}</span>
+
+		//	Sort the genders
+<span class="nc" id="L680">		Collections.sort(selectable);</span>
+
+		//	Create a new model for the combobox and set it
+<span class="nc" id="L683">		cbGender.setModel(new DefaultComboBoxModel&lt;&gt;(selectable));</span>
+<span class="nc bnc" id="L684" title="All 4 branches missed.">		if (gender != null &amp;&amp; selectable.contains(gender))</span>
+		{
+<span class="nc" id="L686">			cbGender.setSelectedItem(gender);</span>
+		}
+<span class="nc" id="L688">	}</span>
+
+	private void loadCategory(Element category, RuleSet rs)
+	{
+<span class="nc" id="L692">		List&lt;RuleSet&gt; cat = categories.get(category.getAttributeValue(&quot;title&quot;));</span>
+		List&lt;RuleSet&gt; thiscat;
+
+<span class="nc bnc" id="L695" title="All 2 branches missed.">		if (cat == null)</span>
+		{
+<span class="nc" id="L697">			thiscat = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L698">			categories.put(category.getAttributeValue(&quot;title&quot;), thiscat);</span>
+		}
+		else
+		{
+<span class="nc" id="L702">			thiscat = cat;</span>
+		}
+
+<span class="nc" id="L705">		thiscat.add(rs);</span>
+<span class="nc" id="L706">	}</span>
+
+	private void loadData(File path)
+	{
+<span class="nc bnc" id="L710" title="All 2 branches missed.">		if (path.isDirectory())</span>
+		{
+<span class="nc" id="L712">			File[] dataFiles = path.listFiles(new XMLFilter());</span>
+<span class="nc" id="L713">			SAXBuilder builder = new SAXBuilder();</span>
+<span class="nc" id="L714">			GeneratorDtdResolver resolver = new GeneratorDtdResolver(path);</span>
+<span class="nc" id="L715">			builder.setEntityResolver(resolver);</span>
+
+<span class="nc bnc" id="L717" title="All 2 branches missed.">			for (File dataFile : dataFiles)</span>
+			{
+				try
+				{
+<span class="nc" id="L721">					URL url = dataFile.toURI().toURL();</span>
+<span class="nc" id="L722">					Document nameSet = builder.build(url);</span>
+<span class="nc" id="L723">					DocType dt = nameSet.getDocType();</span>
+
+<span class="nc bnc" id="L725" title="All 2 branches missed.">					if (dt.getElementName().equals(&quot;GENERATOR&quot;))</span>
+					{
+<span class="nc" id="L727">						loadFromDocument(nameSet);</span>
+					}
+				}
+<span class="nc" id="L730">				catch (Exception e)</span>
+				{
+<span class="nc" id="L732">					Logging.errorPrint(e.getMessage(), e);</span>
+<span class="nc" id="L733">					JOptionPane.showMessageDialog(this, &quot;XML Error with file &quot; + dataFile.getName());</span>
+<span class="nc" id="L734">				}</span>
+			}
+
+<span class="nc" id="L737">			loadDropdowns();</span>
+<span class="nc" id="L738">		}</span>
+		else
+		{
+<span class="nc" id="L741">			JOptionPane.showMessageDialog(this, &quot;No data files in directory &quot; + path.getPath());</span>
+		}
+<span class="nc" id="L743">	}</span>
+
+	//	Get a list of category names from the categories map
+	private Vector&lt;String&gt; getCategoryNames()
+	{
+<span class="nc" id="L748">		Vector&lt;String&gt; cats = new Vector&lt;&gt;();</span>
+<span class="nc" id="L749">		Set&lt;String&gt; keySet = categories.keySet();</span>
+
+<span class="nc bnc" id="L751" title="All 2 branches missed.">		for (final String key : keySet)</span>
+		{
+			//	Ignore any category that starts with this
+<span class="nc bnc" id="L754" title="All 2 branches missed.">			if (key.startsWith(&quot;Sex:&quot;))</span>
+			{
+<span class="nc" id="L756">				continue;</span>
+			}
+
+<span class="nc" id="L759">			cats.add(key);</span>
+<span class="nc" id="L760">		}</span>
+
+		//	Sor the selected categories before returning it
+<span class="nc" id="L763">		Collections.sort(cats);</span>
+
+<span class="nc" id="L765">		return cats;</span>
+	}
+
+	private void loadDropdowns()
+	{
+		//	This method now just loads the category dropdown from the list of 
+		//	category names
+<span class="nc" id="L772">		Vector&lt;String&gt; cats = this.getCategoryNames();</span>
+<span class="nc" id="L773">		cbCategory.setModel(new DefaultComboBoxModel&lt;&gt;(cats));</span>
+
+<span class="nc" id="L775">		this.loadGenderDD();</span>
+<span class="nc" id="L776">		this.loadCatalogDD();</span>
+<span class="nc" id="L777">	}</span>
+
+	private void loadFromDocument(Document nameSet) throws DataConversionException
+	{
+<span class="nc" id="L781">		Element generator = nameSet.getRootElement();</span>
+<span class="nc" id="L782">		java.util.List&lt;?&gt; rulesets = generator.getChildren(&quot;RULESET&quot;);</span>
+<span class="nc" id="L783">		java.util.List&lt;?&gt; lists = generator.getChildren(&quot;LIST&quot;);</span>
+
+<span class="nc bnc" id="L785" title="All 2 branches missed.">		for (final Object o : lists)</span>
+		{
+<span class="nc" id="L787">			Element list = (Element) o;</span>
+<span class="nc" id="L788">			loadList(list);</span>
+<span class="nc" id="L789">		}</span>
+
+<span class="nc bnc" id="L791" title="All 2 branches missed.">		for (final Object ruleset : rulesets)</span>
+		{
+<span class="nc" id="L793">			Element ruleSet = (Element) ruleset;</span>
+<span class="nc" id="L794">			RuleSet rs = loadRuleSet(ruleSet);</span>
+<span class="nc" id="L795">			allVars.addDataElement(rs);</span>
+<span class="nc" id="L796">		}</span>
+<span class="nc" id="L797">	}</span>
+
+	private String loadList(Element list) throws DataConversionException
+	{
+<span class="nc" id="L801">		pcgen.core.doomsdaybook.DDList dataList = new pcgen.core.doomsdaybook.DDList(allVars,</span>
+<span class="nc" id="L802">			list.getAttributeValue(&quot;title&quot;), list.getAttributeValue(&quot;id&quot;));</span>
+<span class="nc" id="L803">		java.util.List&lt;?&gt; elements = list.getChildren();</span>
+
+<span class="nc bnc" id="L805" title="All 2 branches missed.">		for (final Object element : elements)</span>
+		{
+<span class="nc" id="L807">			Element child = (Element) element;</span>
+<span class="nc" id="L808">			String elementName = child.getName();</span>
+
+<span class="nc bnc" id="L810" title="All 2 branches missed.">			if (elementName.equals(&quot;VALUE&quot;))</span>
+			{
+<span class="nc" id="L812">				WeightedDataValue dv =</span>
+<span class="nc" id="L813">						new WeightedDataValue(child.getText(), child.getAttribute(&quot;weight&quot;).getIntValue());</span>
+<span class="nc" id="L814">				List&lt;?&gt; subElements = child.getChildren(&quot;SUBVALUE&quot;);</span>
+
+<span class="nc bnc" id="L816" title="All 2 branches missed.">				for (final Object subElement1 : subElements)</span>
+				{
+<span class="nc" id="L818">					Element subElement = (Element) subElement1;</span>
+<span class="nc" id="L819">					dv.addSubValue(subElement.getAttributeValue(&quot;type&quot;), subElement.getText());</span>
+<span class="nc" id="L820">				}</span>
+
+<span class="nc" id="L822">				dataList.add(dv);</span>
+			}
+<span class="nc" id="L824">		}</span>
+
+<span class="nc" id="L826">		allVars.addDataElement(dataList);</span>
+
+<span class="nc" id="L828">		return dataList.getId();</span>
+	}
+
+	private String loadRule(Element rule, String id) throws DataConversionException
+	{
+<span class="nc" id="L833">		Rule dataRule = new Rule(allVars, id, id, rule.getAttribute(&quot;weight&quot;).getIntValue());</span>
+<span class="nc" id="L834">		java.util.List&lt;?&gt; elements = rule.getChildren();</span>
+
+<span class="nc bnc" id="L836" title="All 2 branches missed.">		for (final Object element : elements)</span>
+		{
+<span class="nc" id="L838">			Element child = (Element) element;</span>
+<span class="nc" id="L839">			String elementName = child.getName();</span>
+
+<span class="nc bnc" id="L841" title="All 6 branches missed.">			switch (elementName)</span>
+			{
+				case &quot;GETLIST&quot; -&gt; {
+<span class="nc" id="L844">					String listId = child.getAttributeValue(&quot;idref&quot;);</span>
+<span class="nc" id="L845">					dataRule.add(listId);</span>
+<span class="nc" id="L846">				}</span>
+				case &quot;SPACE&quot; -&gt; {
+<span class="nc" id="L848">					SpaceRule sp = new SpaceRule();</span>
+<span class="nc" id="L849">					allVars.addDataElement(sp);</span>
+<span class="nc" id="L850">					dataRule.add(sp.getId());</span>
+<span class="nc" id="L851">				}</span>
+				case &quot;HYPHEN&quot; -&gt; {
+<span class="nc" id="L853">					HyphenRule hy = new HyphenRule();</span>
+<span class="nc" id="L854">					allVars.addDataElement(hy);</span>
+<span class="nc" id="L855">					dataRule.add(hy.getId());</span>
+<span class="nc" id="L856">				}</span>
+				case &quot;CR&quot; -&gt; {
+<span class="nc" id="L858">					CRRule cr = new CRRule();</span>
+<span class="nc" id="L859">					allVars.addDataElement(cr);</span>
+<span class="nc" id="L860">					dataRule.add(cr.getId());</span>
+<span class="nc" id="L861">				}</span>
+				case &quot;GETRULE&quot; -&gt; {
+<span class="nc" id="L863">					String ruleId = child.getAttributeValue(&quot;idref&quot;);</span>
+<span class="nc" id="L864">					dataRule.add(ruleId);</span>
+				}
+			}
+<span class="nc" id="L867">		}</span>
+
+<span class="nc" id="L869">		allVars.addDataElement(dataRule);</span>
+
+<span class="nc" id="L871">		return dataRule.getId();</span>
+	}
+
+	private RuleSet loadRuleSet(Element ruleSet) throws DataConversionException
+	{
+<span class="nc" id="L876">		RuleSet rs = new RuleSet(allVars, ruleSet.getAttributeValue(&quot;title&quot;), ruleSet.getAttributeValue(&quot;id&quot;),</span>
+<span class="nc" id="L877">			ruleSet.getAttributeValue(&quot;usage&quot;));</span>
+<span class="nc" id="L878">		java.util.List&lt;?&gt; elements = ruleSet.getChildren();</span>
+<span class="nc" id="L879">		ListIterator&lt;?&gt; elementsIterator = elements.listIterator();</span>
+<span class="nc" id="L880">		int num = 0;</span>
+
+<span class="nc bnc" id="L882" title="All 2 branches missed.">		while (elementsIterator.hasNext())</span>
+		{
+<span class="nc" id="L884">			Element child = (Element) elementsIterator.next();</span>
+<span class="nc" id="L885">			String elementName = child.getName();</span>
+
+<span class="nc bnc" id="L887" title="All 2 branches missed.">			if (elementName.equals(&quot;CATEGORY&quot;))</span>
+			{
+<span class="nc" id="L889">				loadCategory(child, rs);</span>
+			}
+<span class="nc bnc" id="L891" title="All 2 branches missed.">			else if (elementName.equals(&quot;RULE&quot;))</span>
+			{
+<span class="nc" id="L893">				rs.add(loadRule(child, rs.getId() + num));</span>
+			}
+
+<span class="nc" id="L896">			num++;</span>
+<span class="nc" id="L897">		}</span>
+
+<span class="nc" id="L899">		return rs;</span>
+	}
+
+	private void loadStructureDD()
+	{
+<span class="nc bnc" id="L904" title="All 2 branches missed.">		if (chkStructure.isSelected())</span>
+		{
+<span class="nc" id="L906">			cbStructure.setModel(new DefaultComboBoxModel&lt;&gt;());</span>
+<span class="nc" id="L907">			cbStructure.setEnabled(false);</span>
+		}
+		else
+		{
+<span class="nc" id="L911">			Vector&lt;DataElement&gt; struct = new Vector&lt;&gt;();</span>
+
+<span class="nc bnc" id="L913" title="All 2 branches missed.">			for (String key : ((RuleSet) cbCatalog.getSelectedItem()))</span>
+			{
+				try
+				{
+<span class="nc" id="L917">					struct.add(allVars.getDataElement(key));</span>
+				}
+<span class="nc" id="L919">				catch (Exception e)</span>
+				{
+<span class="nc" id="L921">					Logging.errorPrint(e.getMessage(), e);</span>
+<span class="nc" id="L922">				}</span>
+<span class="nc" id="L923">			}</span>
+
+<span class="nc" id="L925">			DefaultComboBoxModel&lt;DataElement&gt; structModel = new DefaultComboBoxModel&lt;&gt;(struct);</span>
+<span class="nc" id="L926">			cbStructure.setModel(structModel);</span>
+<span class="nc" id="L927">			cbStructure.setEnabled(true);</span>
+		}
+<span class="nc" id="L929">	}</span>
+
+	/**
+	 * @return the generated name chosen by the user
+	 */
+	public String getChosenName()
+	{
+<span class="nc" id="L936">		return name.getText();</span>
+	}
+
+	/**
+	 * @return the gender
+	 */
+	public String getGender()
+	{
+<span class="nc" id="L944">		return (String) cbGender.getSelectedItem();</span>
+	}
+
+	/**
+	 * @param gender the gender to set
+	 */
+	public void setGender(String gender)
+	{
+<span class="nc bnc" id="L952" title="All 4 branches missed.">		if (gender != null &amp;&amp; cbGender != null)</span>
+		{
+<span class="nc" id="L954">			cbGender.setSelectedItem(gender);</span>
+		}
+<span class="nc" id="L956">	}</span>
+
+	/**
+	 * The Class {@code GeneratorDtdResolver} is an EntityResolver implementation
+	 * for use with a SAX parser. It forces the generator.dtd to be read from a 
+	 * known location.
+	 */
+	public static class GeneratorDtdResolver implements EntityResolver
+	{
+
+		private final File parent;
+
+		/**
+		 * Create a new instance of GeneratorDtdResolver to read the 
+		 * generator.dtd from a specific directory.
+		 * @param parent The parent directory holding generator.dtd
+		 */
+		GeneratorDtdResolver(File parent)
+<span class="nc" id="L974">		{</span>
+<span class="nc" id="L975">			this.parent = parent;</span>
+
+<span class="nc" id="L977">		}</span>
+
+		@Override
+		public InputSource resolveEntity(String publicId, String systemId)
+		{
+<span class="nc bnc" id="L982" title="All 2 branches missed.">			if (systemId.endsWith(&quot;generator.dtd&quot;))</span>
+			{
+				// return a special input source
+				InputStream dtdIn;
+				try
+				{
+<span class="nc" id="L988">					dtdIn = new FileInputStream(new File(parent, &quot;generator.dtd&quot;));</span>
+				}
+<span class="nc" id="L990">				catch (FileNotFoundException e)</span>
+				{
+<span class="nc" id="L992">					Logging.errorPrint(&quot;GeneratorDtdResolver.resolveEntity failed&quot;, e);</span>
+<span class="nc" id="L993">					return null;</span>
+
+<span class="nc" id="L995">				}</span>
+<span class="nc" id="L996">				return new InputSource(dtdIn);</span>
+			}
+			else
+			{
+				// use the default behaviour
+<span class="nc" id="L1001">				return null;</span>
+			}
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

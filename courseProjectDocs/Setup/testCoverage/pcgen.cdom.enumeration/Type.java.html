@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Type.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.cdom.enumeration</a> &gt; <span class="el_source">Type.java</span></div><h1>Type.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2006 Tom Parker &lt;thpr@users.sourceforge.net&gt;
+ * 
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+package pcgen.cdom.enumeration;
+
+import java.lang.reflect.Field;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Objects;
+
+import pcgen.base.enumeration.TypeSafeConstant;
+import pcgen.base.lang.UnreachableError;
+import pcgen.base.util.CaseInsensitiveMap;
+import pcgen.cdom.base.Constants;
+
+/**
+ * 
+ * This Class is a Type Safe Constant. It is designed to hold Types in a
+ * type-safe fashion, so that they can be quickly compared and use less memory
+ * when identical Types exist in two CDOMObjects.
+ */
+public final class Type implements TypeSafeConstant, Comparable&lt;Type&gt;
+{
+	/**
+	 * This Map contains the mappings from Strings to the Type Safe Constant
+	 */
+<span class="fc" id="L41">	private static final CaseInsensitiveMap&lt;Type&gt; TYPE_MAP = new CaseInsensitiveMap&lt;&gt;();</span>
+
+<span class="fc" id="L43">	public static final Type NATURAL = getConstant(&quot;Natural&quot;);</span>
+
+<span class="fc" id="L45">	public static final Type CUSTOM = getConstant(Constants.TYPE_CUSTOM);</span>
+
+<span class="fc" id="L47">	public static final Type NONE = getConstant(&quot;None&quot;);</span>
+
+<span class="fc" id="L49">	public static final Type HUMANOID = getConstant(&quot;Humanoid&quot;);</span>
+
+<span class="fc" id="L51">	public static final Type WEAPON = getConstant(&quot;Weapon&quot;);</span>
+
+<span class="fc" id="L53">	public static final Type MELEE = getConstant(&quot;Melee&quot;);</span>
+
+<span class="fc" id="L55">	public static final Type SIMPLE = getConstant(&quot;Simple&quot;);</span>
+
+<span class="fc" id="L57">	public static final Type UNARMED = getConstant(&quot;Unarmed&quot;);</span>
+
+<span class="fc" id="L59">	public static final Type SUBDUAL = getConstant(&quot;Subdual&quot;);</span>
+
+<span class="fc" id="L61">	public static final Type STANDARD = getConstant(&quot;Standard&quot;);</span>
+
+<span class="fc" id="L63">	public static final Type MONK = getConstant(&quot;Monk&quot;);</span>
+
+<span class="fc" id="L65">	public static final Type BLUDGEONING = getConstant(&quot;Bludgeoning&quot;);</span>
+
+<span class="fc" id="L67">	public static final Type AUTO_GEN = getConstant(&quot;AUTO_GEN&quot;);</span>
+
+<span class="fc" id="L69">	public static final Type BOTH = getConstant(&quot;Both&quot;);</span>
+
+<span class="fc" id="L71">	public static final Type THROWN = getConstant(&quot;Thrown&quot;);</span>
+
+<span class="fc" id="L73">	public static final Type RANGED = getConstant(&quot;Ranged&quot;);</span>
+
+<span class="fc" id="L75">	public static final Type DOUBLE = getConstant(&quot;Double&quot;);</span>
+
+<span class="fc" id="L77">	public static final Type HEAD1 = getConstant(&quot;Head1&quot;);</span>
+
+<span class="fc" id="L79">	public static final Type HEAD2 = getConstant(&quot;Head2&quot;);</span>
+
+<span class="fc" id="L81">	public static final Type TEMPORARY = getConstant(&quot;TEMPORARY&quot;);</span>
+
+<span class="fc" id="L83">	public static final Type DIVINE = getConstant(&quot;Divine&quot;);</span>
+
+<span class="fc" id="L85">	public static final Type POTION = getConstant(&quot;Potion&quot;);</span>
+
+<span class="fc" id="L87">	public static final Type RING = getConstant(&quot;Ring&quot;);</span>
+
+<span class="fc" id="L89">	public static final Type SCROLL = getConstant(&quot;Scroll&quot;);</span>
+
+<span class="fc" id="L91">	public static final Type WAND = getConstant(&quot;Wand&quot;);</span>
+
+<span class="fc" id="L93">	public static final Type MONSTER = getConstant(&quot;Monster&quot;);</span>
+
+<span class="fc" id="L95">	public static final Type SHIELD = getConstant(&quot;Shield&quot;);</span>
+
+<span class="fc" id="L97">	public static final Type ARMOR = getConstant(&quot;Armor&quot;);</span>
+
+<span class="fc" id="L99">	public static final Type MAGIC = getConstant(&quot;Magic&quot;);</span>
+
+<span class="fc" id="L101">	public static final Type MASTERWORK = getConstant(&quot;Masterwork&quot;);</span>
+
+<span class="fc" id="L103">  public static final Type ANY = getConstant(&quot;ANY&quot;);</span>
+
+	static
+	{
+<span class="fc" id="L107">		buildMap();</span>
+	}
+
+	/**
+	 * This is used to provide a unique ordinal to each constant in this class
+	 */
+<span class="fc" id="L113">	private static int ordinalCount = 0;</span>
+
+	/**
+	 * The name of this Constant
+	 */
+	private final String fieldName;
+
+	/**
+	 * The ordinal of this Constant
+	 */
+	private final int ordinal;
+
+	private Type(String name)
+<span class="fc" id="L126">	{</span>
+<span class="fc" id="L127">		Objects.requireNonNull(name, &quot;Name for Type cannot be null&quot;);</span>
+<span class="fc" id="L128">		ordinal = ordinalCount++;</span>
+<span class="fc" id="L129">		fieldName = name;</span>
+<span class="fc" id="L130">	}</span>
+
+	/**
+	 * Converts this Constant to a String (returns the name of this Constant)
+	 * 
+	 * @return The string representation (name) of this Constant
+	 */
+	@Override
+	public String toString()
+	{
+<span class="fc" id="L140">		return fieldName;</span>
+	}
+
+	/**
+	 * Gets the ordinal of this Constant
+	 */
+	@Override
+	public int getOrdinal()
+	{
+<span class="nc" id="L149">		return ordinal;</span>
+	}
+
+	/**
+	 * Converts this Constant to a String (returns the name of this Constant)
+	 * that is suitable for backwards compatible comparison. The returned value
+	 * will always be uppercase.
+	 * 
+	 * @return The string representation (name) of this Constant
+	 */
+	public String getComparisonString()
+	{
+<span class="fc" id="L161">		return fieldName.toUpperCase();</span>
+	}
+
+	/**
+	 * Returns the constant for the given String (the search for the constant is
+	 * case insensitive). If the constant does not already exist, a new Constant
+	 * is created with the given String as the name of the Constant.
+	 * 
+	 * @param name
+	 *            The name of the constant to be returned
+	 * @return The Constant for the given name
+	 */
+	public static Type getConstant(String name)
+	{
+<span class="fc" id="L175">		Type type = TYPE_MAP.get(name);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">		if (type == null)</span>
+		{
+<span class="fc" id="L178">			type = new Type(name);</span>
+<span class="fc" id="L179">			TYPE_MAP.put(name, type);</span>
+		}
+<span class="fc" id="L181">		return type;</span>
+	}
+
+	/**
+	 * Returns the constant for the given String (the search for the constant is
+	 * case insensitive). If the constant does not already exist, an
+	 * IllegalArgumentException is thrown.
+	 * 
+	 * @param name
+	 *            The name of the constant to be returned
+	 * @return The Constant for the given name
+	 * @throws IllegalArgumentException
+	 *             if the given String is not a previously defined Type
+	 */
+	public static Type valueOf(String name)
+	{
+<span class="fc" id="L197">		Type type = TYPE_MAP.get(name);</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">		if (type == null)</span>
+		{
+<span class="nc" id="L200">			throw new IllegalArgumentException(name + &quot; is not a previously defined Type&quot;);</span>
+		}
+<span class="fc" id="L202">		return type;</span>
+	}
+
+	/**
+	 * Returns a Collection of all of the Constants in this Class.
+	 * 
+	 * This collection maintains a reference to the Constants in this Class, so
+	 * if a new Constant is created, the Collection returned by this method will
+	 * be modified. (Beware of ConcurrentModificationExceptions)
+	 * 
+	 * @return a Collection of all of the Constants in this Class.
+	 */
+	public static Collection&lt;Type&gt; getAllConstants()
+	{
+<span class="nc" id="L216">		return Collections.unmodifiableCollection(TYPE_MAP.values());</span>
+	}
+
+	@Override
+	public int compareTo(Type type)
+	{
+		/*
+		 * Note: Some tools will report a problem here because Type implements
+		 * compareTo, but does not implement custom implementations of hashCode
+		 * or equals(). Because this is intended as a TypeSafeConstant, and Type
+		 * has a private constructor, it is unnecessary to implement a custom
+		 * hashCode or equals.
+		 */
+<span class="nc" id="L229">		return fieldName.compareTo(type.fieldName);</span>
+	}
+
+	public static void buildMap()
+	{
+<span class="fc" id="L234">		TYPE_MAP.clear();</span>
+<span class="fc" id="L235">		Field[] fields = Type.class.getDeclaredFields();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (Field field : fields)</span>
+        {
+<span class="fc" id="L238">            int mod = field.getModifiers();</span>
+
+<span class="fc bfc" id="L240" title="All 4 branches covered.">            if (java.lang.reflect.Modifier.isStatic(mod) &amp;&amp; java.lang.reflect.Modifier.isFinal(mod)</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                    &amp;&amp; java.lang.reflect.Modifier.isPublic(mod))</span>
+            {
+                try
+                {
+<span class="fc" id="L245">                    Object obj = field.get(null);</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                    if (obj instanceof Type)</span>
+                    {
+<span class="fc" id="L248">                        TYPE_MAP.put(field.getName(), (Type) obj);</span>
+                    }
+<span class="nc" id="L250">                } catch (IllegalArgumentException | IllegalAccessException e)</span>
+                {
+<span class="nc" id="L252">                    throw new UnreachableError(e);</span>
+<span class="fc" id="L253">                }</span>
+            }
+        }
+<span class="fc" id="L256">	}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

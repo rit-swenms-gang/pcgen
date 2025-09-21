@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CharacterManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.system</a> &gt; <span class="el_source">CharacterManager.java</span></div><h1>CharacterManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2010 Connor Petty &lt;cpmeister@users.sourceforge.net&gt;
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.system;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.logging.Level;
+
+import pcgen.cdom.base.Constants;
+import pcgen.core.Campaign;
+import pcgen.core.GameMode;
+import pcgen.core.Globals;
+import pcgen.core.PlayerCharacter;
+import pcgen.facade.core.CharacterFacade;
+import pcgen.facade.core.CharacterStubFacade;
+import pcgen.facade.core.DataSetFacade;
+import pcgen.facade.core.PartyFacade;
+import pcgen.facade.core.SourceSelectionFacade;
+import pcgen.facade.core.UIDelegate;
+import pcgen.facade.util.ListFacade;
+import pcgen.facade.util.ListFacades;
+import pcgen.gui2.facade.CharacterFacadeImpl;
+import pcgen.gui2.facade.PartyFacadeImpl;
+import pcgen.io.PCGFile;
+import pcgen.io.PCGIOHandler;
+import pcgen.pluginmgr.PCGenMessageHandler;
+import pcgen.pluginmgr.PluginManager;
+import pcgen.pluginmgr.messages.PlayerCharacterWasLoadedMessage;
+import pcgen.util.Logging;
+
+import org.apache.commons.lang3.StringUtils;
+
+/**
+ * This class stores the characters that are currently opened by
+ * PCGen. It also handles creating new characters and opening
+ * characters from files. The getCharacters method returns
+ * a listenable list that allows users of this class to not
+ * only see what characters are open but to easily track any
+ * changes to the list of available characters.
+ */
+public final class CharacterManager
+{
+
+	private static final PartyFacadeImpl CHARACTERS;
+	private static final RecentFileList RECENT_CHARACTERS;
+	private static final RecentFileList RECENT_PARTIES;
+	private static final PCGenMessageHandler MESSAGE_HANDLER;
+
+	static
+	{
+<span class="nc" id="L69">		CHARACTERS = new PartyFacadeImpl();</span>
+<span class="nc" id="L70">		RECENT_CHARACTERS = new RecentFileList(PCGenSettings.RECENT_CHARACTERS);</span>
+<span class="nc" id="L71">		RECENT_PARTIES = new RecentFileList(PCGenSettings.RECENT_PARTIES);</span>
+<span class="nc" id="L72">		MESSAGE_HANDLER = PluginManager.getInstance().getPostbox();</span>
+<span class="nc" id="L73">	}</span>
+
+	private CharacterManager()
+	{
+	}
+
+	/**
+	 * Create a new character using the supplied data sets.
+	 * @param delegate the UIDelegate that this character will use.
+	 * @param dataset the dataset that this will be loaded with.
+	 * @return The character that was created.
+	 */
+	public static CharacterFacade createNewCharacter(UIDelegate delegate, DataSetFacade dataset)
+	{
+		@SuppressWarnings(&quot;rawtypes&quot;)
+<span class="nc" id="L88">		List campaigns = ListFacades.wrap(dataset.getCampaigns());</span>
+		try
+		{
+			@SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L92">			PlayerCharacter pc = new PlayerCharacter(campaigns);</span>
+<span class="nc" id="L93">			Globals.getPCList().add(pc);</span>
+<span class="nc" id="L94">			CharacterFacade character = new CharacterFacadeImpl(pc, delegate, dataset);</span>
+<span class="nc" id="L95">			String name = createNewCharacterName();</span>
+<span class="nc" id="L96">			character.setName(name);</span>
+<span class="nc" id="L97">			CHARACTERS.addElement(character);</span>
+<span class="nc" id="L98">			Logging.log(Logging.INFO, &quot;Created new character &quot; + name + '.'); //$NON-NLS-1$</span>
+<span class="nc" id="L99">			MESSAGE_HANDLER.handleMessage(new PlayerCharacterWasLoadedMessage(delegate, pc));</span>
+<span class="nc" id="L100">			return character;</span>
+		}
+<span class="nc" id="L102">		catch (final Exception e)</span>
+		{
+<span class="nc" id="L104">			Logging.errorPrint(&quot;Unable to create character with data &quot; //$NON-NLS-1$</span>
+				+ dataset, e);
+<span class="nc" id="L106">			delegate.showErrorMessage(LanguageBundle.getString(&quot;in_cmCreateErrorTitle&quot;), //$NON-NLS-1$</span>
+<span class="nc" id="L107">				LanguageBundle.getFormattedString(&quot;in_cmCreateErrorMessage&quot;, //$NON-NLS-1$</span>
+<span class="nc" id="L108">					e.getMessage()));</span>
+<span class="nc" id="L109">			return null;</span>
+		}
+
+	}
+
+	public static ListFacade&lt;File&gt; getRecentCharacters()
+	{
+<span class="nc" id="L116">		return RECENT_CHARACTERS;</span>
+	}
+
+	public static ListFacade&lt;File&gt; getRecentParties()
+	{
+<span class="nc" id="L121">		return RECENT_PARTIES;</span>
+	}
+
+	/**
+	 * This opens an existing character from a file and adds it to the
+	 * list of open characters. If there is a character already open
+	 * that uses this file, then this method does nothing.
+	 * @param file the file to load this character from
+	 * @param delegate the UIDelegate that this character will use
+	 * @param dataset the dataset that this will be loaded with
+	 * @return The character that was opened.
+	 */
+	public static CharacterFacade openCharacter(File file, UIDelegate delegate, DataSetFacade dataset)
+	{
+<span class="nc" id="L135">		final PlayerCharacter newPC = openPcInternal(file, delegate, dataset, false);</span>
+
+<span class="nc bnc" id="L137" title="All 2 branches missed.">		if (newPC == null)</span>
+		{
+<span class="nc" id="L139">			return null;</span>
+		}
+
+<span class="nc" id="L142">		return createChracterFacade(delegate, dataset, newPC);</span>
+	}
+
+	/**
+	 * This opens an existing character from a file and adds it to the
+	 * list of open characters. If there is a character already open
+	 * that uses this file, then this method does nothing.
+	 * @param file the file to load this character from
+	 * @param delegate the UIDelegate that this character will use
+	 * @param dataset the dataset that this will be loaded with
+	 * @param blockLoadedMessage Should we stop the character loaded message being sent out to listeners.
+	 * @return The character that was opened.
+	 */
+	public static PlayerCharacter openPlayerCharacter(File file, UIDelegate delegate, DataSetFacade dataset,
+		boolean blockLoadedMessage)
+	{
+<span class="nc" id="L158">		final PlayerCharacter newPC = openPcInternal(file, delegate, dataset, blockLoadedMessage);</span>
+
+<span class="nc bnc" id="L160" title="All 2 branches missed.">		if (newPC == null)</span>
+		{
+<span class="nc" id="L162">			return null;</span>
+		}
+
+<span class="nc" id="L165">		createChracterFacade(delegate, dataset, newPC);</span>
+<span class="nc" id="L166">		return newPC;</span>
+	}
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	private static PlayerCharacter openPcInternal(File file, UIDelegate delegate, DataSetFacade dataset,
+		boolean blockLoadedMessage)
+	{
+		@SuppressWarnings(&quot;rawtypes&quot;)
+<span class="nc" id="L174">		List campaigns = ListFacades.wrap(dataset.getCampaigns());</span>
+		try
+		{
+<span class="nc" id="L177">			final PlayerCharacter newPC = new PlayerCharacter(campaigns);</span>
+<span class="nc" id="L178">			newPC.setFileName(file.getAbsolutePath());</span>
+<span class="nc" id="L179">			final PCGIOHandler ioHandler = new PCGIOHandler();</span>
+<span class="nc" id="L180">			ioHandler.read(newPC, file.getAbsolutePath());</span>
+			// Ensure any custom equipment held by the character is added to the dataset's list
+<span class="nc" id="L182">			dataset.refreshEquipment();</span>
+<span class="nc" id="L183">			newPC.calcActiveBonuses();</span>
+
+<span class="nc bnc" id="L185" title="All 2 branches missed.">			if (!showLoadNotices(true, ioHandler.getErrors(), file.getName(), delegate))</span>
+			{
+				// if we've had errors, then abort trying to add the new PC, it's most likely &quot;broken&quot;
+<span class="nc" id="L188">				return null;</span>
+			}
+<span class="nc bnc" id="L190" title="All 2 branches missed.">			if (!showLoadNotices(false, ioHandler.getWarnings(), file.getName(), delegate))</span>
+			{
+<span class="nc" id="L192">				return null;</span>
+			}
+<span class="nc" id="L194">			Logging.log(Logging.INFO, &quot;Loaded character &quot; + newPC.getName() //$NON-NLS-1$</span>
+<span class="nc" id="L195">				+ &quot; - &quot; + file.getAbsolutePath()); //$NON-NLS-1$</span>
+
+			// if it's not broken, then only warnings should have been generated, and we won't count those
+			// Register the character so that future checks to see if file already loaded will work
+<span class="nc" id="L199">			Globals.getPCList().add(newPC);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">			if (!blockLoadedMessage)</span>
+			{
+<span class="nc" id="L202">				MESSAGE_HANDLER.handleMessage(new PlayerCharacterWasLoadedMessage(delegate, newPC));</span>
+			}
+<span class="nc" id="L204">			return newPC;</span>
+
+		}
+<span class="nc" id="L207">		catch (final Exception e)</span>
+		{
+<span class="nc" id="L209">			Logging.errorPrint(&quot;Unable to load character &quot; + file, e); //$NON-NLS-1$</span>
+<span class="nc" id="L210">			delegate.showErrorMessage(LanguageBundle.getString(&quot;in_cmLoadErrorTitle&quot;), //$NON-NLS-1$</span>
+<span class="nc" id="L211">				LanguageBundle.getFormattedString(&quot;in_cmLoadErrorMessage&quot;, //$NON-NLS-1$</span>
+<span class="nc" id="L212">					file, e.getMessage()));</span>
+<span class="nc" id="L213">			return null;</span>
+		}
+	}
+
+	private static CharacterFacade createChracterFacade(UIDelegate delegate, DataSetFacade dataset,
+		final PlayerCharacter newPC)
+	{
+<span class="nc" id="L220">		CharacterFacade character = new CharacterFacadeImpl(newPC, delegate, dataset);</span>
+<span class="nc" id="L221">		CHARACTERS.addElement(character);</span>
+<span class="nc" id="L222">		return character;</span>
+	}
+
+	/**
+	 * Show the user any warnings or errors from the character load and get
+	 * their approval to continue.
+	 *
+	 * @param errors Is this a list of errors?
+	 * @param warnings The warnings generated on load.
+	 * @param fileName The name of the file being loaded.
+	 * @param delegate The UIDelegate to use for notifications.
+	 * @return true if the character should be loaded, false if not.
+	 */
+	private static boolean showLoadNotices(boolean errors, List&lt;String&gt; warnings, String fileName, UIDelegate delegate)
+	{
+<span class="nc bnc" id="L237" title="All 2 branches missed.">		if (warnings.isEmpty())</span>
+		{
+<span class="nc" id="L239">			return true;</span>
+		}
+
+<span class="nc" id="L242">		StringBuilder warningMsg = new StringBuilder();</span>
+		Level lvl;
+<span class="nc bnc" id="L244" title="All 2 branches missed.">		if (errors)</span>
+		{
+<span class="nc" id="L246">			warningMsg.append(LanguageBundle.getString(&quot;in_cmErrorStart&quot;));</span>
+<span class="nc" id="L247">			Logging.errorPrint(&quot;The following errors were encountered while loading &quot; + fileName);</span>
+<span class="nc" id="L248">			lvl = Logging.ERROR;</span>
+		}
+		else
+		{
+<span class="nc" id="L252">			warningMsg.append(LanguageBundle.getString(&quot;in_cmWarnStart&quot;));</span>
+<span class="nc" id="L253">			Logging.log(Logging.WARNING, &quot;The following warnings were encountered while loading &quot; + fileName);</span>
+<span class="nc" id="L254">			lvl = Logging.WARNING;</span>
+		}
+<span class="nc" id="L256">		warningMsg.append('\n');</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">		for (final String string : warnings)</span>
+		{
+<span class="nc" id="L259">			warningMsg.append(string);</span>
+<span class="nc" id="L260">			warningMsg.append('\n');</span>
+<span class="nc" id="L261">			Logging.log(lvl, &quot;* &quot; + string); //$NON-NLS-1$</span>
+<span class="nc" id="L262">		}</span>
+
+<span class="nc bnc" id="L264" title="All 2 branches missed.">		if (errors)</span>
+		{
+<span class="nc" id="L266">			warningMsg.append(LanguageBundle.getString(&quot;in_cmErrorEnd&quot;));</span>
+<span class="nc" id="L267">			delegate.showErrorMessage(fileName, warningMsg.toString());</span>
+<span class="nc" id="L268">			return false;</span>
+		}
+
+<span class="nc" id="L271">		warningMsg.append(LanguageBundle.getString(&quot;in_cmWarnEnd&quot;));</span>
+<span class="nc" id="L272">		return delegate.showWarningConfirm(fileName, warningMsg.toString());</span>
+	}
+
+	/**
+	 * This opens an existing party from a file and adds all characters to the
+	 * list of open characters.
+	 *
+	 * @param file the file to load this party from
+	 * @param delegate the UIDelegate that these characters will use
+	 * @param dataset the dataset that this will be loaded with
+	 * @return The party that was opened.
+	 */
+	public static PartyFacade openParty(File file, final UIDelegate delegate, final DataSetFacade dataset)
+	{
+<span class="nc" id="L286">		Logging.log(Logging.INFO, &quot;Loading party &quot; + file.getAbsolutePath()); //$NON-NLS-1$</span>
+<span class="nc" id="L287">		PCGIOHandler.readCharacterFileList(file).forEach(charFile -&gt; openCharacter(charFile, delegate, dataset));</span>
+<span class="nc" id="L288">		CHARACTERS.setFile(file);</span>
+<span class="nc" id="L289">		return CHARACTERS;</span>
+	}
+
+	public static SourceSelectionFacade getRequiredSourcesForParty(File pcpFile, UIDelegate delegate)
+	{
+<span class="nc" id="L294">		List&lt;File&gt; files = PCGIOHandler.readCharacterFileList(pcpFile);</span>
+<span class="nc bnc" id="L295" title="All 4 branches missed.">		if ((files == null) || files.isEmpty())</span>
+		{
+<span class="nc" id="L297">			return null;</span>
+		}
+<span class="nc" id="L299">		GameMode gameMode = null;</span>
+<span class="nc" id="L300">		HashSet&lt;Campaign&gt; campaignSet = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">		for (final File file : files)</span>
+		{
+<span class="nc" id="L303">			SourceSelectionFacade selection = getRequiredSourcesForCharacter(file, delegate);</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">			if (selection == null)</span>
+			{
+<span class="nc" id="L306">				Logging.errorPrint(&quot;Failed to find sources in: &quot; + file.getAbsolutePath());</span>
+<span class="nc" id="L307">				continue;</span>
+			}
+<span class="nc" id="L309">			GameMode game = selection.getGameMode().get();</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">			if (gameMode == null)</span>
+			{
+<span class="nc" id="L312">				gameMode = game;</span>
+			}
+<span class="nc bnc" id="L314" title="All 2 branches missed.">			else if (gameMode != game)</span>
+			{
+<span class="nc" id="L316">				Logging.errorPrint(&quot;Characters in &quot; + pcpFile.getAbsolutePath() + &quot; do not share the same game mode&quot;);</span>
+<span class="nc" id="L317">				return null;</span>
+			}
+
+<span class="nc bnc" id="L320" title="All 2 branches missed.">			for (final Campaign campaign : selection.getCampaigns())</span>
+			{
+<span class="nc" id="L322">				campaignSet.add(campaign);</span>
+<span class="nc" id="L323">			}</span>
+<span class="nc" id="L324">		}</span>
+		//TODO: check to make sure that the campaigns are compatable
+
+<span class="nc" id="L327">		return FacadeFactory.createSourceSelection(gameMode, new ArrayList&lt;&gt;(campaignSet));</span>
+	}
+
+	/**
+	 *
+	 * @param pcgFile a character file
+	 * @param delegate  The UIDelegate used to display message to the user
+	 * @return a SourceSelectionFacade or null if no sources could be found
+	 */
+	public static SourceSelectionFacade getRequiredSourcesForCharacter(File pcgFile, UIDelegate delegate)
+	{
+<span class="nc bnc" id="L338" title="All 2 branches missed.">		if (!PCGFile.isPCGenCharacterFile(pcgFile))</span>
+		{
+<span class="nc" id="L340">			throw new IllegalArgumentException(&quot;invalid file: &quot; + pcgFile);</span>
+		}
+
+<span class="nc" id="L343">		final PCGIOHandler ioHandler = new PCGIOHandler();</span>
+<span class="nc" id="L344">		SourceSelectionFacade selection = ioHandler.readSources(pcgFile);</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">		if (!ioHandler.getErrors().isEmpty())</span>
+		{
+<span class="nc" id="L347">			ioHandler.getErrors().forEach(msg -&gt; {</span>
+<span class="nc" id="L348">				delegate.showErrorMessage(Constants.APPLICATION_NAME, msg);</span>
+<span class="nc" id="L349">				Logging.errorPrint(msg);</span>
+<span class="nc" id="L350">			});</span>
+<span class="nc" id="L351">			return null;</span>
+		}
+<span class="nc" id="L353">		return selection;</span>
+	}
+
+	/**
+	 * Check if the character's filename is ready to be saved to.
+	 * @param character The character to be checked.
+	 * @return true if the file can be written to, false otherwise.
+	 */
+	public static boolean characterFilenameValid(CharacterFacade character)
+	{
+<span class="nc bnc" id="L363" title="All 4 branches missed.">		if (character.getFileRef().get() == null || StringUtils.isEmpty(character.getFileRef().get().getName()))</span>
+		{
+<span class="nc" id="L365">			return false;</span>
+		}
+
+<span class="nc" id="L368">		File file = character.getFileRef().get();</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">		if (StringUtils.isBlank(file.getName()))</span>
+		{
+<span class="nc" id="L371">			return false;</span>
+		}
+<span class="nc bnc" id="L373" title="All 6 branches missed.">		return !file.isDirectory() &amp;&amp; (!file.exists() || file.canWrite());</span>
+	}
+
+	/**
+	 * Saves this character to the character's file specified
+	 * by character.getFileRef().getReference()
+	 * This is expected to be called before a character is to
+	 * be removed from the list of open characters.
+	 * @param character the character to be saved
+	 * @return true if the save succeeded, false if not
+	 */
+	public static boolean saveCharacter(CharacterFacade character)
+	{
+<span class="nc" id="L386">		File file = character.getFileRef().get();</span>
+<span class="nc bnc" id="L387" title="All 2 branches missed.">		if (StringUtils.isBlank(file.getName()))</span>
+		{
+<span class="nc" id="L389">			return false;</span>
+		}
+
+<span class="nc" id="L392">		Logging.log(Logging.INFO, &quot;Saving character &quot; + character.getNameRef().get() //$NON-NLS-1$</span>
+<span class="nc" id="L393">			+ &quot; - &quot; + file.getAbsolutePath()); //$NON-NLS-1$</span>
+
+<span class="nc bnc" id="L395" title="All 2 branches missed.">		if (character instanceof CharacterFacadeImpl characterFacade)</span>
+		{
+<span class="nc" id="L397">			UIDelegate delegate = character.getUIDelegate();</span>
+			try
+			{
+<span class="nc" id="L400">				characterFacade.save();</span>
+			}
+<span class="nc" id="L402">			catch (final NullPointerException e)</span>
+			{
+<span class="nc" id="L404">				Logging.errorPrint(&quot;Could not save &quot; + character.getNameRef().get(), e);</span>
+<span class="nc" id="L405">				delegate.showErrorMessage(Constants.APPLICATION_NAME, &quot;Could not save &quot; + character.getNameRef().get());</span>
+<span class="nc" id="L406">				return false;</span>
+<span class="nc" id="L407">			}</span>
+<span class="nc" id="L408">		}</span>
+		else
+		{
+<span class="nc" id="L411">			Logging.errorPrint(&quot;Could not save &quot; + character.getNameRef().get()</span>
+<span class="nc" id="L412">				+ &quot; due to unexpected class of character: &quot; + character.getClass().getCanonicalName());</span>
+<span class="nc" id="L413">			return false;</span>
+		}
+
+<span class="nc" id="L416">		RECENT_CHARACTERS.addRecentFile(file);</span>
+<span class="nc" id="L417">		return true;</span>
+	}
+
+	public static boolean saveCurrentParty()
+	{
+<span class="nc" id="L422">		File file = CHARACTERS.getFileRef().get();</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">		if (file == null)</span>
+		{
+<span class="nc" id="L425">			return false;</span>
+		}
+<span class="nc" id="L427">		Logging.log(Logging.INFO, &quot;Saving party &quot; + file.getAbsolutePath()); //$NON-NLS-1$</span>
+<span class="nc" id="L428">		CHARACTERS.save();</span>
+<span class="nc" id="L429">		return true;</span>
+	}
+
+	/**
+	 * removes a character from the list of open characters.
+	 * This is called at the end of a close character operation.
+	 * Note: this operation does not save the character!
+	 * @param character the character to be closed
+	 */
+	public static void removeCharacter(CharacterFacade character)
+	{
+<span class="nc" id="L440">		CHARACTERS.removeElement(character);</span>
+		// This advises the message handler also.
+<span class="nc" id="L442">		character.closeCharacter();</span>
+<span class="nc" id="L443">		File charFile = character.getFileRef().get();</span>
+<span class="nc" id="L444">		RECENT_CHARACTERS.addRecentFile(charFile);</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">		if (CHARACTERS.isEmpty())</span>
+		{
+<span class="nc" id="L447">			RECENT_PARTIES.addRecentFile(CHARACTERS.getFileRef().get());</span>
+<span class="nc" id="L448">			CHARACTERS.setFile(null);</span>
+		}
+<span class="nc" id="L450">		Logging.log(Logging.INFO, &quot;Closed character &quot; + character.getNameRef().get() //$NON-NLS-1$</span>
+<span class="nc" id="L451">			+ &quot; - &quot; + charFile.getAbsolutePath()); //$NON-NLS-1$</span>
+<span class="nc" id="L452">	}</span>
+
+	public static void removeAllCharacters()
+	{
+<span class="nc bnc" id="L456" title="All 2 branches missed.">		for (final CharacterFacade characterFacade : CHARACTERS)</span>
+		{
+<span class="nc" id="L458">			RECENT_CHARACTERS.addRecentFile(characterFacade.getFileRef().get());</span>
+			// This advises the message handler also.
+<span class="nc" id="L460">			characterFacade.closeCharacter();</span>
+<span class="nc" id="L461">		}</span>
+<span class="nc" id="L462">		CHARACTERS.clearContents();</span>
+<span class="nc" id="L463">		RECENT_PARTIES.addRecentFile(CHARACTERS.getFileRef().get());</span>
+<span class="nc" id="L464">		CHARACTERS.setFile(null);</span>
+<span class="nc" id="L465">		Logging.log(Logging.INFO, &quot;Closed all characters&quot;); //$NON-NLS-1$</span>
+<span class="nc" id="L466">	}</span>
+
+	public static PartyFacade getCharacters()
+	{
+<span class="nc" id="L470">		return CHARACTERS;</span>
+	}
+
+	/**
+	 * Retrieve the loaded character matching the character stub. The character
+	 * may not have been saved yet, so may not have a file name, in which case
+	 * the match is made on character name. This is often used for retrieval of
+	 * a loaded master or companion.
+	 *
+	 * @param companion The companion to be searched for.
+	 * @return The character, or null if the companion is not loaded.
+	 */
+	public static CharacterFacade getCharacterMatching(CharacterStubFacade companion)
+	{
+<span class="nc" id="L484">		File compFile = companion.getFileRef().get();</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">		if (StringUtils.isEmpty(compFile.getName()))</span>
+		{
+<span class="nc" id="L487">			String compName = companion.getNameRef().get();</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">			for (final CharacterFacade character : getCharacters())</span>
+			{
+<span class="nc" id="L490">				String charName = character.getNameRef().get();</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">				if (Objects.equals(compName, charName))</span>
+				{
+<span class="nc" id="L493">					return character;</span>
+				}
+<span class="nc" id="L495">			}</span>
+<span class="nc" id="L496">		}</span>
+		else
+		{
+<span class="nc bnc" id="L499" title="All 2 branches missed.">			for (final CharacterFacade character : getCharacters())</span>
+			{
+<span class="nc" id="L501">				File charFile = character.getFileRef().get();</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">				if (compFile.equals(charFile))</span>
+				{
+<span class="nc" id="L504">					return character;</span>
+				}
+<span class="nc" id="L506">			}</span>
+		}
+<span class="nc" id="L508">		return null;</span>
+	}
+
+	private static String createNewCharacterName()
+	{
+<span class="nc" id="L513">		String name = &quot;Unnamed &quot;;</span>
+<span class="nc" id="L514">		int i = 1;</span>
+<span class="nc bnc" id="L515" title="All 2 branches missed.">		while (isNameUsed(name + i))</span>
+		{
+<span class="nc" id="L517">			i++;</span>
+		}
+<span class="nc" id="L519">		return name + i;</span>
+	}
+
+	private static boolean isNameUsed(String name)
+	{
+<span class="nc bnc" id="L524" title="All 2 branches missed.">		for (final CharacterFacade character : CHARACTERS)</span>
+		{
+<span class="nc bnc" id="L526" title="All 2 branches missed.">			if (character.getNameRef().get().equals(name))</span>
+			{
+<span class="nc" id="L528">				return true;</span>
+			}
+<span class="nc" id="L530">		}</span>
+<span class="nc" id="L531">		return false;</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

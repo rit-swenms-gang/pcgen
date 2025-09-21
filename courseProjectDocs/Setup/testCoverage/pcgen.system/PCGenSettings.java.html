@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PCGenSettings.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.system</a> &gt; <span class="el_source">PCGenSettings.java</span></div><h1>PCGenSettings.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2010 Connor Petty &lt;cpmeister@users.sourceforge.net&gt;
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * 
+ */
+package pcgen.system;
+
+import java.io.File;
+
+import pcgen.output.publish.OutputDB;
+
+import org.apache.commons.lang3.SystemUtils;
+
+/**
+ * This stores some of the properties that pcgen uses.
+ * This class is mainly intended to be used to store non-ui related
+ * properties
+ */
+public final class PCGenSettings extends PropertyContext
+{
+
+<span class="fc" id="L35">	private static final PCGenSettings INSTANCE = new PCGenSettings();</span>
+	/**
+	 * This is the PropertyContext for the pcgen options, all keys that are used with
+	 * this context have a key name starting with 'OPTION'
+	 */
+<span class="fc" id="L40">	public static final PropertyContext OPTIONS_CONTEXT = INSTANCE.createChildContext(&quot;pcgen.options&quot;);</span>
+	public static final String OPTION_SAVE_CUSTOM_EQUIPMENT = &quot;saveCustomInLst&quot;;
+	public static final String OPTION_ALLOWED_IN_SOURCES = &quot;optionAllowedInSources&quot;;
+	public static final String OPTION_SOURCES_ALLOW_MULTI_LINE = &quot;optionSourcesAllowMultiLine&quot;;
+	public static final String OPTION_SHOW_LICENSE = &quot;showLicense&quot;;
+	public static final String OPTION_SHOW_MATURE_ON_LOAD = &quot;showMatureOnLoad&quot;;
+	public static final String OPTION_CREATE_PCG_BACKUP = &quot;createPcgBackup&quot;;
+	public static final String OPTION_SHOW_WARNING_AT_FIRST_LEVEL_UP = &quot;showWarningAtFirstLevelUp&quot;;
+	public static final String OPTION_AUTO_RESIZE_EQUIP = &quot;autoResizeEquip&quot;;
+	public static final String OPTION_SHOW_SKILL_MOD_BREAKDOWN = &quot;showSkillModBreakdown&quot;;
+	public static final String OPTION_SHOW_SKILL_RANK_BREAKDOWN = &quot;showSkillRankBreakdown&quot;;
+	public static final String OPTION_SHOW_OUTPUT_NAME_FOR_OTHER_ITEMS = &quot;showOutputNameForOtherItems&quot;;
+	public static final String OPTION_AUTOLOAD_SOURCES_AT_START = &quot;autoloadSourcesAtStart&quot;;
+	public static final String OPTION_AUTOLOAD_SOURCES_WITH_PC = &quot;autoloadSourcesWithPC&quot;;
+	public static final String OPTION_ALLOW_OVERRIDE_DUPLICATES = &quot;allowOverrideDuplicates&quot;;
+	public static final String OPTION_SKILL_FILTER = &quot;skillsOutputFilter&quot;;
+	public static final String OPTION_GENERATE_TEMP_FILE_WITH_PDF = &quot;generateTempFileWithPdf&quot;;
+	/**
+	 * The key for the path to the character files.
+	 */
+	public static final String PCG_SAVE_PATH = &quot;pcgen.files.characters&quot;;
+	public static final String PCP_SAVE_PATH = &quot;pcgen.files.parties&quot;;
+	public static final String CHAR_PORTRAITS_PATH = &quot;pcgen.files.portaits&quot;;
+	public static final String BACKUP_PCG_PATH = &quot;pcgen.files.characters.backup&quot;;
+	public static final String SELECTED_SPELL_SHEET_PATH = &quot;pcgen.files.selectedSpellOutputSheet&quot;;
+	public static final String RECENT_CHARACTERS = &quot;recentCharacters&quot;;
+	public static final String RECENT_PARTIES = &quot;recentParties&quot;;
+	public static final String LAST_LOADED_SOURCES = &quot;lastLoadedSources&quot;;
+	public static final String LAST_LOADED_GAME = &quot;lastLoadedGame&quot;;
+	public static final String PAPERSIZE = &quot;papersize&quot;;
+
+	public static final String VENDOR_DATA_DIR = &quot;pcgen.files.vendordataPath&quot;;
+	public static final String HOMEBREW_DATA_DIR = &quot;pcgen.files.homebrewdataPath&quot;;
+	public static final String CUSTOM_DATA_DIR = &quot;pcgen.files.customPath&quot;;
+
+	/* Data converter saved choices. */
+	public static final String CONVERT_OUTPUT_SAVE_PATH = &quot;pcgen.convert.outputPath&quot;;
+	public static final String CONVERT_INPUT_PATH = &quot;pcgen.convert.inputPath&quot;;
+	public static final String CONVERT_GAMEMODE = &quot;pcgen.convert.gamemode&quot;;
+	public static final String CONVERT_SOURCES = &quot;pcgen.convert.sources&quot;;
+	public static final String CONVERT_DATA_LOG_FILE = &quot;pcgen.convert.dataLogFile&quot;;
+
+<span class="fc" id="L82">	public static final PropertyContext GMGEN_OPTIONS_CONTEXT = INSTANCE.createChildContext(&quot;gmgen.options&quot;);</span>
+
+	private PCGenSettings()
+	{
+<span class="fc" id="L86">		super(&quot;options.ini&quot;);</span>
+<span class="fc" id="L87">		setProperty(PCG_SAVE_PATH,</span>
+<span class="fc" id="L88">			(ConfigurationSettings.getUserDir() + &quot;/characters&quot;).replace('/', File.separatorChar));</span>
+<span class="fc" id="L89">		setProperty(PCP_SAVE_PATH,</span>
+<span class="fc" id="L90">			(ConfigurationSettings.getUserDir() + &quot;/characters&quot;).replace('/', File.separatorChar));</span>
+<span class="fc" id="L91">		setProperty(CHAR_PORTRAITS_PATH,</span>
+<span class="fc" id="L92">			(ConfigurationSettings.getUserDir() + &quot;/characters&quot;).replace('/', File.separatorChar));</span>
+<span class="fc" id="L93">		setProperty(BACKUP_PCG_PATH,</span>
+<span class="fc" id="L94">			(ConfigurationSettings.getUserDir() + &quot;/characters&quot;).replace('/', File.separatorChar));</span>
+<span class="fc" id="L95">		setProperty(VENDOR_DATA_DIR, &quot;@vendordata&quot;);</span>
+<span class="fc" id="L96">		setProperty(HOMEBREW_DATA_DIR, &quot;@homebrewdata&quot;);</span>
+<span class="fc" id="L97">		setProperty(CUSTOM_DATA_DIR, &quot;@data/customsources&quot;.replace('/', File.separatorChar));</span>
+<span class="fc" id="L98">		OutputDB.registerBooleanPreference(OPTION_SHOW_OUTPUT_NAME_FOR_OTHER_ITEMS, false);</span>
+<span class="fc" id="L99">	}</span>
+
+	@Override
+	protected void beforePropertiesSaved()
+	{
+<span class="nc" id="L104">		relativize(VENDOR_DATA_DIR);</span>
+<span class="nc" id="L105">		relativize(HOMEBREW_DATA_DIR);</span>
+<span class="nc" id="L106">		relativize(CUSTOM_DATA_DIR);</span>
+<span class="nc" id="L107">	}</span>
+
+	public static PCGenSettings getInstance()
+	{
+<span class="fc" id="L111">		return INSTANCE;</span>
+	}
+
+	public static String getSelectedSpellSheet()
+	{
+<span class="nc" id="L116">		return getInstance().getProperty(SELECTED_SPELL_SHEET_PATH);</span>
+	}
+
+	public static String getPcgDir()
+	{
+<span class="nc" id="L121">		return getInstance().getProperty(PCG_SAVE_PATH);</span>
+	}
+
+	public static String getPortraitsDir()
+	{
+<span class="nc" id="L126">		return getInstance().getProperty(CHAR_PORTRAITS_PATH);</span>
+	}
+
+	public static String getBackupPcgDir()
+	{
+<span class="nc" id="L131">		return getInstance().getProperty(BACKUP_PCG_PATH);</span>
+	}
+
+	public static boolean getCreatePcgBackup()
+	{
+<span class="nc" id="L136">		return OPTIONS_CONTEXT.initBoolean(PCGenSettings.OPTION_CREATE_PCG_BACKUP, true);</span>
+	}
+
+	public static String getVendorDataDir()
+	{
+<span class="nc" id="L141">		return getDirectory(VENDOR_DATA_DIR);</span>
+	}
+
+	public static String getHomebrewDataDir()
+	{
+<span class="nc" id="L146">		return getDirectory(HOMEBREW_DATA_DIR);</span>
+	}
+
+	public static String getCustomDir()
+	{
+<span class="nc" id="L151">		return getDirectory(CUSTOM_DATA_DIR);</span>
+	}
+
+	private static String getSystemProperty(String key)
+	{
+<span class="nc" id="L156">		return getInstance().getProperty(key);</span>
+	}
+
+	private static Object setSystemProperty(String key, String value)
+	{
+<span class="nc" id="L161">		return getInstance().setProperty(key, value);</span>
+	}
+
+	private static String getDirectory(String key)
+	{
+<span class="nc" id="L166">		return expandRelativePath(getSystemProperty(key));</span>
+	}
+
+	private static String expandRelativePath(String path)
+	{
+<span class="nc bnc" id="L171" title="All 2 branches missed.">		if (path.startsWith(&quot;@&quot;))</span>
+		{
+<span class="nc" id="L173">			path = SystemUtils.USER_DIR + File.separator + path.substring(1);</span>
+		}
+<span class="nc" id="L175">		return path;</span>
+	}
+
+	private static String unexpandRelativePath(String path)
+	{
+<span class="nc bnc" id="L180" title="All 2 branches missed.">		if (path.startsWith(SystemUtils.USER_DIR + File.separator))</span>
+		{
+<span class="nc" id="L182">			path = '@' + path.substring(SystemUtils.USER_DIR.length() + 1);</span>
+		}
+<span class="nc" id="L184">		return path;</span>
+	}
+
+	private static void relativize(String property)
+	{
+<span class="nc" id="L189">		setSystemProperty(property, unexpandRelativePath(getSystemProperty(property)));</span>
+<span class="nc" id="L190">	}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

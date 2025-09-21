@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleSet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.core.doomsdaybook</a> &gt; <span class="el_source">RuleSet.java</span></div><h1>RuleSet.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2003 (C) Devon Jones
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.core.doomsdaybook;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import gmgen.plugin.dice.Dice;
+
+/**
+ * This class deals with RuleSets for Random name generation
+ *  
+ */
+public class RuleSet extends ArrayList&lt;String&gt; implements DataElement
+{
+<span class="nc" id="L31">	private final List&lt;DataValue&gt; retList = new ArrayList&lt;&gt;();</span>
+	private Rule retRule;
+	private String id;
+	private String title;
+<span class="nc" id="L35">	private String usage = &quot;private&quot;;</span>
+	private final VariableHashMap allVars;
+	private int weight;
+
+	/**
+	 * Constructor
+	 * 
+	 * @param allVars
+	 * @param title
+	 * @param id
+	 * @param weight
+	 */
+	public RuleSet(VariableHashMap allVars, String title, String id, int weight)
+<span class="nc" id="L48">	{</span>
+<span class="nc" id="L49">		this.allVars = allVars;</span>
+<span class="nc" id="L50">		this.title = title;</span>
+<span class="nc" id="L51">		this.id = id;</span>
+<span class="nc" id="L52">		this.weight = weight;</span>
+<span class="nc" id="L53">	}</span>
+
+	/**
+	 * Constructor
+	 * 
+	 * @param allVars
+	 * @param title
+	 * @param id
+	 * @param usage
+	 */
+	public RuleSet(VariableHashMap allVars, String title, String id, String usage)
+	{
+<span class="nc" id="L65">		this(allVars, title, id, 1, usage);</span>
+<span class="nc" id="L66">	}</span>
+
+	/**
+	 * Constructor
+	 * 
+	 * @param allVars
+	 * @param title
+	 * @param id
+	 * @param weight
+	 * @param usage
+	 */
+	private RuleSet(VariableHashMap allVars, String title, String id, int weight, String usage)
+<span class="nc" id="L78">	{</span>
+<span class="nc" id="L79">		this.allVars = allVars;</span>
+<span class="nc" id="L80">		this.title = title;</span>
+<span class="nc" id="L81">		this.id = id;</span>
+<span class="nc" id="L82">		this.weight = weight;</span>
+<span class="nc" id="L83">		this.usage = usage;</span>
+<span class="nc" id="L84">	}</span>
+
+	/**
+	 * Get the data
+	 * 
+	 * @return A list of data
+	 * @throws Exception 
+	 */
+	@Override
+	public List&lt;DataValue&gt; getData() throws Exception
+	{
+<span class="nc" id="L95">		retList.clear();</span>
+
+<span class="nc" id="L97">		int rangeTop = getRange();</span>
+		int modifier;
+
+		try
+		{
+<span class="nc" id="L102">			modifier = Integer.parseInt(allVars.getVal(getId() + &quot;modifier&quot;));</span>
+		}
+<span class="nc" id="L104">		catch (Exception e)</span>
+		{
+<span class="nc" id="L106">			modifier = 0;</span>
+<span class="nc" id="L107">		}</span>
+
+		// Determine which entry to choose
+<span class="nc" id="L110">		Dice die = new Dice(1, rangeTop, 0);</span>
+<span class="nc" id="L111">		int choice = die.roll();</span>
+<span class="nc" id="L112">		choice += modifier;</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">		choice = (choice &lt; 0) ? rangeTop : choice;</span>
+
+		//select the detail to return
+<span class="nc" id="L116">		int aWeight = 0;</span>
+
+		// Iterate through the list of choices until the weights (from each DataValue)
+		// are greater the num chosen as the 'choice'
+<span class="nc bnc" id="L120" title="All 2 branches missed.">		for (String key : this)</span>
+		{
+<span class="nc" id="L122">			DataElement chkValue = allVars.getDataElement(key);</span>
+<span class="nc" id="L123">			int valueWeight = chkValue.getWeight();</span>
+
+<span class="nc bnc" id="L125" title="All 2 branches missed.">			if (valueWeight &gt; 0)</span>
+			{
+<span class="nc" id="L127">				aWeight += valueWeight;</span>
+
+<span class="nc bnc" id="L129" title="All 2 branches missed.">				if (aWeight &gt;= choice)</span>
+				{
+<span class="nc" id="L131">					retList.addAll(chkValue.getData());</span>
+
+<span class="nc" id="L133">					break;</span>
+				}
+			}
+<span class="nc" id="L136">		}</span>
+
+<span class="nc" id="L138">		return retList;</span>
+	}
+
+	/**
+	 * Set the id
+	 * @param id
+	 */
+	public void setId(String id)
+	{
+<span class="nc" id="L147">		this.id = id;</span>
+<span class="nc" id="L148">	}</span>
+
+	/**
+	 * Get the id
+	 * @return id
+	 */
+	@Override
+	public String getId()
+	{
+<span class="nc" id="L157">		return id;</span>
+	}
+
+	/**
+	 * Get the last data
+	 * @return the last list of data
+	 */
+	@Override
+	public List&lt;DataValue&gt; getLastData()
+	{
+<span class="nc" id="L167">		return retList;</span>
+	}
+
+	/**
+	 * Get the last rule
+	 * @return last rule
+	 */
+	public Rule getLastRule()
+	{
+<span class="nc" id="L176">		return retRule;</span>
+	}
+
+	/**
+	 * Get the range.
+	 *
+	 * @return range
+	 * @throws Exception When no entry exists for the supplied key.
+	 */
+	private int getRange() throws Exception
+	{
+<span class="nc" id="L187">		int rangeTop = 0;</span>
+
+<span class="nc bnc" id="L189" title="All 2 branches missed.">		for (String key : this)</span>
+		{
+<span class="nc" id="L191">			DataElement value = allVars.getDataElement(key);</span>
+<span class="nc" id="L192">			rangeTop += value.getWeight();</span>
+<span class="nc" id="L193">		}</span>
+
+<span class="nc bnc" id="L195" title="All 2 branches missed.">		if (rangeTop &lt;= 0)</span>
+		{ //the die will nullpointer if it is not at least 1
+<span class="nc" id="L197">			rangeTop = 1;</span>
+		}
+
+<span class="nc" id="L200">		return rangeTop;</span>
+	}
+
+	/**
+	 * Get the rule.
+	 * 
+	 * @return rule
+	 * @throws Exception When no entry exists for the supplied key.
+	 */
+	public Rule getRule() throws Exception
+	{
+<span class="nc" id="L211">		int rangeTop = getRange();</span>
+		int modifier;
+
+		try
+		{
+<span class="nc" id="L216">			modifier = Integer.parseInt(allVars.getVal(getId() + &quot;modifier&quot;));</span>
+		}
+<span class="nc" id="L218">		catch (Exception e)</span>
+		{
+<span class="nc" id="L220">			modifier = 0;</span>
+<span class="nc" id="L221">		}</span>
+
+		// Determine which entry to choose
+<span class="nc" id="L224">		Dice die = new Dice(1, rangeTop, 0);</span>
+<span class="nc" id="L225">		int choice = die.roll();</span>
+<span class="nc" id="L226">		choice += modifier;</span>
+
+<span class="nc bnc" id="L228" title="All 2 branches missed.">		choice = (choice &lt; 0) ? rangeTop : choice;</span>
+
+		//select the detail to return
+<span class="nc" id="L231">		int aWeight = 0;</span>
+
+		// Iterate through the list of choices until the weights (from each DataValue)
+		// are greater the num chosen as the 'choice'
+<span class="nc bnc" id="L235" title="All 2 branches missed.">		for (String key : this)</span>
+		{
+<span class="nc" id="L237">			Rule chkValue = (Rule) allVars.getDataElement(key);</span>
+<span class="nc" id="L238">			int valueWeight = chkValue.getWeight();</span>
+
+<span class="nc bnc" id="L240" title="All 2 branches missed.">			if (valueWeight &gt; 0)</span>
+			{
+<span class="nc" id="L242">				aWeight += valueWeight;</span>
+
+<span class="nc bnc" id="L244" title="All 2 branches missed.">				if (aWeight &gt;= choice)</span>
+				{
+<span class="nc" id="L246">					retRule = chkValue;</span>
+
+<span class="nc" id="L248">					return chkValue;</span>
+				}
+			}
+<span class="nc" id="L251">		}</span>
+
+<span class="nc" id="L253">		return retRule;</span>
+	}
+
+	/**
+	 * Get the rule given a choice
+	 * 
+	 * @param choice
+	 * @return Rule
+	 * @throws Exception When no entry exists for the supplied key.
+	 */
+	public Rule getRule(int choice) throws Exception
+	{
+		//select the detail to return
+<span class="nc" id="L266">		int aWeight = 0;</span>
+
+		// Iterate through the list of choices until the weights (from each DataValue)
+		// are greater the num chosen as the 'choice'
+<span class="nc bnc" id="L270" title="All 2 branches missed.">		for (String key : this)</span>
+		{
+<span class="nc" id="L272">			Rule chkValue = (Rule) allVars.getDataElement(key);</span>
+<span class="nc" id="L273">			int valueWeight = chkValue.getWeight();</span>
+
+<span class="nc bnc" id="L275" title="All 2 branches missed.">			if (valueWeight &gt; 0)</span>
+			{
+<span class="nc" id="L277">				aWeight += valueWeight;</span>
+
+<span class="nc bnc" id="L279" title="All 2 branches missed.">				if (aWeight &gt;= choice)</span>
+				{
+<span class="nc" id="L281">					retRule = chkValue;</span>
+
+<span class="nc" id="L283">					break;</span>
+				}
+			}
+<span class="nc" id="L286">		}</span>
+
+<span class="nc" id="L288">		return retRule;</span>
+	}
+
+	/**
+	 * Set the title
+	 * @param title
+	 */
+	public void setTitle(String title)
+	{
+<span class="nc" id="L297">		this.title = title;</span>
+<span class="nc" id="L298">	}</span>
+
+	/**
+	 * Get the title
+	 * @return title
+	 */
+	@Override
+	public String getTitle()
+	{
+<span class="nc" id="L307">		return title;</span>
+	}
+
+	/**
+	 * Set the usage
+	 * @param usage
+	 */
+	public void setUsage(String usage)
+	{
+<span class="nc" id="L316">		this.usage = usage;</span>
+<span class="nc" id="L317">	}</span>
+
+	/**
+	 * Get the usage
+	 * @return usage
+	 */
+	public String getUsage()
+	{
+<span class="nc" id="L325">		return usage;</span>
+	}
+
+	/**
+	 * Set the weight
+	 * @param weight
+	 */
+	public void setWeight(int weight)
+	{
+<span class="nc" id="L334">		this.weight = weight;</span>
+<span class="nc" id="L335">	}</span>
+
+	/**
+	 * Get the weight
+	 * @return weight
+	 */
+	@Override
+	public int getWeight()
+	{
+<span class="nc" id="L344">		return weight;</span>
+	}
+
+	@Override
+	public String toString()
+	{
+<span class="nc" id="L350">		return getTitle();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

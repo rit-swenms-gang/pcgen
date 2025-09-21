@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DebugDialogController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui3.dialog</a> &gt; <span class="el_source">DebugDialogController.java</span></div><h1>DebugDialogController.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2019 (C) Eitan Adler &lt;lists@eitanadler.com&gt;
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.     See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+
+package pcgen.gui3.dialog;
+
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.lang.management.MemoryUsage;
+import java.text.DecimalFormat;
+import java.text.MessageFormat;
+import java.text.NumberFormat;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+
+import pcgen.system.LoggingRecorder;
+import pcgen.util.Logging;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
+
+/**
+ * A dialog that shows logs and memory usage.
+ * Over time we could add more debug and troubleshooting information into the pane.
+ */
+<span class="nc" id="L49">public class DebugDialogController</span>
+{
+
+<span class="nc" id="L52">	private static final MemoryMXBean MEMORY_BEAN = ManagementFactory.getMemoryMXBean();</span>
+	@FXML
+	private TableView&lt;Map&lt;String, String&gt;&gt; memoryTable;
+
+<span class="nc" id="L56">	private final ObservableList&lt;Map&lt;String, String&gt;&gt; memoryTableData = FXCollections.observableArrayList();</span>
+	@FXML
+	private TextArea logText;
+
+<span class="nc" id="L60">	private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);</span>
+
+	@FXML
+	void initialize()
+	{
+<span class="nc" id="L65">		memoryTable.setItems(memoryTableData);</span>
+<span class="nc" id="L66">		setMemoryTableData();</span>
+<span class="nc" id="L67">		logText.setText(LoggingRecorder.getLogs());</span>
+<span class="nc" id="L68">		Logging.registerHandler(new LogHandler());</span>
+<span class="nc" id="L69">	}</span>
+
+	private void setMemoryTableData()
+	{
+		// posible optimization: get the rows rather than clear and re-add
+<span class="nc" id="L74">		memoryTableData.clear();</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">		for (int row = 0; row &lt; 2; ++row)</span>
+		{
+<span class="nc" id="L77">			Map&lt;String, String&gt; dataRow = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">			for (int column = 0; column &lt; memoryTable.getColumns().size(); column++)</span>
+			{
+<span class="nc" id="L80">				String id = memoryTable.getColumns().get(column).getId();</span>
+<span class="nc" id="L81">				dataRow.put(id, getMemoryTableValue(row, column));</span>
+			}
+<span class="nc" id="L83">			memoryTableData.add(dataRow);</span>
+		}
+
+<span class="nc" id="L86">		memoryTable.setItems(memoryTableData);</span>
+<span class="nc" id="L87">		memoryTable.refresh();</span>
+<span class="nc" id="L88">	}</span>
+
+	private static String getMemoryTableValue(int rowIndex, int columnIndex)
+	{
+<span class="nc" id="L92">		final long MEGABYTE = 1024 * 1024;</span>
+
+		MemoryUsage usage;
+<span class="nc bnc" id="L95" title="All 2 branches missed.">		if (rowIndex == 0)</span>
+		{
+<span class="nc" id="L97">			usage = MEMORY_BEAN.getHeapMemoryUsage();</span>
+		}
+		else
+		{
+<span class="nc" id="L101">			usage = MEMORY_BEAN.getNonHeapMemoryUsage();</span>
+		}
+<span class="nc" id="L103">		final NumberFormat format = new DecimalFormat(&quot;###,###,###&quot;);</span>
+<span class="nc bnc" id="L104" title="All 7 branches missed.">		return switch (columnIndex)</span>
+				{
+<span class="nc bnc" id="L106" title="All 2 branches missed.">					case 0 -&gt; (rowIndex == 0) ? &quot;Heap&quot; : &quot;Non-Heap&quot;;</span>
+<span class="nc" id="L107">					case 1 -&gt; format.format(usage.getInit() / MEGABYTE);</span>
+<span class="nc" id="L108">					case 2 -&gt; format.format(usage.getUsed() / MEGABYTE);</span>
+<span class="nc" id="L109">					case 3 -&gt; format.format(usage.getCommitted() / MEGABYTE);</span>
+<span class="nc" id="L110">					case 4 -&gt; format.format(usage.getMax() / MEGABYTE);</span>
+<span class="nc" id="L111">					case 5 -&gt; String.valueOf(100 * (usage.getUsed() / usage.getMax()));</span>
+<span class="nc" id="L112">					default -&gt; throw new IllegalStateException(&quot;Unexpected column index: &quot; + columnIndex);</span>
+				};
+	}
+
+	@FXML
+	private void clearLogs(final ActionEvent actionEvent)
+	{
+<span class="nc" id="L119">		LoggingRecorder.clearLogs();</span>
+<span class="nc" id="L120">		logText.setText(LoggingRecorder.getLogs());</span>
+<span class="nc" id="L121">	}</span>
+
+	void initTimer()
+	{
+<span class="nc" id="L125">		scheduler.scheduleAtFixedRate(this::setMemoryTableData, 0, 30, TimeUnit.SECONDS);</span>
+<span class="nc" id="L126">	}</span>
+
+	private final class LogHandler extends Handler implements Runnable
+	{
+
+		private LogHandler()
+<span class="nc" id="L132">		{</span>
+<span class="nc" id="L133">			setLevel(Logging.DEBUG);</span>
+<span class="nc" id="L134">		}</span>
+
+		@Override
+		public void publish(LogRecord record)
+		{
+<span class="nc" id="L139">		}</span>
+
+		@Override
+		public void flush()
+		{
+<span class="nc" id="L144">		}</span>
+
+		@Override
+		public void close()
+		{
+<span class="nc" id="L149">		}</span>
+
+		@Override
+		public void run()
+		{
+<span class="nc" id="L154">			logText.setText(LoggingRecorder.getLogs());</span>
+<span class="nc" id="L155">		}</span>
+	}
+
+
+	@FXML
+	private void runGC(final ActionEvent actionEvent)
+	{
+<span class="nc" id="L162">		MEMORY_BEAN.gc();</span>
+<span class="nc" id="L163">		Logging.log(Logging.INFO, MessageFormat.format(&quot;Memory used after manual GC, Heap: {0}, Non heap: {1}&quot;,</span>
+<span class="nc" id="L164">				MEMORY_BEAN.getHeapMemoryUsage().getUsed(), MEMORY_BEAN.getNonHeapMemoryUsage().getUsed()));</span>
+<span class="nc" id="L165">	}</span>
+	void shutdown()
+	{
+<span class="nc" id="L168">		scheduler.shutdown();</span>
+<span class="nc" id="L169">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

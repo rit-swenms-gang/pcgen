@@ -1,0 +1,500 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VariableContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.rules.context</a> &gt; <span class="el_source">VariableContext.java</span></div><h1>VariableContext.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2014-9 (C) Tom Parker &lt;thpr@users.sourceforge.net&gt;
+ * 
+ * This library is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This library is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.rules.context;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Supplier;
+
+import pcgen.base.calculation.FormulaModifier;
+import pcgen.base.calculation.IgnoreVariables;
+import pcgen.base.formula.base.DependencyManager;
+import pcgen.base.formula.base.FormulaFunction;
+import pcgen.base.formula.base.FormulaManager;
+import pcgen.base.formula.base.FormulaSemantics;
+import pcgen.base.formula.base.LegalScope;
+import pcgen.base.formula.base.ManagerFactory;
+import pcgen.base.formula.base.ScopeInstance;
+import pcgen.base.formula.base.VarScoped;
+import pcgen.base.formula.base.VariableID;
+import pcgen.base.formula.base.VariableLibrary;
+import pcgen.base.formula.base.WriteableFunctionLibrary;
+import pcgen.base.formula.base.WriteableVariableStore;
+import pcgen.base.formula.exception.SemanticsException;
+import pcgen.base.formula.inst.FormulaUtilities;
+import pcgen.base.formula.inst.NEPFormula;
+import pcgen.base.formula.inst.ScopeManagerInst;
+import pcgen.base.formula.inst.SimpleFunctionLibrary;
+import pcgen.base.formula.inst.VariableManager;
+import pcgen.base.solver.DynamicSolverManager;
+import pcgen.base.solver.FormulaSetupFactory;
+import pcgen.base.solver.SimpleSolverFactory;
+import pcgen.base.solver.SolverFactory;
+import pcgen.base.solver.SolverManager;
+import pcgen.base.solver.SupplierValueStore;
+import pcgen.base.util.ComplexResult;
+import pcgen.base.util.FormatManager;
+import pcgen.cdom.base.FormulaFactory;
+import pcgen.cdom.enumeration.CharID;
+import pcgen.cdom.formula.ManagerKey;
+import pcgen.cdom.formula.PluginFunctionLibrary;
+import pcgen.cdom.formula.VariableChannel;
+import pcgen.cdom.formula.VariableChannelFactory;
+import pcgen.cdom.formula.VariableChannelFactoryInst;
+import pcgen.cdom.formula.VariableWrapper;
+import pcgen.cdom.formula.VariableWrapperFactory;
+import pcgen.cdom.formula.VariableWrapperFactoryInst;
+import pcgen.cdom.formula.scope.LegalScopeUtilities;
+import pcgen.cdom.formula.scope.PCGenScope;
+import pcgen.cdom.helper.ReferenceDependency;
+import pcgen.rules.persistence.TokenLibrary;
+import pcgen.rules.persistence.token.ModifierFactory;
+import pcgen.util.Logging;
+
+/**
+ * A VariableContext is responsible for managing variable items during the load of data
+ * and (in some cases) subsequently while the data set associated with the parent
+ * LoadContext is operating.
+ */
+public class VariableContext implements VariableChannelFactory,
+		VariableWrapperFactory, VariableLibrary
+{
+	/**
+	 * This is the FormulaSetupFactory for this VariableContext. This is used to generate
+	 * a FormulaManager for each PC.
+	 */
+<span class="fc" id="L83">	private final FormulaSetupFactory formulaSetupFactory = new FormulaSetupFactory();</span>
+
+	/**
+	 * This is the ManagerFactory for this VariableContext. This is used to generate an
+	 * EvaluationManager, FormulaSemantics and other relevant items provided to the
+	 * formula system during formula processing.
+	 */
+	private final ManagerFactory managerFactory;
+
+	/*
+	 * There are a series of items we override in the FormulaSetupFactory, and keep
+	 * locally for certain types of processing.
+	 */
+	/**
+	 * The FunctionLibrary for the FormulaSetupFactory and this VariableContext. Local so
+	 * that we can add functions based on plugins and data.
+	 */
+<span class="fc" id="L100">	private final WriteableFunctionLibrary myFunctionLibrary = new SimpleFunctionLibrary();</span>
+
+	/**
+	 * The ValueStore for the FormulaSetupFactory and this VariableContext. Local so
+	 * that we can set the defaults for variable formats from data.
+	 */
+<span class="fc" id="L106">	private final SupplierValueStore myValueStore = new SupplierValueStore();</span>
+
+	/**
+	 * The SolverFactory for the FormulaSetupFactory and this VariableContext. Local so
+	 * that we can set the defaults for variable formats from data.
+	 */
+<span class="fc" id="L112">	private final SolverFactory solverFactory = new SimpleSolverFactory(myValueStore);</span>
+
+	/**
+	 * The LegalScopeManager for the FormulaSetupFactory and this VariableContext. Local
+	 * so that we can load scopes based on data (like DYNAMICSCOPE:) and provide it to the
+	 * VariableManager.
+	 */
+<span class="fc" id="L119">	private final ScopeManagerInst legalScopeManager = new ScopeManagerInst();</span>
+
+	/**
+	 * The VariableManager for the FormulaSetupFactory and this VariableContext. Local so
+	 * the data can assert legal variables.
+	 */
+<span class="fc" id="L125">	private final VariableManager variableManager =</span>
+			new VariableManager(legalScopeManager, myValueStore);
+
+	/**
+	 * The naive FormulaManager for this VariableContext. This serves only as a base item
+	 * for loading formulas, not for evaluation.
+	 * 
+	 * Each PC will also have its own FormulaManager (which will contain a dedicated
+	 * VariableStore for that PC). This specific FormulaManager is derived from this
+	 * FormulaManager in generateSolverManager().
+	 * 
+	 * Lazy instantiation to avoid trying to pull the &quot;Global&quot; scope before it is loaded
+	 * from plugins.
+	 */
+<span class="fc" id="L139">	private FormulaManager loadFormulaManager = null;</span>
+
+	/**
+	 * Contains a VariableChannelFactory used to develop VariableChannels for this
+	 * VariableContext.
+	 */
+<span class="fc" id="L145">	private VariableChannelFactoryInst variableChannelFactory = new VariableChannelFactoryInst();</span>
+
+	/**
+	 * Contains a VariableWrapperFactory used to develop VariableWrappers for this
+	 * VariableContext.
+	 */
+<span class="fc" id="L151">	private VariableWrapperFactoryInst variableWrapperFactory =</span>
+			new VariableWrapperFactoryInst();
+
+	/**
+	 * Constructs a new VariableContext with the given ManagerFactory.
+	 * 
+	 * @param managerFactory
+	 *            The ManagerFactory used to generate managers for formula evaluation by
+	 *            all items loaded while this VariableContext is active
+	 */
+	public VariableContext(ManagerFactory managerFactory)
+<span class="fc" id="L162">	{</span>
+<span class="fc" id="L163">		this.managerFactory = Objects.requireNonNull(managerFactory);</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">		for (FormulaFunction f : PluginFunctionLibrary.getInstance().getFunctions())</span>
+		{
+<span class="nc" id="L166">			myFunctionLibrary.addFunction(f);</span>
+<span class="nc" id="L167">		}</span>
+<span class="fc" id="L168">		FormulaUtilities.loadBuiltInFunctions(myFunctionLibrary);</span>
+<span class="fc" id="L169">		LegalScopeUtilities.loadLegalScopeLibrary(legalScopeManager);</span>
+<span class="fc" id="L170">		formulaSetupFactory.setValueStoreSupplier(() -&gt; myValueStore);</span>
+<span class="fc" id="L171">		formulaSetupFactory.setLegalScopeManagerSupplier(() -&gt; legalScopeManager);</span>
+<span class="fc" id="L172">		formulaSetupFactory.setFunctionLibrarySupplier(() -&gt; myFunctionLibrary);</span>
+<span class="fc" id="L173">		formulaSetupFactory.setVariableLibraryFunction((lsm, vs) -&gt; variableManager);</span>
+<span class="fc" id="L174">	}</span>
+
+	/**
+	 * Returns the FormulaManager for this VariableContext.
+	 * 
+	 * Lazy instantiation to avoid trying to pull the &quot;Global&quot; scope before it is loaded
+	 * from plugins (so care should be taken to only call this method after the &quot;Global&quot;
+	 * scope is loaded).
+	 * 
+	 * @return The FormulaManager for this VariableContext
+	 */
+	public FormulaManager getFormulaManager()
+	{
+<span class="fc bfc" id="L187" title="All 2 branches covered.">		if (loadFormulaManager == null)</span>
+		{
+<span class="fc" id="L189">			loadFormulaManager = formulaSetupFactory.generate();</span>
+		}
+<span class="fc" id="L191">		return loadFormulaManager;</span>
+	}
+
+	/**
+	 * Returns a new FormulaManager; method is designed to be used once with each PC.
+	 */
+	public FormulaManager getPCFormulaManager()
+	{
+<span class="fc" id="L199">		return formulaSetupFactory.generate();</span>
+	}
+
+	/**
+	 * Returns a FormulaModifier based on the given information.
+	 * 
+	 * @param modType
+	 *            The type of the modifier to be generated (e.g. &quot;ADD&quot;)
+	 * @param instructions
+	 *            The instructions for the modifier
+	 * @param varScope
+	 *            The PCGenScope in which the FormulaModifier is operating
+	 * @param formatManager
+	 *            The FormatManager indicating the format of the object being operated on
+	 *            by the FormulaModifier
+	 * @return a FormulaModifier based on the given information
+	 */
+	public &lt;T&gt; FormulaModifier&lt;T&gt; getModifier(String modType,
+		String instructions, FormulaManager formulaManager, PCGenScope varScope,
+		FormatManager&lt;T&gt; formatManager)
+	{
+<span class="fc" id="L220">		Class&lt;T&gt; varClass = formatManager.getManagedClass();</span>
+<span class="fc" id="L221">		ModifierFactory&lt;T&gt; factory = TokenLibrary.getModifier(varClass, modType);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">		if (factory == null)</span>
+		{
+<span class="fc" id="L224">			throw new IllegalArgumentException(</span>
+<span class="fc" id="L225">				&quot;Requested unknown ModifierType: &quot; + varClass.getSimpleName() + &quot; &quot; + modType);</span>
+		}
+<span class="fc" id="L227">		FormulaModifier&lt;T&gt; modifier =</span>
+<span class="fc" id="L228">				factory.getModifier(instructions, formatManager);</span>
+		
+<span class="fc" id="L230">		FormulaSemantics semantics = managerFactory.generateFormulaSemantics(formulaManager, varScope);</span>
+<span class="fc" id="L231">		semantics = semantics.getWith(FormulaSemantics.INPUT_FORMAT, Optional.of(formatManager));</span>
+		try
+		{
+<span class="fc" id="L234">			modifier.isValid(semantics);</span>
+		}
+<span class="fc" id="L236">		catch (SemanticsException e)</span>
+		{
+<span class="fc" id="L238">			throw new IllegalArgumentException(&quot;Invalid Semantics on Formula: &quot;</span>
+<span class="fc" id="L239">				+ modType + &quot; ... &quot; + e.getLocalizedMessage(), e);</span>
+<span class="fc" id="L240">		}</span>
+
+		/*
+		 * getDependencies needs to be called during LST load, so that object references are captured
+		 */
+<span class="fc" id="L245">		DependencyManager fdm = managerFactory.generateDependencyManager(formulaManager, null);</span>
+<span class="fc" id="L246">		fdm = fdm.getWith(DependencyManager.SCOPE, Optional.of(varScope));</span>
+<span class="fc" id="L247">		fdm = fdm.getWith(DependencyManager.VARSTRATEGY, Optional.of(new IgnoreVariables()));</span>
+<span class="fc" id="L248">		fdm = fdm.getWith(ManagerKey.REFERENCES, new ReferenceDependency());</span>
+<span class="fc" id="L249">		modifier.getDependencies(fdm);</span>
+<span class="fc" id="L250">		modifier.addReferences(fdm.get(ManagerKey.REFERENCES).getReferences());</span>
+<span class="fc" id="L251">		return modifier;</span>
+	}
+
+	/**
+	 * Adds a FormulaFunction to the VariableContext.
+	 * 
+	 * Behavior is not defined if an an attempt is made to add null or a FormulaFunction
+	 * with a null name. An exception may be thrown.
+	 * 
+	 * @param function
+	 *            The FormulaFunction to be added to the VariableContext
+	 */
+	public void addFunction(FormulaFunction function)
+	{
+<span class="fc" id="L265">		myFunctionLibrary.addFunction(function);</span>
+<span class="fc" id="L266">	}</span>
+
+	/**
+	 * Returns the PCGenScope for the given name.
+	 * 
+	 * @param name
+	 *            The name of the PCGenScope to be returned
+	 * @return The PCGenScope for the given name
+	 */
+	public PCGenScope getScope(String name)
+	{
+<span class="fc" id="L277">		return (PCGenScope) legalScopeManager.getScope(name);</span>
+	}
+
+	/**
+	 * Registers the given PCGenScope.
+	 * 
+	 * @param scope
+	 *            The PCGenScope to be registered
+	 */
+	public void registerScope(PCGenScope scope)
+	{
+<span class="nc" id="L288">		legalScopeManager.registerScope(scope);</span>
+<span class="nc" id="L289">	}</span>
+
+	/**
+	 * Returns a Collection of the LegalScope objects for this Context.
+	 * 
+	 * @return A Collection of the LegalScope objects for this Context
+	 */
+	public Collection&lt;LegalScope&gt; getScopes()
+	{
+<span class="nc" id="L298">		return legalScopeManager.getLegalScopes();</span>
+	}
+
+	/**
+	 * Validates the default values provided to the formula system. Effectively ensures
+	 * that each default value is not dependent on variables or in other ways can't be
+	 * directly calculated. Will report to the error system any results from the analysis.
+	 */
+	public void validateDefaults()
+	{
+<span class="nc" id="L308">		ComplexResult&lt;Boolean&gt; result = solverFactory.validateDefaults();</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">		if (!result.get())</span>
+		{
+<span class="nc" id="L311">			result.getMessages().stream().forEach(Logging::errorPrint);</span>
+		}
+<span class="nc" id="L313">	}</span>
+
+	/**
+	 * Generates a SolverManager with a FormulaManager using the given
+	 * WriteableVariableStore.
+	 * 
+	 * @param varStore
+	 *            The WriteableVariableStore to be used for the returned SolverManager
+	 * @return A SolverManager with a FormulaManager using the given
+	 *         WriteableVariableStore
+	 */
+	public SolverManager generateSolverManager(WriteableVariableStore varStore)
+	{
+<span class="fc" id="L326">		FormulaManager derived = getFormulaManager().getWith(FormulaManager.RESULTS, varStore);</span>
+<span class="fc" id="L327">		return new DynamicSolverManager(derived, managerFactory, solverFactory, varStore);</span>
+	}
+
+	/**
+	 * Returns a &quot;valid&quot; NEPFormula for the given expression.
+	 * 
+	 * If the given expression does not represent a valid formula, then this
+	 * will throw an IllegalArgumentException.
+	 * 
+	 * If the given expression does not return an object of the type in the
+	 * given FormatManager, then this will throw an IllegalArgumentException.
+	 * 
+	 * @param activeScope
+	 *            The PCGenScope in which the NEPFormula is established and
+	 *            checked
+	 * @param formatManager
+	 *            The FormatManager in which the NEPFormula is established and
+	 *            checked
+	 * @param instructions
+	 *            The String representation of the formula to be converted to a
+	 *            NEPFormula
+	 * @return a &quot;valid&quot; NEPFormula for the given expression
+	 */
+	public &lt;T&gt; NEPFormula&lt;T&gt; getValidFormula(PCGenScope activeScope, FormatManager&lt;T&gt; formatManager,
+		String instructions)
+	{
+<span class="nc" id="L353">		return FormulaFactory.getValidFormula(instructions, managerFactory, getFormulaManager(), activeScope,</span>
+			formatManager);
+	}
+
+	/**
+	 * Adds a relationship between a Solver format and a default Supplier for that format
+	 * of Solver to this VariableContext.
+	 * 
+	 * The default Supplier for a format of Solver may not be redefined for a
+	 * SolverFactory. Once a given default Supplier has been established for a format of
+	 * Solver, this method MUST NOT be called a second time for that format of Solver.
+	 * 
+	 * @param &lt;T&gt;
+	 *            The format (class) of object changed by the given Supplier
+	 * @param varFormat
+	 *            The format (as a FormatManager) of Solver for which the given Supplier
+	 *            should be the default value
+	 * @param defaultValue
+	 *            The Supplier to be used to provide the default value for the given
+	 *            Solver format
+	 * @throws IllegalArgumentException
+	 *             if the given Solver format already has a default Supplier defined for
+	 *             this SolverFactory
+	 */
+	public &lt;T&gt; void addDefault(FormatManager&lt;T&gt; varFormat, Supplier&lt;T&gt; defaultValue)
+	{
+<span class="fc" id="L379">		solverFactory.addSolverFormat(varFormat, defaultValue);</span>
+<span class="fc" id="L380">	}</span>
+
+	/**
+	 * Returns the default value for a given Format (provided as a FormatManager).
+	 * 
+	 * @param &lt;T&gt;
+	 *            The format (class) of object for which the default value should be
+	 *            returned
+	 * @param variableFormat
+	 *            The FormatManager for which the default value should be returned
+	 * @return The default value for the given Format
+	 */
+	public &lt;T&gt; T getDefaultValue(FormatManager&lt;T&gt; variableFormat)
+	{
+<span class="fc" id="L394">		return solverFactory.getDefault(variableFormat);</span>
+	}
+
+	/**
+	 * Returns true if there is a default modifier set for the given FormatManager.
+	 * 
+	 * Warning: This is NOT whether there is a Default Value for the given FormatManager.
+	 * This is a much simpler test that checks if there is a specifically provided Default
+	 * Modifier. The distinction here is that a format like ARRAY[NUMBER] will return
+	 * false from this; while it is legal, it never have a specifically defined default,
+	 * as it is a derived default value.
+	 * 
+	 * @param formatManager
+	 *            The FormatManager indicating the format to check for a default modifier
+	 * @return true if there is a default modifier set for the given FormatManager; false
+	 *         otherwise
+	 */
+	public boolean hasDefaultModifier(FormatManager&lt;?&gt; formatManager)
+	{
+<span class="nc bnc" id="L413" title="All 2 branches missed.">		return myValueStore.get(formatManager) != null;</span>
+	}
+
+	/*
+	 * Begin: (Delegated) Items part of VariableLibrary interface
+	 */
+	@Override
+	public boolean isLegalVariableID(LegalScope varScope, String varName)
+	{
+<span class="fc" id="L422">		return variableManager.isLegalVariableID(varScope, varName);</span>
+	}
+
+	@Override
+	public FormatManager&lt;?&gt; getVariableFormat(LegalScope varScope, String varName)
+	{
+<span class="fc" id="L428">		return variableManager.getVariableFormat(varScope, varName);</span>
+	}
+
+	@Override
+	public VariableID&lt;?&gt; getVariableID(ScopeInstance instance, String varName)
+	{
+<span class="fc" id="L434">		return variableManager.getVariableID(instance, varName);</span>
+	}
+
+	@Override
+	public void assertLegalVariableID(String varName, LegalScope varScope, FormatManager&lt;?&gt; formatManager)
+	{
+<span class="fc" id="L440">		variableManager.assertLegalVariableID(varName, varScope, formatManager);</span>
+<span class="fc" id="L441">	}</span>
+
+	@Override
+	public List&lt;FormatManager&lt;?&gt;&gt; getInvalidFormats()
+	{
+<span class="nc" id="L446">		return variableManager.getInvalidFormats();</span>
+	}
+	/*
+	 * End: (Delegated) Items part of VariableLibrary interface
+	 */
+
+	/*
+	 * Begin: (Delegated) Items part of VariableChannelFactory interface
+	 */
+	@Override
+	public VariableChannel&lt;?&gt; getChannel(CharID id, VarScoped owner, String name)
+	{
+<span class="nc" id="L458">		return variableChannelFactory.getChannel(id, owner, name);</span>
+	}
+
+	@Override
+	public VariableChannel&lt;?&gt; getGlobalChannel(CharID id, String name)
+	{
+<span class="fc" id="L464">		return variableChannelFactory.getGlobalChannel(id, name);</span>
+	}
+
+	@Override
+	public void disconnect(VariableChannel&lt;?&gt; variableChannel)
+	{
+<span class="nc" id="L470">		variableChannelFactory.disconnect(variableChannel);</span>
+<span class="nc" id="L471">	}</span>
+	/*
+	 * End: (Delegated) Items part of VariableChannelFactory interface
+	 */
+
+	/*
+	 * Begin: (Delegated) Items part of VariableWrapperFactory interface
+	 */
+	@Override
+	public VariableWrapper&lt;?&gt; getWrapper(CharID id, VarScoped owner, String name)
+	{
+<span class="nc" id="L482">		return variableWrapperFactory.getWrapper(id, owner, name);</span>
+	}
+
+	@Override
+	public VariableWrapper&lt;?&gt; getGlobalWrapper(CharID id, String name)
+	{
+<span class="nc" id="L488">		return variableWrapperFactory.getGlobalWrapper(id, name);</span>
+	}
+
+	@Override
+	public void disconnect(VariableWrapper&lt;?&gt; variableWrapper)
+	{
+<span class="nc" id="L494">		variableWrapperFactory.disconnect(variableWrapper);</span>
+<span class="nc" id="L495">	}</span>
+	/*
+	 * End: (Delegated) Items part of VariableWrapperFactory interface
+	 */
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

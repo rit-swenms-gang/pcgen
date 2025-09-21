@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConvertPanel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui2.converter</a> &gt; <span class="el_source">ConvertPanel.java</span></div><h1>ConvertPanel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2009 Tom Parker &lt;thpr@users.sourceforge.net&gt;
+ * 
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+package pcgen.gui2.converter;
+
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.List;
+
+import javax.swing.Box;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.ScrollPaneConstants;
+
+import pcgen.cdom.base.CDOMObject;
+import pcgen.cdom.inst.ObjectCache;
+import pcgen.gui2.converter.event.ProgressEvent;
+import pcgen.gui2.converter.event.ProgressListener;
+import pcgen.gui2.converter.event.TaskStrategyListener;
+import pcgen.gui2.converter.event.TaskStrategyMessage;
+import pcgen.gui2.converter.panel.ConvertSubPanel;
+import pcgen.gui2.tools.CursorControlUtilities;
+import pcgen.gui2.tools.Utility;
+
+public class ConvertPanel extends JPanel
+{
+	private static final long serialVersionUID = 1686411319132380251L;
+
+<span class="nc" id="L52">	private final JPanel basePanel = new JPanel();</span>
+
+	private final JButton finishButton;
+
+	private final JButton prevButton;
+
+	private final JButton nextButton;
+
+	private final JButton cancelButton;
+
+	private final CDOMObject properties;
+
+	private final ProgressListener pl;
+
+	private final List&lt;ConvertSubPanel&gt; queue;
+
+<span class="nc" id="L68">	private int currentPanel = -1;</span>
+
+	private final JLabel statusLabel;
+
+	public ConvertPanel(List&lt;ConvertSubPanel&gt; bq)
+	{
+<span class="nc" id="L74">		super(new BorderLayout());</span>
+<span class="nc" id="L75">		statusLabel = new JLabel();</span>
+<span class="nc" id="L76">		TaskStrategyListener tsl = (source, string) -&gt; statusLabel.setText(string);</span>
+<span class="nc" id="L77">		TaskStrategyMessage.addTaskStrategyListener(tsl);</span>
+
+<span class="nc" id="L79">		properties = new ObjectCache();</span>
+<span class="nc" id="L80">		Box buttonBox = Box.createHorizontalBox();</span>
+<span class="nc" id="L81">		prevButton = new JButton(&quot;&lt; Previous&quot;);</span>
+<span class="nc" id="L82">		prevButton.setMnemonic('P');</span>
+<span class="nc" id="L83">		prevButton.addActionListener(new PreviousButtonListener());</span>
+<span class="nc" id="L84">		prevButton.setEnabled(false); // FUTURE Need to reenable this</span>
+<span class="nc" id="L85">		buttonBox.add(prevButton);</span>
+<span class="nc" id="L86">		nextButton = new JButton(&quot;Next &gt;&quot;);</span>
+<span class="nc" id="L87">		nextButton.setMnemonic('N');</span>
+<span class="nc" id="L88">		pl = new ProgressListener()</span>
+<span class="nc" id="L89">		{</span>
+			@Override
+			public void progressAllowed(ProgressEvent pe)
+			{
+<span class="nc bnc" id="L93" title="All 2 branches missed.">				if (pe.getID() == ProgressEvent.AUTO_ADVANCE)</span>
+				{
+<span class="nc" id="L95">					proceedToNextPanel();</span>
+				}
+				else
+				{
+<span class="nc" id="L99">					nextButton.setEnabled(true);</span>
+				}
+<span class="nc" id="L101">			}</span>
+
+			@Override
+			public void progressNotAllowed(ProgressEvent pe)
+			{
+<span class="nc" id="L106">				nextButton.setEnabled(false);</span>
+<span class="nc" id="L107">			}</span>
+		};
+<span class="nc" id="L109">		nextButton.addActionListener(arg0 -&gt; proceedToNextPanel());</span>
+<span class="nc" id="L110">		buttonBox.add(nextButton);</span>
+<span class="nc" id="L111">		cancelButton = new JButton(&quot;Cancel&quot;);</span>
+<span class="nc" id="L112">		cancelButton.addActionListener(arg0 -&gt; checkExit());</span>
+<span class="nc" id="L113">		buttonBox.add(cancelButton);</span>
+<span class="nc" id="L114">		finishButton = new JButton(&quot;Finish&quot;);</span>
+<span class="nc" id="L115">		finishButton.addActionListener(arg0 -&gt; {</span>
+<span class="nc" id="L116">            PCGenDataConvert.savePrefs();</span>
+<span class="nc" id="L117">            System.exit(0);</span>
+<span class="nc" id="L118">        });</span>
+<span class="nc" id="L119">		finishButton.setVisible(false);</span>
+<span class="nc" id="L120">		buttonBox.add(finishButton);</span>
+<span class="nc" id="L121">		basePanel.setPreferredSize(new Dimension(800, 500));</span>
+<span class="nc" id="L122">		JScrollPane jsp = new JScrollPane(basePanel);</span>
+<span class="nc" id="L123">		jsp.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);</span>
+<span class="nc" id="L124">		jsp.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);</span>
+<span class="nc" id="L125">		add(jsp);</span>
+<span class="nc" id="L126">		JPanel buttonLayout = new JPanel(new GridBagLayout());</span>
+<span class="nc" id="L127">		GridBagConstraints gbc = new GridBagConstraints();</span>
+<span class="nc" id="L128">		Utility.buildRelativeConstraints(gbc, 1, 1, 1.0, 0, GridBagConstraints.HORIZONTAL, GridBagConstraints.WEST);</span>
+<span class="nc" id="L129">		gbc.insets = new Insets(0, 10, 5, 10);</span>
+<span class="nc" id="L130">		buttonLayout.add(statusLabel, gbc);</span>
+<span class="nc" id="L131">		Utility.buildRelativeConstraints(gbc, GridBagConstraints.REMAINDER, 1, 0, 0, GridBagConstraints.NONE,</span>
+			GridBagConstraints.EAST);
+<span class="nc" id="L133">		buttonLayout.add(buttonBox, gbc);</span>
+<span class="nc" id="L134">		add(buttonLayout, BorderLayout.SOUTH);</span>
+<span class="nc" id="L135">		queue = bq;</span>
+<span class="nc" id="L136">		runNextPanel();</span>
+<span class="nc" id="L137">	}</span>
+
+	private void proceedToNextPanel()
+	{
+<span class="nc" id="L141">		Thread t = new Thread(() -&gt; {</span>
+<span class="nc" id="L142">			CursorControlUtilities.startWaitCursor(basePanel);</span>
+<span class="nc" id="L143">			runNextPanel();</span>
+<span class="nc" id="L144">			CursorControlUtilities.stopWaitCursor(basePanel);</span>
+<span class="nc" id="L145">		});</span>
+<span class="nc" id="L146">		t.start();</span>
+<span class="nc" id="L147">	}</span>
+
+	public void prepare(ConvertSubPanel panel, boolean allowPrev)
+	{
+<span class="nc" id="L151">		setButtonVisibility(panel.isLast(), allowPrev);</span>
+<span class="nc" id="L152">		panel.addProgressListener(pl);</span>
+<span class="nc" id="L153">		panel.performAnalysis(properties);</span>
+<span class="nc" id="L154">	}</span>
+
+	private void setButtonVisibility(boolean displayingLast, boolean allowPrev)
+	{
+<span class="nc" id="L158">		nextButton.setEnabled(false);</span>
+<span class="nc" id="L159">		prevButton.setEnabled(allowPrev);</span>
+		//finishButton.setVisible(displayingLast);
+<span class="nc" id="L161">		cancelButton.setVisible(true);</span>
+<span class="nc" id="L162">	}</span>
+
+	private void showFinishButton()
+	{
+<span class="nc" id="L166">		finishButton.setVisible(true);</span>
+<span class="nc" id="L167">		cancelButton.setVisible(false);</span>
+<span class="nc" id="L168">	}</span>
+
+	public void checkExit()
+	{
+<span class="nc" id="L172">		int response = JOptionPane.showConfirmDialog(this, &quot;Are you sure you wish to cancel and exit?&quot;, &quot;Confirm Exit&quot;,</span>
+			JOptionPane.OK_CANCEL_OPTION);
+<span class="nc bnc" id="L174" title="All 2 branches missed.">		if (response == JOptionPane.OK_OPTION)</span>
+		{
+<span class="nc" id="L176">			PCGenDataConvert.savePrefs();</span>
+<span class="nc" id="L177">			System.exit(0);</span>
+		}
+<span class="nc" id="L179">	}</span>
+
+	private void runNextPanel()
+	{
+		ConvertSubPanel nextpanel;
+		do
+		{
+<span class="nc" id="L186">			boolean allowPrev = false;</span>
+<span class="nc bnc" id="L187" title="All 4 branches missed.">			if (currentPanel &gt;= 0 &amp;&amp; currentPanel &lt; queue.size())</span>
+			{
+<span class="nc" id="L189">				allowPrev = queue.get(currentPanel).returnAllowed();</span>
+			}
+<span class="nc" id="L191">			currentPanel++;</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">			if (currentPanel &lt; queue.size())</span>
+			{
+<span class="nc" id="L194">				nextpanel = queue.get(currentPanel);</span>
+<span class="nc" id="L195">				prepare(nextpanel, allowPrev);</span>
+<span class="nc" id="L196">				basePanel.removeAll();</span>
+<span class="nc" id="L197">				nextpanel.setupDisplay(basePanel, properties);</span>
+<span class="nc" id="L198">				basePanel.repaint();</span>
+			}
+			else
+			{
+<span class="nc" id="L202">				nextpanel = null;</span>
+<span class="nc" id="L203">				showFinishButton();</span>
+			}
+		}
+<span class="nc bnc" id="L206" title="All 4 branches missed.">		while (nextpanel != null &amp;&amp; nextpanel.autoAdvance(properties));</span>
+<span class="nc" id="L207">	}</span>
+
+	/**
+		 * The Class {@code PreviousButtonListener} ...
+		 * 
+		 * 
+		 */
+<span class="nc" id="L214">	public class PreviousButtonListener implements ActionListener</span>
+	{
+
+		@Override
+		public void actionPerformed(ActionEvent e)
+		{
+<span class="nc" id="L220">			CursorControlUtilities.startWaitCursor(basePanel);</span>
+			ConvertSubPanel prevpanel;
+			do
+			{
+<span class="nc" id="L224">				currentPanel--;</span>
+<span class="nc bnc" id="L225" title="All 4 branches missed.">				if (currentPanel &gt;= 0 &amp;&amp; currentPanel &lt; queue.size())</span>
+				{
+<span class="nc" id="L227">					prevpanel = queue.get(currentPanel);</span>
+<span class="nc" id="L228">					boolean allowPrev = false;</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">					if (currentPanel &gt; 0)</span>
+					{
+<span class="nc" id="L231">						allowPrev = queue.get(currentPanel - 1).returnAllowed();</span>
+					}
+<span class="nc" id="L233">					prepare(prevpanel, allowPrev);</span>
+<span class="nc" id="L234">					basePanel.removeAll();</span>
+<span class="nc" id="L235">					prevpanel.setupDisplay(basePanel, properties);</span>
+<span class="nc" id="L236">					basePanel.repaint();</span>
+<span class="nc" id="L237">				}</span>
+				else
+				{
+<span class="nc" id="L240">					prevpanel = null;</span>
+				}
+			}
+<span class="nc bnc" id="L243" title="All 4 branches missed.">			while (prevpanel != null &amp;&amp; prevpanel.autoAdvance(properties));</span>
+<span class="nc" id="L244">			CursorControlUtilities.stopWaitCursor(basePanel);</span>
+<span class="nc" id="L245">		}</span>
+
+	}
+
+	/**
+	 * @return The field which will be used for status display
+	 */
+	public Component getStatusField()
+	{
+<span class="nc" id="L254">		return statusLabel;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

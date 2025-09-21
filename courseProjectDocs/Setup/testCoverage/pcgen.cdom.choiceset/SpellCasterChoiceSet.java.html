@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpellCasterChoiceSet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.cdom.choiceset</a> &gt; <span class="el_source">SpellCasterChoiceSet.java</span></div><h1>SpellCasterChoiceSet.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2006 (C) Tom Parker &lt;thpr@users.sourceforge.net&gt;
+ * 
+ * This library is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This library is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * 
+ * 
+ */
+package pcgen.cdom.choiceset;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import pcgen.base.lang.StringUtil;
+import pcgen.cdom.base.ChoiceSet;
+import pcgen.cdom.base.Constants;
+import pcgen.cdom.base.PrimitiveChoiceSet;
+import pcgen.cdom.enumeration.FactKey;
+import pcgen.cdom.enumeration.GroupingState;
+import pcgen.cdom.reference.CDOMGroupRef;
+import pcgen.core.PCClass;
+import pcgen.core.PlayerCharacter;
+
+/**
+ * A SpellCasterChoiceSet contains references to PCClass Objects.
+ * 
+ * The contents of a SpellCasterChoiceSet is defined at construction of the
+ * SpellCasterChoiceSet. The contents of a SpellCasterChoiceSet is fixed, and
+ * will not vary by the PlayerCharacter used to resolve the
+ * SpellCasterChoiceSet.
+ */
+public class SpellCasterChoiceSet extends ChoiceSet&lt;PCClass&gt; implements PrimitiveChoiceSet&lt;PCClass&gt;
+{
+
+	/**
+	 * Caches the special case of an empty PrimitiveChoiceSet. This is used in
+	 * order to avoid wasteful processing and memory in cases where a
+	 * SpellCasterChoiceSet does not contain any Class-based items. (If it only
+	 * contains spell types and spells [primitives], then this empty
+	 * PrimitiveChoiceSet will be used.)
+	 */
+<span class="fc" id="L56">	private static final PrimitiveChoiceSet&lt;PCClass&gt; EMPTY_CHOICE_SET = new PrimitiveChoiceSet&lt;&gt;()</span>
+<span class="fc" id="L57">	{</span>
+
+		@Override
+		public Class&lt;PCClass&gt; getChoiceClass()
+		{
+<span class="nc" id="L62">			return PCClass.class;</span>
+		}
+
+		@Override
+		public String getLSTformat(boolean useAny)
+		{
+<span class="nc" id="L68">			return Constants.EMPTY_STRING;</span>
+		}
+
+		@Override
+		public Set&lt;PCClass&gt; getSet(PlayerCharacter pc)
+		{
+<span class="nc" id="L74">			return Collections.emptySet();</span>
+		}
+
+		@Override
+		public GroupingState getGroupingState()
+		{
+			// CONSIDER throwing something here, never should be called?
+<span class="nc" id="L81">			return GroupingState.ANY;</span>
+		}
+	};
+
+	/**
+	 * Storage of all PCClass objects potentially available. This is effectively
+	 * used as a cache to avoid a reference to the ReferenceContext during
+	 * runtime. This is used to establish which Classes are available based on
+	 * the String-based spell types provided at construction.
+	 */
+	private final CDOMGroupRef&lt;PCClass&gt; allClasses;
+
+	/**
+	 * Contains a list of spell types that are contained in this
+	 * SpellCasterChoiceSet
+	 */
+	private final List&lt;String&gt; spelltypes;
+
+	/**
+	 * The underlying PrimitiveChoiceSet that contains the objects in this
+	 * SpellCasterChoiceSet. This includes Group-based references to PCClasses.
+	 * 
+	 * It is necessary to keep this separate from the individual references due
+	 * to quirks in addition behavior of SpellCaster choices. If provided a
+	 * group reference, then only items that the PlayerCharacter has levels in
+	 * out of that group are available for selection. If items are provided as a
+	 * primitive, then that item is universally added to the potential choices.
+	 * 
+	 * CONSIDER is this separation good behavior or a bug?
+	 */
+	private final PrimitiveChoiceSet&lt;PCClass&gt; types;
+
+	/**
+	 * The underlying PrimitiveChoiceSet that contains the objects in this
+	 * SpellCasterChoiceSet. This includes individual references to (primitive)
+	 * PCClasses.
+	 */
+	private final PrimitiveChoiceSet&lt;PCClass&gt; primitives;
+
+	/**
+	 * Constructs a new SpellCasterChoiceSet which contains the Set of objects
+	 * contained within the given CDOMReferences. The CDOMReferences do not need
+	 * to be resolved at the time of construction of the SpellCasterChoiceSet.
+	 * 
+	 * This constructor is value-semantic, meaning that ownership of the List
+	 * provided to this constructor is not transferred. Modification of the List
+	 * (after this constructor completes) does not result in modifying the
+	 * SpellCasterChoiceSet, and the SpellCasterChoiceSet will not modify the
+	 * given List.
+	 * 
+	 * @param allRef
+	 *            The &quot;ALL&quot; Reference for PCClass objects
+	 * @param spelltype
+	 *            A List of spell types that this SpellCasterChoiceSet will
+	 *            allow to be used to select a PCClass
+	 * @param typePCS
+	 *            A PrimitiveChoiceSet which defines the Set of objects
+	 *            contained within the SpellCasterChoiceSet that were referenced
+	 *            by group (e.g. TYPE=)
+	 * @param primPCS
+	 *            A PrimitiveChoiceSet which defines the Set of primitive
+	 *            objects contained within the SpellCasterChoiceSet that were
+	 *            referenced by key
+	 */
+	public SpellCasterChoiceSet(CDOMGroupRef&lt;PCClass&gt; allRef, List&lt;String&gt; spelltype,
+		PrimitiveChoiceSet&lt;PCClass&gt; typePCS, PrimitiveChoiceSet&lt;PCClass&gt; primPCS)
+	{
+<span class="fc bfc" id="L148" title="All 2 branches covered.">		super(&quot;SPELLCASTER&quot;, typePCS == null ? EMPTY_CHOICE_SET : typePCS);</span>
+<span class="fc" id="L149">		types = typePCS;</span>
+<span class="fc" id="L150">		primitives = primPCS;</span>
+<span class="fc" id="L151">		spelltypes = new ArrayList&lt;&gt;(spelltype);</span>
+<span class="fc" id="L152">		allClasses = allRef;</span>
+<span class="fc" id="L153">	}</span>
+
+	/**
+	 * Returns a representation of this SpellCasterChoiceSet, suitable for
+	 * storing in an LST file.
+	 * 
+	 * @return A representation of this SpellCasterChoiceSet, suitable for
+	 *         storing in an LST file.
+	 */
+	@Override
+	public String getLSTformat()
+	{
+<span class="fc" id="L165">		return getLSTformat(true);</span>
+	}
+
+	/**
+	 * Returns a representation of this SpellCasterChoiceSet, suitable for
+	 * storing in an LST file.
+	 * 
+	 * @param useAny
+	 *            use &quot;ANY&quot; for the global &quot;ALL&quot; reference when creating the LST
+	 *            format
+	 * @return A representation of this SpellCasterChoiceSet, suitable for
+	 *         storing in an LST file.
+	 */
+	@Override
+	public String getLSTformat(boolean useAny)
+	{
+<span class="fc" id="L181">		List&lt;String&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">		if (primitives != null)</span>
+		{
+<span class="fc" id="L184">			list.add(primitives.getLSTformat(useAny));</span>
+		}
+<span class="fc bfc" id="L186" title="All 2 branches covered.">		if (types != null)</span>
+		{
+<span class="fc" id="L188">			list.add(types.getLSTformat(useAny));</span>
+		}
+<span class="fc bfc" id="L190" title="All 2 branches covered.">		if (!spelltypes.isEmpty())</span>
+		{
+<span class="fc" id="L192">			list.addAll(spelltypes);</span>
+		}
+<span class="fc" id="L194">		return StringUtil.join(list, Constants.COMMA);</span>
+	}
+
+	/**
+	 * The class of object this SpellCasterChoiceSet contains.
+	 * 
+	 * The behavior of this method is undefined if the CDOMReference objects
+	 * provided during the construction of this SpellCasterChoiceSet are not yet
+	 * resolved.
+	 * 
+	 * @return The class of object this SpellCasterChoiceSet contains.
+	 */
+	@Override
+	public Class&lt;PCClass&gt; getChoiceClass()
+	{
+<span class="fc" id="L209">		return PCClass.class;</span>
+	}
+
+	/**
+	 * Returns a Set containing the Objects which this SpellCasterChoiceSet
+	 * contains. The contents of a SpellCasterChoiceSet is fixed, and will not
+	 * vary by the PlayerCharacter used to resolve the SpellCasterChoiceSet.
+	 * 
+	 * The behavior of this method is undefined if the CDOMReference objects
+	 * provided during the construction of this SpellCasterChoiceSet are not yet
+	 * resolved.
+	 * 
+	 * Ownership of the Set returned by this method will be transferred to the
+	 * calling object. Modification of the returned Set should not result in
+	 * modifying the SpellCasterChoiceSet, and modifying the
+	 * SpellCasterChoiceSet after the Set is returned should not modify the Set.
+	 * However, modification of the PCClass objects contained within the
+	 * returned set will result in modification of the PCClass objects contained
+	 * within this SpellCasterChoiceSet.
+	 * 
+	 * @param pc
+	 *            The PlayerCharacter for which the choices in this
+	 *            SpellCasterChoiceSet should be returned.
+	 * @return A Set containing the Objects which this SpellCasterChoiceSet
+	 *         contains.
+	 */
+	@Override
+	public Set&lt;PCClass&gt; getSet(PlayerCharacter pc)
+	{
+<span class="nc" id="L238">		FactKey&lt;String&gt; fk = FactKey.valueOf(&quot;SpellType&quot;);</span>
+<span class="nc" id="L239">		Set&lt;PCClass&gt; returnSet = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">		if (types != null)</span>
+		{
+<span class="nc bnc" id="L242" title="All 2 branches missed.">			for (PCClass pcc : types.getSet(pc))</span>
+			{
+<span class="nc bnc" id="L244" title="All 4 branches missed.">				if ((pcc.get(fk) != null) &amp;&amp; (pc.getClassKeyed(pcc.getKeyName()) != null))</span>
+				{
+<span class="nc" id="L246">					returnSet.add(pcc);</span>
+				}
+<span class="nc" id="L248">			}</span>
+		}
+<span class="nc bnc" id="L250" title="All 2 branches missed.">		if (primitives != null)</span>
+		{
+<span class="nc" id="L252">			returnSet.addAll(primitives.getSet(pc));</span>
+		}
+<span class="nc bnc" id="L254" title="All 2 branches missed.">		if (spelltypes != null)</span>
+		{
+<span class="nc bnc" id="L256" title="All 2 branches missed.">			for (PCClass pcc : allClasses.getContainedObjects())</span>
+			{
+<span class="nc bnc" id="L258" title="All 2 branches missed.">				TYPE: for (String type : spelltypes)</span>
+				{
+<span class="nc" id="L260">					String spelltype = pcc.getResolved(fk);</span>
+<span class="nc bnc" id="L261" title="All 4 branches missed.">					if (type.equalsIgnoreCase(spelltype) &amp;&amp; pc.getClassKeyed(pcc.getKeyName()) != null)</span>
+					{
+<span class="nc" id="L263">						returnSet.add(pcc);</span>
+<span class="nc" id="L264">						break TYPE;</span>
+					}
+<span class="nc" id="L266">				}</span>
+<span class="nc" id="L267">			}</span>
+		}
+<span class="nc" id="L269">		return returnSet;</span>
+	}
+
+	@Override
+	public int hashCode()
+	{
+<span class="nc bnc" id="L275" title="All 4 branches missed.">		return (types == null ? 0 : types.hashCode() * 29) + (primitives == null ? 0 : primitives.hashCode());</span>
+	}
+
+	@Override
+	public boolean equals(Object obj)
+	{
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">		if (obj == this)</span>
+		{
+<span class="nc" id="L283">			return true;</span>
+		}
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">		if (obj instanceof SpellCasterChoiceSet other)</span>
+		{
+<span class="fc bfc" id="L287" title="All 2 branches covered.">			if (types == null)</span>
+			{
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">				if (other.types != null)</span>
+				{
+<span class="nc" id="L291">					return false;</span>
+				}
+			}
+			else
+			{
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">				if (!types.equals(other.types))</span>
+				{
+<span class="nc" id="L298">					return false;</span>
+				}
+			}
+<span class="fc bfc" id="L301" title="All 2 branches covered.">			if (primitives == null)</span>
+			{
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">				return other.primitives == null;</span>
+			}
+<span class="fc" id="L305">			return primitives.equals(other.primitives);</span>
+		}
+<span class="nc" id="L307">		return false;</span>
+	}
+
+	/**
+	 * Returns the GroupingState for this SpellCasterChoiceSet. The
+	 * GroupingState indicates how this SpellCasterChoiceSet can be combined
+	 * with other PrimitiveChoiceSets.
+	 * 
+	 * @return The GroupingState for this SpellCasterChoiceSet.
+	 */
+	@Override
+	public GroupingState getGroupingState()
+	{
+<span class="fc" id="L320">		GroupingState state = GroupingState.EMPTY;</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">		if (primitives != null)</span>
+		{
+<span class="fc" id="L323">			state = primitives.getGroupingState().add(state);</span>
+		}
+<span class="fc bfc" id="L325" title="All 2 branches covered.">		if (types != null)</span>
+		{
+<span class="fc" id="L327">			state = types.getGroupingState().add(state);</span>
+		}
+<span class="fc bfc" id="L329" title="All 2 branches covered.">		if (!spelltypes.isEmpty())</span>
+		{
+<span class="fc" id="L331">			state = GroupingState.ANY.add(state);</span>
+		}
+		//TODO I think this needs state.compound(GroupingState.ALLOWS_UNION)??
+<span class="fc" id="L334">		return state;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

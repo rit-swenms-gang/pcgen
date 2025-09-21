@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DDList.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.core.doomsdaybook</a> &gt; <span class="el_source">DDList.java</span></div><h1>DDList.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2003 (C) Devon Jones
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.core.doomsdaybook;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import gmgen.plugin.dice.Dice;
+
+public class DDList extends ArrayList&lt;WeightedDataValue&gt; implements DataElement
+{
+<span class="nc" id="L27">	private final List&lt;DataValue&gt; retList = new ArrayList&lt;&gt;();</span>
+	private String id;
+	private String title;
+	private final VariableHashMap allVars;
+	private int weight;
+
+	/**
+	 * Constructor
+	 * @param allVars
+	 * @param title
+	 * @param id
+	 */
+	public DDList(VariableHashMap allVars, String title, String id)
+	{
+<span class="nc" id="L41">		this(allVars, title, id, 1);</span>
+<span class="nc" id="L42">	}</span>
+
+	/**
+	 * Constructor
+	 * @param allVars
+	 * @param title
+	 * @param id
+	 * @param weight
+	 */
+	private DDList(VariableHashMap allVars, String title, String id, int weight)
+<span class="nc" id="L52">	{</span>
+<span class="nc" id="L53">		this.allVars = allVars;</span>
+<span class="nc" id="L54">		this.title = title;</span>
+<span class="nc" id="L55">		this.id = id;</span>
+<span class="nc" id="L56">		this.weight = weight;</span>
+<span class="nc" id="L57">	}</span>
+
+	@Override
+	public List&lt;DataValue&gt; getData()
+	{
+<span class="nc" id="L62">		retList.clear();</span>
+
+<span class="nc" id="L64">		int rangeTop = getRange();</span>
+		int modifier;
+
+		try
+		{
+<span class="nc" id="L69">			modifier = Integer.parseInt(allVars.getVal(getId() + &quot;modifier&quot;));</span>
+		}
+<span class="nc" id="L71">		catch (NumberFormatException | variableException e)</span>
+		{
+<span class="nc" id="L73">			modifier = 0;</span>
+<span class="nc" id="L74">		}</span>
+
+		// Determine which entry to choose
+<span class="nc" id="L77">		Dice die = new Dice(1, rangeTop, 0);</span>
+<span class="nc" id="L78">		int choice = die.roll();</span>
+<span class="nc" id="L79">		choice += modifier;</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">		choice = (choice &lt; 0) ? rangeTop : choice;</span>
+
+		//select the detail to return
+<span class="nc" id="L83">		int aWeight = 0;</span>
+
+		// Iterate through the list of choices until the weights (from each DataValue)
+		// are greater the num chosen as the 'choice'
+<span class="nc bnc" id="L87" title="All 2 branches missed.">		for (WeightedDataValue chkValue : this)</span>
+		{
+<span class="nc" id="L89">			int valueWeight = chkValue.getWeight();</span>
+
+<span class="nc bnc" id="L91" title="All 2 branches missed.">			if (valueWeight &gt; 0)</span>
+			{
+<span class="nc" id="L93">				aWeight += valueWeight;</span>
+
+<span class="nc bnc" id="L95" title="All 2 branches missed.">				if (aWeight &gt;= choice)</span>
+				{
+<span class="nc" id="L97">					retList.add(chkValue);</span>
+
+<span class="nc" id="L99">					break;</span>
+				}
+			}
+<span class="nc" id="L102">		}</span>
+
+<span class="nc" id="L104">		return retList;</span>
+	}
+
+	/**
+	 * Set the id of the list
+	 * @param id
+	 */
+	public void setId(String id)
+	{
+<span class="nc" id="L113">		this.id = id;</span>
+<span class="nc" id="L114">	}</span>
+
+	@Override
+	public String getId()
+	{
+<span class="nc" id="L119">		return id;</span>
+	}
+
+	@Override
+	public List&lt;DataValue&gt; getLastData()
+	{
+<span class="nc" id="L125">		return retList;</span>
+	}
+
+	/**
+	 * Get the range
+	 * @return the range
+	 */
+	private int getRange()
+	{
+<span class="nc" id="L134">		int rangeTop = this.stream()</span>
+<span class="nc" id="L135">		                   .mapToInt(WeightedDataValue::getWeight)</span>
+<span class="nc" id="L136">		                   .sum();</span>
+
+<span class="nc bnc" id="L138" title="All 2 branches missed.">		if (rangeTop &lt;= 0)</span>
+		{ //the die will nullpointer if it is not at least 1
+<span class="nc" id="L140">			rangeTop = 1;</span>
+		}
+
+<span class="nc" id="L143">		return rangeTop;</span>
+	}
+
+	/**
+	 * Set the title of the list
+	 * @param title
+	 */
+	public void setTitle(String title)
+	{
+<span class="nc" id="L152">		this.title = title;</span>
+<span class="nc" id="L153">	}</span>
+
+	@Override
+	public String getTitle()
+	{
+<span class="nc" id="L158">		return title;</span>
+	}
+
+	@Override
+	public int getWeight()
+	{
+<span class="nc" id="L164">		return weight;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

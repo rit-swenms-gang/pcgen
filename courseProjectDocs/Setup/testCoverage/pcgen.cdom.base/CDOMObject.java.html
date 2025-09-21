@@ -1,0 +1,1393 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CDOMObject.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.cdom.base</a> &gt; <span class="el_source">CDOMObject.java</span></div><h1>CDOMObject.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2007-18 Tom Parker &lt;thpr@users.sourceforge.net&gt;
+ *
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+package pcgen.cdom.base;
+
+import java.net.URI;
+import java.text.Collator;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import org.jetbrains.annotations.NotNull;
+import pcgen.base.formula.Formula;
+import pcgen.base.formula.base.VarScoped;
+import pcgen.base.lang.StringUtil;
+import pcgen.base.util.DoubleKeyMapToList;
+import pcgen.base.util.Indirect;
+import pcgen.base.util.MapToList;
+import pcgen.base.util.ObjectContainer;
+import pcgen.cdom.content.RemoteModifier;
+import pcgen.cdom.content.VarModifier;
+import pcgen.cdom.enumeration.FactKey;
+import pcgen.cdom.enumeration.FactSetKey;
+import pcgen.cdom.enumeration.FormulaKey;
+import pcgen.cdom.enumeration.IntegerKey;
+import pcgen.cdom.enumeration.ListKey;
+import pcgen.cdom.enumeration.MapKey;
+import pcgen.cdom.enumeration.ObjectKey;
+import pcgen.cdom.enumeration.StringKey;
+import pcgen.cdom.enumeration.VariableKey;
+import pcgen.cdom.formula.PCGenScoped;
+import pcgen.cdom.helper.InfoBoolean;
+import pcgen.cdom.helper.VarHolderSupport;
+import pcgen.cdom.util.FactSetKeyMapToList;
+import pcgen.cdom.util.ListKeyMapToList;
+import pcgen.cdom.util.MapKeyMap;
+import pcgen.core.Description;
+import pcgen.core.Equipment;
+import pcgen.core.PlayerCharacter;
+import pcgen.core.analysis.BonusActivation;
+import pcgen.core.bonus.BonusObj;
+
+<span class="fc" id="L68">public abstract class CDOMObject extends ConcretePrereqObject</span>
+		implements Cloneable, BonusContainer, Loadable, Reducible, PCGenScoped, VarHolder,
+		VarContainer
+{
+
+<span class="fc" id="L73">	public static final Comparator&lt;CDOMObject&gt; P_OBJECT_COMP =</span>
+<span class="nc" id="L74">			(o1, o2) -&gt; o1.getKeyName().compareToIgnoreCase(o2.getKeyName());</span>
+<span class="fc" id="L75">	public static final Comparator&lt;CDOMObject&gt; P_OBJECT_NAME_COMP = (o1, o2) -&gt; {</span>
+<span class="nc" id="L76">		final Collator collator = Collator.getInstance();</span>
+
+		// Check sort keys first
+<span class="nc" id="L79">		String key1 = o1.get(StringKey.SORT_KEY);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">		if (key1 == null)</span>
+		{
+<span class="nc" id="L82">			key1 = o1.getDisplayName();</span>
+		}
+<span class="nc" id="L84">		String key2 = o2.get(StringKey.SORT_KEY);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">		if (key2 == null)</span>
+		{
+<span class="nc" id="L87">			key2 = o2.getDisplayName();</span>
+		}
+<span class="nc bnc" id="L89" title="All 2 branches missed.">		if (!key1.equals(key2))</span>
+		{
+<span class="nc" id="L91">			return collator.compare(key1, key2);</span>
+		}
+<span class="nc bnc" id="L93" title="All 2 branches missed.">		if (!o1.getDisplayName().equals(o2.getDisplayName()))</span>
+		{
+<span class="nc" id="L95">			return collator.compare(o1.getDisplayName(), o2.getDisplayName());</span>
+		}
+		// Fall back to keyname if the displayname is the same
+<span class="nc" id="L98">		return collator.compare(o1.getKeyName(), o2.getKeyName());</span>
+	};
+	/**
+	 * The source URI for this CDOMObject.
+	 */
+<span class="fc" id="L103">	private URI sourceURI = null;</span>
+
+	/**
+	 * The display name for this CDOMObject.
+	 */
+<span class="fc" id="L108">	private String displayName = Constants.EMPTY_STRING;</span>
+
+	/**
+	 * Support object to store the variable information on an object.
+	 */
+<span class="fc" id="L113">	private VarHolderSupport varHolder = new VarHolderSupport();</span>
+
+	/*
+	 * CONSIDER This should be a NumberMap - not Integer, but allow Double as
+	 * well, in one HashMap... this will control the size of CDOMObject.
+	 */
+	/** A map to hold items keyed by Integers for the object */
+	// TODO make this final once clone() is no longer required...
+<span class="fc" id="L121">	private Map&lt;IntegerKey, Integer&gt; integerChar = null;</span>
+
+	/** A map to hold items keyed by Strings for the object */
+	// TODO make this final once clone() is no longer required...
+<span class="fc" id="L125">	private Map&lt;StringKey, String&gt; stringChar = null;</span>
+
+	/** A map to hold items keyed by Strings for the object */
+	// TODO make this final once clone() is no longer required...
+<span class="fc" id="L129">	private Map&lt;FormulaKey, Formula&gt; formulaChar = null;</span>
+
+	/** A map to hold items keyed by Strings for the object */
+	// TODO make this final once clone() is no longer required...
+<span class="fc" id="L133">	private Map&lt;VariableKey, Formula&gt; variableChar = null;</span>
+
+	/** A map to hold items keyed by Strings for the object */
+	// TODO make this final once clone() is no longer required...
+<span class="fc" id="L137">	private Map&lt;ObjectKey&lt;?&gt;, Object&gt; objectChar = null;</span>
+
+	/** A map to hold items keyed by Strings for the object */
+	// TODO make this final once clone() is no longer required...
+<span class="fc" id="L141">	private Map&lt;FactKey&lt;?&gt;, Object&gt; factChar = null;</span>
+
+	/** A map to hold items keyed by Strings for the object */
+	// TODO make this final once clone() is no longer required...
+<span class="fc" id="L145">	private FactSetKeyMapToList factSetChar = null;</span>
+
+	/** A map of Lists for the object */
+	// TODO make this final once clone() is no longer required...
+<span class="fc" id="L149">	private ListKeyMapToList listChar = null;</span>
+
+	/** A map of Maps for the object */
+	// TODO make this final once clone() is no longer required...
+<span class="fc" id="L153">	private MapKeyMap mapChar = null;</span>
+
+	// TODO make this final once clone() is no longer required...
+	/*
+	 * CONSIDER This is currently order enforcing the reference fetching to
+	 * match the integration tests that we perform, and their current behavior.
+	 * Not sure if this is really the best solution?
+	 */
+<span class="fc" id="L161">	private DoubleKeyMapToList&lt;CDOMReference&lt;? extends CDOMList&lt;?&gt;&gt;, CDOMReference&lt;?&gt;, AssociatedPrereqObject&gt; cdomListMods =</span>
+			null;
+
+	public final boolean containsKey(IntegerKey key)
+	{
+<span class="nc bnc" id="L166" title="All 4 branches missed.">		return integerChar != null &amp;&amp; integerChar.containsKey(key);</span>
+	}
+
+	public final Integer get(IntegerKey key)
+	{
+<span class="fc bfc" id="L171" title="All 2 branches covered.">		return integerChar == null ? null : integerChar.get(key);</span>
+	}
+
+	public final int getSafe(IntegerKey key)
+	{
+<span class="fc bfc" id="L176" title="All 2 branches covered.">		Integer intValue = integerChar == null ? null : integerChar.get(key);</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">		return intValue == null ? key.getDefault() : intValue;</span>
+	}
+
+	public final Integer put(IntegerKey key, Integer intValue)
+	{
+<span class="fc bfc" id="L182" title="All 2 branches covered.">		if (integerChar == null)</span>
+		{
+<span class="fc" id="L184">			integerChar = new HashMap&lt;&gt;();</span>
+		}
+<span class="fc" id="L186">		return integerChar.put(key, intValue);</span>
+	}
+
+	public final Integer remove(IntegerKey key)
+	{
+<span class="nc bnc" id="L191" title="All 2 branches missed.">		Integer out = integerChar == null ? null : integerChar.remove(key);</span>
+<span class="nc bnc" id="L192" title="All 4 branches missed.">		if (out != null &amp;&amp; integerChar.isEmpty())</span>
+		{
+<span class="nc" id="L194">			integerChar = null;</span>
+		}
+<span class="nc" id="L196">		return out;</span>
+	}
+
+	public final Set&lt;IntegerKey&gt; getIntegerKeys()
+	{
+<span class="fc bfc" id="L201" title="All 2 branches covered.">		return integerChar == null ? Collections.emptySet() : new HashSet&lt;&gt;(integerChar.keySet());</span>
+	}
+
+	public final boolean containsKey(StringKey key)
+	{
+<span class="nc bnc" id="L206" title="All 4 branches missed.">		return stringChar != null &amp;&amp; stringChar.containsKey(key);</span>
+	}
+
+	public final String get(StringKey key)
+	{
+<span class="fc bfc" id="L211" title="All 2 branches covered.">		return stringChar == null ? null : stringChar.get(key);</span>
+	}
+
+	public final String getSafe(StringKey key)
+	{
+<span class="nc bnc" id="L216" title="All 2 branches missed.">		String str = stringChar == null ? null : stringChar.get(key);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">		return str == null ? &quot;&quot; : str;</span>
+	}
+
+	public final String put(StringKey key, String value)
+	{
+<span class="fc bfc" id="L222" title="All 2 branches covered.">		if (stringChar == null)</span>
+		{
+<span class="fc" id="L224">			stringChar = new EnumMap&lt;&gt;(StringKey.class);</span>
+		}
+<span class="fc" id="L226">		return stringChar.put(key, value);</span>
+	}
+
+	public final String remove(StringKey key)
+	{
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">		String out = stringChar == null ? null : stringChar.remove(key);</span>
+<span class="pc bpc" id="L232" title="1 of 4 branches missed.">		if (out != null &amp;&amp; stringChar.isEmpty())</span>
+		{
+<span class="nc" id="L234">			stringChar = null;</span>
+		}
+<span class="fc" id="L236">		return out;</span>
+	}
+
+	public final Set&lt;StringKey&gt; getStringKeys()
+	{
+<span class="fc bfc" id="L241" title="All 2 branches covered.">		return stringChar == null</span>
+<span class="fc" id="L242">				? EnumSet.noneOf(StringKey.class)</span>
+<span class="fc" id="L243">				: EnumSet.copyOf(stringChar.keySet());</span>
+	}
+
+	public final boolean containsKey(FormulaKey key)
+	{
+<span class="nc bnc" id="L248" title="All 4 branches missed.">		return formulaChar != null &amp;&amp; formulaChar.containsKey(key);</span>
+	}
+
+	public final Formula get(FormulaKey key)
+	{
+<span class="fc bfc" id="L253" title="All 2 branches covered.">		return formulaChar == null ? null : formulaChar.get(key);</span>
+	}
+
+	public final Formula getSafe(FormulaKey key)
+	{
+<span class="fc" id="L258">		Formula formula = get(key);</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">		return formula == null ? key.getDefault() : formula;</span>
+	}
+
+	public final Formula put(FormulaKey key, Formula value)
+	{
+<span class="fc bfc" id="L264" title="All 2 branches covered.">		if (formulaChar == null)</span>
+		{
+<span class="fc" id="L266">			formulaChar = new HashMap&lt;&gt;();</span>
+		}
+<span class="fc" id="L268">		return formulaChar.put(key, value);</span>
+	}
+
+	public final Formula remove(FormulaKey key)
+	{
+<span class="nc bnc" id="L273" title="All 2 branches missed.">		Formula out = formulaChar == null ? null : formulaChar.remove(key);</span>
+<span class="nc bnc" id="L274" title="All 4 branches missed.">		if (out != null &amp;&amp; formulaChar.isEmpty())</span>
+		{
+<span class="nc" id="L276">			formulaChar = null;</span>
+		}
+<span class="nc" id="L278">		return out;</span>
+	}
+
+	public final Set&lt;FormulaKey&gt; getFormulaKeys()
+	{
+<span class="fc bfc" id="L283" title="All 2 branches covered.">		return formulaChar == null ? Collections.emptySet() : new HashSet&lt;&gt;(formulaChar.keySet());</span>
+	}
+
+	public final boolean containsKey(VariableKey key)
+	{
+<span class="nc bnc" id="L288" title="All 4 branches missed.">		return variableChar != null &amp;&amp; variableChar.containsKey(key);</span>
+	}
+
+	public final Formula get(VariableKey key)
+	{
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">		return variableChar == null ? null : variableChar.get(key);</span>
+	}
+
+	public final Set&lt;VariableKey&gt; getVariableKeys()
+	{
+<span class="fc bfc" id="L298" title="All 2 branches covered.">		return variableChar == null ? Collections.emptySet() : new HashSet&lt;&gt;(variableChar.keySet());</span>
+	}
+
+	public final Formula put(VariableKey key, Formula value)
+	{
+<span class="fc bfc" id="L303" title="All 2 branches covered.">		if (variableChar == null)</span>
+		{
+<span class="fc" id="L305">			variableChar = new HashMap&lt;&gt;();</span>
+		}
+<span class="fc" id="L307">		return variableChar.put(key, value);</span>
+	}
+
+	public final Formula remove(VariableKey key)
+	{
+<span class="nc bnc" id="L312" title="All 2 branches missed.">		Formula out = variableChar == null ? null : variableChar.remove(key);</span>
+<span class="nc bnc" id="L313" title="All 4 branches missed.">		if (out != null &amp;&amp; variableChar.isEmpty())</span>
+		{
+<span class="nc" id="L315">			variableChar = null;</span>
+		}
+<span class="nc" id="L317">		return out;</span>
+	}
+
+	public final void removeAllVariables()
+	{
+<span class="nc" id="L322">		variableChar = null;</span>
+<span class="nc" id="L323">	}</span>
+
+	public final boolean containsKey(ObjectKey&lt;?&gt; key)
+	{
+<span class="nc bnc" id="L327" title="All 4 branches missed.">		return objectChar != null &amp;&amp; objectChar.containsKey(key);</span>
+	}
+
+	public final &lt;OT&gt; OT get(ObjectKey&lt;OT&gt; key)
+	{
+<span class="fc bfc" id="L332" title="All 2 branches covered.">		return objectChar == null ? null : key.cast(objectChar.get(key));</span>
+	}
+
+	public final &lt;OT&gt; OT getSafe(ObjectKey&lt;OT&gt; key)
+	{
+<span class="fc" id="L337">		OT obj = get(key);</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">		return obj == null ? key.getDefault() : obj;</span>
+	}
+
+	public final &lt;OT&gt; OT put(ObjectKey&lt;OT&gt; key, OT value)
+	{
+<span class="fc bfc" id="L343" title="All 2 branches covered.">		if (objectChar == null)</span>
+		{
+<span class="fc" id="L345">			objectChar = new HashMap&lt;&gt;();</span>
+		}
+<span class="fc" id="L347">		return key.cast(objectChar.put(key, value));</span>
+	}
+
+	public final &lt;OT&gt; OT remove(ObjectKey&lt;OT&gt; key)
+	{
+<span class="fc bfc" id="L352" title="All 2 branches covered.">		OT out = objectChar == null ? null : key.cast(objectChar.remove(key));</span>
+<span class="pc bpc" id="L353" title="1 of 4 branches missed.">		if (out != null &amp;&amp; objectChar.isEmpty())</span>
+		{
+<span class="fc" id="L355">			objectChar = null;</span>
+		}
+<span class="fc" id="L357">		return out;</span>
+	}
+
+	public final Set&lt;ObjectKey&lt;?&gt;&gt; getObjectKeys()
+	{
+<span class="fc bfc" id="L362" title="All 2 branches covered.">		return objectChar == null ? Collections.emptySet() : new HashSet&lt;&gt;(objectChar.keySet());</span>
+	}
+
+	public final boolean containsKey(FactKey&lt;?&gt; key)
+	{
+<span class="nc bnc" id="L367" title="All 4 branches missed.">		return factChar != null &amp;&amp; factChar.containsKey(key);</span>
+	}
+
+	public final &lt;FT&gt; Indirect&lt;FT&gt; get(FactKey&lt;FT&gt; key)
+	{
+<span class="fc bfc" id="L372" title="All 2 branches covered.">		if (factChar == null)</span>
+		{
+<span class="fc" id="L374">			return null;</span>
+		}
+		@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L377">		Indirect&lt;FT&gt; indirect = (Indirect&lt;FT&gt;) factChar.get(key);</span>
+<span class="fc" id="L378">		return indirect;</span>
+	}
+
+	public final &lt;FT&gt; FT getResolved(FactKey&lt;FT&gt; key)
+	{
+<span class="fc bfc" id="L383" title="All 2 branches covered.">		if (factChar == null)</span>
+		{
+<span class="fc" id="L385">			return null;</span>
+		}
+		@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L388">		Indirect&lt;FT&gt; indirect = (Indirect&lt;FT&gt;) factChar.get(key);</span>
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">		if (indirect == null)</span>
+		{
+<span class="nc" id="L391">			return null;</span>
+		}
+<span class="fc" id="L393">		return indirect.get();</span>
+	}
+
+	public final &lt;FT&gt; FT put(FactKey&lt;FT&gt; key, Indirect&lt;FT&gt; value)
+	{
+<span class="fc bfc" id="L398" title="All 2 branches covered.">		if (factChar == null)</span>
+		{
+<span class="fc" id="L400">			factChar = new HashMap&lt;&gt;();</span>
+		}
+<span class="fc" id="L402">		return key.cast(factChar.put(key, value));</span>
+	}
+
+	public final &lt;FT&gt; FT remove(FactKey&lt;FT&gt; key)
+	{
+<span class="nc bnc" id="L407" title="All 2 branches missed.">		FT out = factChar == null ? null : key.cast(factChar.remove(key));</span>
+<span class="nc bnc" id="L408" title="All 4 branches missed.">		if (out != null &amp;&amp; factChar.isEmpty())</span>
+		{
+<span class="nc" id="L410">			factChar = null;</span>
+		}
+<span class="nc" id="L412">		return out;</span>
+	}
+
+	public final Set&lt;FactKey&lt;?&gt;&gt; getFactKeys()
+	{
+<span class="fc bfc" id="L417" title="All 2 branches covered.">		return factChar == null ? Collections.emptySet() : new HashSet&lt;&gt;(factChar.keySet());</span>
+	}
+
+	public final boolean containsSetFor(FactSetKey&lt;?&gt; key)
+	{
+<span class="nc bnc" id="L422" title="All 4 branches missed.">		return factSetChar != null &amp;&amp; factSetChar.containsListFor(key);</span>
+	}
+
+	public final &lt;T&gt; void addToSetFor(FactSetKey&lt;T&gt; key, Indirect&lt;T&gt; element)
+	{
+<span class="fc bfc" id="L427" title="All 2 branches covered.">		if (factSetChar == null)</span>
+		{
+<span class="fc" id="L429">			factSetChar = new FactSetKeyMapToList();</span>
+		}
+<span class="fc" id="L431">		factSetChar.addToListFor(key, element);</span>
+<span class="fc" id="L432">	}</span>
+
+	public final &lt;T&gt; void addAllToSetFor(FactSetKey&lt;T&gt; key, Collection&lt;ObjectContainer&lt;T&gt;&gt; elementCollection)
+	{
+<span class="nc bnc" id="L436" title="All 2 branches missed.">		if (factSetChar == null)</span>
+		{
+<span class="nc" id="L438">			factSetChar = new FactSetKeyMapToList();</span>
+		}
+<span class="nc" id="L440">		factSetChar.addAllToListFor(key, elementCollection);</span>
+<span class="nc" id="L441">	}</span>
+
+	public final &lt;T&gt; List&lt;Indirect&lt;T&gt;&gt; getSetFor(FactSetKey&lt;T&gt; key)
+	{
+<span class="fc bfc" id="L445" title="All 2 branches covered.">		return factSetChar == null ? null : factSetChar.getListFor(key);</span>
+	}
+
+	public final &lt;T&gt; List&lt;Indirect&lt;T&gt;&gt; getSafeSetFor(FactSetKey&lt;T&gt; key)
+	{
+<span class="nc bnc" id="L450" title="All 4 branches missed.">		return factSetChar != null &amp;&amp; factSetChar.containsListFor(key) ? factSetChar.getListFor(key)</span>
+<span class="nc" id="L451">			: new ArrayList&lt;&gt;();</span>
+	}
+
+	public final String getSetAsString(FactSetKey&lt;?&gt; key)
+	{
+<span class="nc" id="L456">		return StringUtil.join(getSetFor(key), &quot;, &quot;);</span>
+	}
+
+	public final int getSizeOfSetFor(FactSetKey&lt;?&gt; key)
+	{
+		// The javadoc says throw NPE, but the code returns 0, so I also return 0 here
+<span class="nc bnc" id="L462" title="All 2 branches missed.">		return factSetChar == null ? 0 : factSetChar.sizeOfListFor(key);</span>
+	}
+
+	public final int getSafeSizeOfSetFor(FactSetKey&lt;?&gt; key)
+	{
+<span class="nc bnc" id="L467" title="All 4 branches missed.">		return factSetChar == null ? 0 : factSetChar.containsListFor(key) ? factSetChar.sizeOfListFor(key) : 0;</span>
+	}
+
+	public final &lt;T&gt; boolean containsInSet(FactSetKey&lt;T&gt; key, ObjectContainer&lt;T&gt; element)
+	{
+<span class="nc bnc" id="L472" title="All 4 branches missed.">		return factSetChar != null &amp;&amp; factSetChar.containsInList(key, element);</span>
+	}
+
+	public final &lt;T&gt; boolean containsAnyInSet(FactSetKey&lt;T&gt; key, Collection&lt;ObjectContainer&lt;T&gt;&gt; elementCollection)
+	{
+<span class="nc bnc" id="L477" title="All 4 branches missed.">		return factSetChar != null &amp;&amp; factSetChar.containsAnyInList(key, elementCollection);</span>
+	}
+
+	public final &lt;T&gt; List&lt;ObjectContainer&lt;T&gt;&gt; removeSetFor(FactSetKey&lt;T&gt; key)
+	{
+<span class="nc bnc" id="L482" title="All 2 branches missed.">		List&lt;ObjectContainer&lt;T&gt;&gt; out = factSetChar == null ? null : factSetChar.removeListFor(key);</span>
+<span class="nc bnc" id="L483" title="All 4 branches missed.">		if (out != null &amp;&amp; factSetChar.isEmpty())</span>
+		{
+<span class="nc" id="L485">			factSetChar = null;</span>
+		}
+<span class="nc" id="L487">		return out;</span>
+	}
+
+	public final &lt;T&gt; boolean removeFromSetFor(FactSetKey&lt;T&gt; key, Indirect&lt;T&gt; element)
+	{
+<span class="nc bnc" id="L492" title="All 4 branches missed.">		boolean removed = factSetChar != null &amp;&amp; factSetChar.removeFromListFor(key, element);</span>
+<span class="nc bnc" id="L493" title="All 4 branches missed.">		if (removed &amp;&amp; factSetChar.isEmpty())</span>
+		{
+<span class="nc" id="L495">			factSetChar = null;</span>
+		}
+<span class="nc" id="L497">		return removed;</span>
+	}
+
+	public final Set&lt;FactSetKey&lt;?&gt;&gt; getFactSetKeys()
+	{
+<span class="fc bfc" id="L502" title="All 2 branches covered.">		return factSetChar == null ? Collections.emptySet() : factSetChar.getKeySet();</span>
+	}
+
+	public final boolean containsListFor(ListKey&lt;?&gt; key)
+	{
+<span class="fc bfc" id="L507" title="All 4 branches covered.">		return listChar != null &amp;&amp; listChar.containsListFor(key);</span>
+	}
+
+	public final &lt;T&gt; void addToListFor(ListKey&lt;T&gt; key, T element)
+	{
+<span class="fc bfc" id="L512" title="All 2 branches covered.">		if (listChar == null)</span>
+		{
+<span class="fc" id="L514">			listChar = new ListKeyMapToList();</span>
+		}
+<span class="fc" id="L516">		listChar.addToListFor(key, element);</span>
+<span class="fc" id="L517">	}</span>
+
+	public final &lt;T&gt; void addAllToListFor(ListKey&lt;T&gt; key, Collection&lt;T&gt; elementCollection)
+	{
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">		if (listChar == null)</span>
+		{
+<span class="fc" id="L523">			listChar = new ListKeyMapToList();</span>
+		}
+<span class="fc" id="L525">		listChar.addAllToListFor(key, elementCollection);</span>
+<span class="fc" id="L526">	}</span>
+
+	/**
+	 * Returns a copy of the list of objects stored in this CDOMObject for the
+	 * given ListKey.
+	 *
+	 * No order is guaranteed, and the returned List may contain duplicates.
+	 * There is no guarantee that duplicate items are sequential items in the
+	 * returned List.
+	 *
+	 * This method is value-semantic in that no changes are made to the key
+	 * passed into the method and ownership of the returned List is transferred
+	 * to the class calling this method.
+	 *
+	 * @param key
+	 *            The ListKey for which a copy of the list should be returned.
+	 * @return A copy of the List contained in this CDOMObject for the given
+	 *         key; null if the given key is not a ListKey in this CDOMObject.
+	 */
+	public final &lt;T&gt; List&lt;T&gt; getListFor(ListKey&lt;T&gt; key)
+	{
+<span class="fc bfc" id="L547" title="All 2 branches covered.">		return listChar == null ? null : listChar.getListFor(key);</span>
+	}
+
+	/**
+	 * Returns a non-null copy of the list of objects stored in this CDOMObject
+	 * for the given ListKey.
+	 *
+	 * No order is guaranteed, and the returned List may contain duplicates.
+	 * There is no guarantee that duplicate items are sequential items in the
+	 * returned List.
+	 *
+	 * This method is value-semantic in that no changes are made to the key
+	 * passed into the method and ownership of the returned List is transferred
+	 * to the class calling this method.
+	 *
+	 * @param key
+	 *            The ListKey for which a copy of the list should be returned.
+	 * @return A copy of the List contained in this CDOMObject for the given
+	 *         key.
+	 */
+	public final &lt;T&gt; List&lt;T&gt; getSafeListFor(ListKey&lt;T&gt; key)
+	{
+<span class="fc bfc" id="L569" title="All 4 branches covered.">		return listChar != null &amp;&amp; listChar.containsListFor(key) ? listChar.getListFor(key) : new ArrayList&lt;&gt;();</span>
+	}
+
+	/**
+	 * Returns a non-null Set of the objects stored in this CDOMObject for the
+	 * given ListKey. The List is converted to a Set to ensure that each entry
+	 * in the List is only occurs once.
+	 *
+	 * This is used because the loading system cannot guarantee &quot;Set&quot; behavior
+	 * (cannot guarantee uniqueness), and a specific infrastructure for a Set
+	 * (vs a List) is considered overkill for the few use cases that require it.
+	 *
+	 * No order of the objects is guaranteed.
+	 *
+	 * This method is value-semantic in that no changes are made to the key
+	 * passed into the method and ownership of the returned Set is transferred
+	 * to the class calling this method.
+	 *
+	 * @param key
+	 *            The ListKey for which a Set of the objects stored in this
+	 *            CDOMObject for the given ListKey should be returned.
+	 * @return A Set of objects in the List contained in this CDOMObject for the
+	 *         given key.
+	 */
+	public final &lt;T extends Comparable&lt;T&gt;&gt; Set&lt;T&gt; getUniqueListFor(ListKey&lt;T&gt; key)
+	{
+<span class="nc bnc" id="L595" title="All 2 branches missed.">		if (listChar == null)</span>
+		{
+<span class="nc" id="L597">			return new HashSet&lt;&gt;();</span>
+		}
+<span class="nc" id="L599">		List&lt;T&gt; list = listChar.getListFor(key);</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">		if (list == null)</span>
+		{
+<span class="nc" id="L602">			return new HashSet&lt;&gt;();</span>
+		}
+<span class="nc" id="L604">		return new LinkedHashSet&lt;&gt;(list);</span>
+	}
+
+	public final String getListAsString(ListKey&lt;?&gt; key)
+	{
+<span class="nc" id="L609">		return StringUtil.join(getListFor(key), &quot;, &quot;);</span>
+	}
+
+	public final int getSizeOfListFor(ListKey&lt;?&gt; key)
+	{
+		// The javadoc says throw NPE, but the code returns 0, so I also return 0 here
+<span class="nc bnc" id="L615" title="All 2 branches missed.">		return listChar == null ? 0 : listChar.sizeOfListFor(key);</span>
+	}
+
+	public final int getSafeSizeOfListFor(ListKey&lt;?&gt; key)
+	{
+<span class="nc bnc" id="L620" title="All 4 branches missed.">		return listChar == null ? 0 : listChar.containsListFor(key) ? listChar.sizeOfListFor(key) : 0;</span>
+	}
+
+	public final &lt;T&gt; boolean containsInList(ListKey&lt;T&gt; key, T element)
+	{
+<span class="fc bfc" id="L625" title="All 4 branches covered.">		return listChar != null &amp;&amp; listChar.containsInList(key, element);</span>
+	}
+
+	public final &lt;T&gt; boolean containsAnyInList(ListKey&lt;T&gt; key, Collection&lt;T&gt; elementCollection)
+	{
+<span class="nc bnc" id="L630" title="All 4 branches missed.">		return listChar != null &amp;&amp; listChar.containsAnyInList(key, elementCollection);</span>
+	}
+
+	public final &lt;T&gt; T getElementInList(ListKey&lt;T&gt; key, int index)
+	{
+<span class="nc bnc" id="L635" title="All 2 branches missed.">		return listChar == null ? null : listChar.getElementInList(key, index);</span>
+	}
+
+	public final &lt;T&gt; List&lt;T&gt; removeListFor(ListKey&lt;T&gt; key)
+	{
+<span class="fc bfc" id="L640" title="All 2 branches covered.">		List&lt;T&gt; out = listChar == null ? null : listChar.removeListFor(key);</span>
+<span class="fc bfc" id="L641" title="All 4 branches covered.">		if (out != null &amp;&amp; listChar.isEmpty())</span>
+		{
+<span class="fc" id="L643">			listChar = null;</span>
+		}
+<span class="fc" id="L645">		return out;</span>
+	}
+
+	public final &lt;T&gt; boolean removeFromListFor(ListKey&lt;T&gt; key, T element)
+	{
+<span class="fc bfc" id="L650" title="All 4 branches covered.">		boolean removed = listChar != null &amp;&amp; listChar.removeFromListFor(key, element);</span>
+<span class="fc bfc" id="L651" title="All 4 branches covered.">		if (removed &amp;&amp; listChar.isEmpty())</span>
+		{
+<span class="fc" id="L653">			listChar = null;</span>
+		}
+<span class="fc" id="L655">		return removed;</span>
+	}
+
+	public final Set&lt;ListKey&lt;?&gt;&gt; getListKeys()
+	{
+<span class="fc bfc" id="L660" title="All 2 branches covered.">		return listChar == null ? Collections.emptySet() : listChar.getKeySet();</span>
+	}
+
+	// ===== MapKeyMap Methods =====
+
+	/**
+	 * Add a value to the map of maps.
+	 *
+	 * @param mapKey The MapKey we are adding an entry to
+	 * @param key The key to assign against
+	 * @param value The value to be stored.
+	 */
+	public final &lt;K, V&gt; V addToMapFor(MapKey&lt;K, V&gt; mapKey, K key, V value)
+	{
+<span class="fc bfc" id="L674" title="All 2 branches covered.">		if (mapChar == null)</span>
+		{
+<span class="fc" id="L676">			mapChar = new MapKeyMap();</span>
+		}
+<span class="fc" id="L678">		return mapChar.addToMapFor(mapKey, key, value);</span>
+	}
+
+	/**
+	 * Remove a value from the map of maps.
+	 *
+	 * @param mapKey The MapKey we are removing an entry from
+	 * @param key The key to eject
+	 */
+	public final &lt;K, V&gt; void removeFromMapFor(MapKey&lt;K, V&gt; mapKey, K key)
+	{
+<span class="nc bnc" id="L689" title="All 2 branches missed.">		if (mapChar != null)</span>
+		{
+<span class="nc" id="L691">			boolean removed = mapChar.removeFromMapFor(mapKey, key);</span>
+<span class="nc bnc" id="L692" title="All 4 branches missed.">			if (removed &amp;&amp; mapChar.isEmpty())</span>
+			{
+<span class="nc" id="L694">				mapChar = null;</span>
+			}
+		}
+<span class="nc" id="L697">	}</span>
+
+	/**
+	 * Remove a map from the map of maps.
+	 *
+	 * @param mapKey The MapKey we are removing
+	 */
+	public final &lt;K, V&gt; void removeMapFor(MapKey&lt;K, V&gt; mapKey)
+	{
+<span class="nc bnc" id="L706" title="All 2 branches missed.">		if (mapChar != null)</span>
+		{
+<span class="nc" id="L708">			Map&lt;K, V&gt; removed = mapChar.removeMapFor(mapKey);</span>
+<span class="nc bnc" id="L709" title="All 4 branches missed.">			if (removed != null &amp;&amp; mapChar.isEmpty())</span>
+			{
+<span class="nc" id="L711">				mapChar = null;</span>
+			}
+		}
+<span class="nc" id="L714">	}</span>
+
+	/**
+	 * Retrieve the map of keys and values for the MapKey.
+	 *
+	 * @param mapKey The MapKey we are retrieving
+	 * @return The map of keys and values.
+	 */
+	public final &lt;K, V&gt; Map&lt;K, V&gt; getMapFor(MapKey&lt;K, V&gt; mapKey)
+	{
+		// The javadoc for getMapFor() says that it returns null, but the implementation does NOT
+		// This caused an NPE in AspectToken.parseNonEmptyToken because it assumed a non-null map
+<span class="fc bfc" id="L726" title="All 2 branches covered.">		return mapChar == null ? Collections.emptyMap() : mapChar.getMapFor(mapKey);</span>
+	}
+
+	/**
+	 * Retrieve the set of keys for the MapKey.
+	 *
+	 * @param mapKey The MapKey we are retrieving
+	 * @return The set of keys.
+	 */
+	@NotNull
+	public final &lt;K, V&gt; Set&lt;K&gt; getKeysFor(MapKey&lt;K, V&gt; mapKey)
+	{
+<span class="pc bpc" id="L738" title="1 of 2 branches missed.">		return mapChar == null ? Collections.emptySet() : mapChar.getKeysFor(mapKey);</span>
+	}
+
+	/**
+	 * Get the value for the given MapKey and secondary key. If there is
+	 * not a mapping for the given keys, null is returned.
+	 *
+	 * @param mapKey
+	 *            The MapKey for retrieving the given value
+	 * @param key2
+	 *            The secondary key for retrieving the given value
+	 * @return Object The value stored for the given keys
+	 */
+	public final &lt;K, V&gt; V get(MapKey&lt;K, V&gt; mapKey, K key2)
+	{
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">		return mapChar == null ? null : mapChar.get(mapKey, key2);</span>
+	}
+
+	/**
+	 * Remove the value associated with the primary and secondary keys
+	 * from the map.
+	 *
+	 * @param mapKey The MapKey of the entry we are removing
+	 * @param key2 The secondary key of the entry we are removing
+	 * @return true if the key and its associated value were successfully removed
+	 *         from the map; false otherwise
+	 */
+	public final &lt;K, V&gt; boolean removeFromMap(MapKey&lt;K, V&gt; mapKey, K key2)
+	{
+<span class="nc bnc" id="L767" title="All 4 branches missed.">		boolean removed = mapChar != null &amp;&amp; mapChar.removeFromMapFor(mapKey, key2);</span>
+<span class="nc bnc" id="L768" title="All 4 branches missed.">		if (removed &amp;&amp; mapChar.isEmpty())</span>
+		{
+<span class="nc" id="L770">			mapChar = null;</span>
+		}
+<span class="nc" id="L772">		return removed;</span>
+	}
+
+	/**
+	 * Retrieve the set of mapkeys held.
+	 *
+	 * @return The set of mapkeys.
+	 */
+	public final Set&lt;MapKey&lt;?, ?&gt;&gt; getMapKeys()
+	{
+<span class="fc bfc" id="L782" title="All 2 branches covered.">		return mapChar == null ? Collections.emptySet() : mapChar.getKeySet();</span>
+	}
+
+	@Override
+	public String getKeyName()
+	{
+		// FIXME TODO Patched for now to avoid NPEs, but this is wrong
+<span class="fc" id="L789">		String returnKey = this.get(StringKey.KEY_NAME);</span>
+<span class="fc bfc" id="L790" title="All 2 branches covered.">		if (returnKey == null)</span>
+		{
+<span class="fc" id="L792">			returnKey = this.getDisplayName();</span>
+			//returnKey = this.get(StringKey.NAME);
+		}
+<span class="fc" id="L795">		return returnKey;</span>
+	}
+
+	public void setKeyName(String key)
+	{
+<span class="fc" id="L800">		put(StringKey.KEY_NAME, key);</span>
+<span class="fc" id="L801">	}</span>
+
+	public final int getSafeSizeOfMapFor(MapKey&lt;?, ?&gt; mapKey)
+	{
+<span class="nc bnc" id="L805" title="All 4 branches missed.">		return mapChar != null &amp;&amp; mapChar.containsMapFor(mapKey) ? mapChar.getKeysFor(mapKey).size() : 0;</span>
+	}
+
+	@Override
+	public void setName(String name)
+	{
+<span class="fc" id="L811">		setDisplayName(name);</span>
+<span class="fc" id="L812">	}</span>
+
+	public void setDisplayName(String name)
+	{
+<span class="fc" id="L816">		displayName = name;</span>
+<span class="fc" id="L817">	}</span>
+
+	public boolean isCDOMEqual(CDOMObject cdo)
+	{
+<span class="fc bfc" id="L821" title="All 2 branches covered.">		if (cdo == this)</span>
+		{
+<span class="fc" id="L823">			return true;</span>
+		}
+<span class="pc bpc" id="L825" title="1 of 2 branches missed.">		if (!equalsPrereqObject(cdo))</span>
+		{
+<span class="nc" id="L827">			return false;</span>
+		}
+<span class="pc bpc" id="L829" title="2 of 6 branches missed.">		if (integerChar == null ? cdo.integerChar != null : !integerChar.equals(cdo.integerChar))</span>
+		{
+			// System.err.println(&quot;CDOM Inequality Integer&quot;);
+			// System.err.println(integerChar + &quot; &quot; + cdo.integerChar);
+<span class="nc" id="L833">			return false;</span>
+		}
+<span class="pc bpc" id="L835" title="2 of 6 branches missed.">		if (stringChar == null ? cdo.stringChar != null : !stringChar.equals(cdo.stringChar))</span>
+		{
+			// System.err.println(&quot;CDOM Inequality String&quot;);
+			// System.err.println(stringChar + &quot; &quot; + cdo.stringChar);
+<span class="nc" id="L839">			return false;</span>
+		}
+<span class="pc bpc" id="L841" title="2 of 6 branches missed.">		if (formulaChar == null ? cdo.formulaChar != null : !formulaChar.equals(cdo.formulaChar))</span>
+		{
+			// System.err.println(&quot;CDOM Inequality Formula&quot;);
+			// System.err.println(formulaChar + &quot; &quot; + cdo.formulaChar);
+<span class="nc" id="L845">			return false;</span>
+		}
+<span class="pc bpc" id="L847" title="4 of 6 branches missed.">		if (variableChar == null ? cdo.variableChar != null : !variableChar.equals(cdo.variableChar))</span>
+		{
+			// System.err.println(&quot;CDOM Inequality Variable&quot;);
+			// System.err.println(variableChar + &quot; &quot; + cdo.variableChar);
+<span class="nc" id="L851">			return false;</span>
+		}
+<span class="pc bpc" id="L853" title="2 of 6 branches missed.">		if (objectChar == null ? cdo.objectChar != null : !objectChar.equals(cdo.objectChar))</span>
+		{
+			// System.err.println(&quot;CDOM Inequality Object&quot;);
+			// System.err.println(objectChar + &quot; &quot; + cdo.objectChar);
+<span class="nc" id="L857">			return false;</span>
+		}
+<span class="pc bpc" id="L859" title="4 of 6 branches missed.">		if (factChar == null ? cdo.factChar != null : !factChar.equals(cdo.factChar))</span>
+		{
+			// System.err.println(&quot;CDOM Inequality Object&quot;);
+			// System.err.println(objectChar + &quot; &quot; + cdo.objectChar);
+<span class="nc" id="L863">			return false;</span>
+		}
+<span class="pc bpc" id="L865" title="2 of 6 branches missed.">		if (listChar == null ? cdo.listChar != null : !listChar.equals(cdo.listChar))</span>
+		{
+			//			 System.err.println(&quot;CDOM Inequality List&quot;);
+			//			 System.err.println(listChar + &quot; &quot; + cdo.listChar);
+			//			 System.err.println(listChar.getKeySet() + &quot; &quot;
+			//			 + cdo.listChar.getKeySet());
+<span class="nc" id="L871">			return false;</span>
+		}
+<span class="pc bpc" id="L873" title="2 of 6 branches missed.">		if (mapChar == null ? cdo.mapChar != null : !mapChar.equals(cdo.mapChar))</span>
+		{
+<span class="nc" id="L875">			return false;</span>
+		}
+<span class="pc bpc" id="L877" title="1 of 4 branches missed.">		return cdomListMods == null ? cdo.cdomListMods == null : cdomListMods.equals(cdo.cdomListMods);</span>
+	}
+
+	public final &lt;T extends CDOMObject&gt; void putToList(CDOMReference&lt;? extends CDOMList&lt;?&gt;&gt; listRef,
+		CDOMReference&lt;T&gt; granted, AssociatedPrereqObject associations)
+	{
+<span class="fc bfc" id="L883" title="All 2 branches covered.">		if (cdomListMods == null)</span>
+		{
+<span class="fc" id="L885">			cdomListMods = new DoubleKeyMapToList&lt;&gt;(HashMap.class, LinkedHashMap.class);</span>
+		}
+<span class="fc" id="L887">		cdomListMods.addToListFor(listRef, granted, associations);</span>
+<span class="fc" id="L888">	}</span>
+
+	public final &lt;T extends CDOMObject&gt; void removeFromList(CDOMReference&lt;? extends CDOMList&lt;?&gt;&gt; listRef,
+		CDOMReference&lt;T&gt; granted)
+	{
+<span class="pc bpc" id="L893" title="1 of 2 branches missed.">		if (cdomListMods != null)</span>
+		{
+<span class="fc" id="L895">			List&lt;AssociatedPrereqObject&gt; removed = cdomListMods.removeListFor(listRef, granted);</span>
+<span class="pc bpc" id="L896" title="2 of 4 branches missed.">			if (removed != null &amp;&amp; cdomListMods.isEmpty())</span>
+			{
+<span class="nc" id="L898">				cdomListMods = null;</span>
+			}
+		}
+<span class="fc" id="L901">	}</span>
+
+	public final boolean hasListMods(CDOMReference&lt;? extends CDOMList&lt;?&gt;&gt; listRef)
+	{
+<span class="nc bnc" id="L905" title="All 4 branches missed.">		return cdomListMods != null &amp;&amp; cdomListMods.containsListFor(listRef);</span>
+	}
+
+	public final &lt;BT extends CDOMObject, L extends CDOMList&lt;BT&gt;&gt; Collection&lt;CDOMReference&lt;BT&gt;&gt; getListMods(
+		CDOMReference&lt;L&gt; listRef)
+	{
+<span class="fc bfc" id="L911" title="All 2 branches covered.">		if (cdomListMods == null)</span>
+		{
+<span class="fc" id="L913">			return null;</span>
+		}
+<span class="fc" id="L915">		Collection&lt;CDOMReference&lt;BT&gt;&gt; set =</span>
+<span class="fc" id="L916">				(Collection&lt;CDOMReference&lt;BT&gt;&gt;) (Set&lt;?&gt;) cdomListMods.getSecondaryKeySet(listRef);</span>
+<span class="pc bpc" id="L917" title="2 of 4 branches missed.">		if (set == null || set.isEmpty())</span>
+		{
+<span class="nc" id="L919">			return null;</span>
+		}
+<span class="fc" id="L921">		return set;</span>
+	}
+
+	public final &lt;BT extends CDOMObject&gt; Collection&lt;CDOMReference&lt;BT&gt;&gt; getSafeListMods(
+		CDOMReference&lt;? extends CDOMList&lt;BT&gt;&gt; listRef)
+	{
+<span class="nc" id="L927">		Collection&lt;CDOMReference&lt;BT&gt;&gt; set = getListMods(listRef);</span>
+<span class="nc bnc" id="L928" title="All 2 branches missed.">		if (set == null)</span>
+		{
+<span class="nc" id="L930">			return Collections.emptySet();</span>
+		}
+<span class="nc" id="L932">		return set;</span>
+	}
+
+	public final Collection&lt;AssociatedPrereqObject&gt; getListAssociations(CDOMReference&lt;? extends CDOMList&lt;?&gt;&gt; listRef,
+		CDOMReference&lt;?&gt; key)
+	{
+<span class="pc bpc" id="L938" title="1 of 2 branches missed.">		return cdomListMods == null ? null : cdomListMods.getListFor(listRef, key);</span>
+	}
+
+	/**
+	 * @return A list of references to the global lists that this CDOM Object has modified
+	 */
+	public final Collection&lt;CDOMReference&lt;? extends CDOMList&lt;?&gt;&gt;&gt; getModifiedLists()
+	{
+<span class="fc bfc" id="L946" title="All 2 branches covered.">		return cdomListMods == null ? Collections.emptySet() : cdomListMods.getKeySet();</span>
+	}
+
+	public final void overlayCDOMObject(CDOMObject cdo)
+	{
+<span class="nc" id="L951">		addAllPrerequisites(cdo.getPrerequisiteList());</span>
+<span class="nc bnc" id="L952" title="All 2 branches missed.">		if (cdo.integerChar != null)</span>
+		{
+<span class="nc bnc" id="L954" title="All 2 branches missed.">			if (integerChar == null)</span>
+			{
+<span class="nc" id="L956">				integerChar = new HashMap&lt;&gt;();</span>
+			}
+<span class="nc" id="L958">			integerChar.putAll(cdo.integerChar);</span>
+		}
+<span class="nc bnc" id="L960" title="All 2 branches missed.">		if (cdo.stringChar != null)</span>
+		{
+<span class="nc bnc" id="L962" title="All 2 branches missed.">			if (stringChar == null)</span>
+			{
+<span class="nc" id="L964">				stringChar = new EnumMap&lt;&gt;(StringKey.class);</span>
+			}
+<span class="nc" id="L966">			stringChar.putAll(cdo.stringChar);</span>
+		}
+<span class="nc bnc" id="L968" title="All 2 branches missed.">		if (cdo.formulaChar != null)</span>
+		{
+<span class="nc bnc" id="L970" title="All 2 branches missed.">			if (formulaChar == null)</span>
+			{
+<span class="nc" id="L972">				formulaChar = new HashMap&lt;&gt;();</span>
+			}
+<span class="nc" id="L974">			formulaChar.putAll(cdo.formulaChar);</span>
+		}
+<span class="nc bnc" id="L976" title="All 2 branches missed.">		if (cdo.objectChar != null)</span>
+		{
+<span class="nc bnc" id="L978" title="All 2 branches missed.">			if (objectChar == null)</span>
+			{
+<span class="nc" id="L980">				objectChar = new HashMap&lt;&gt;();</span>
+			}
+<span class="nc" id="L982">			objectChar.putAll(cdo.objectChar);</span>
+		}
+<span class="nc bnc" id="L984" title="All 2 branches missed.">		if (cdo.factChar != null)</span>
+		{
+<span class="nc bnc" id="L986" title="All 2 branches missed.">			if (factChar == null)</span>
+			{
+<span class="nc" id="L988">				factChar = new HashMap&lt;&gt;();</span>
+			}
+<span class="nc" id="L990">			factChar.putAll(cdo.factChar);</span>
+		}
+<span class="nc bnc" id="L992" title="All 2 branches missed.">		if (cdo.variableChar != null)</span>
+		{
+<span class="nc bnc" id="L994" title="All 2 branches missed.">			if (variableChar == null)</span>
+			{
+<span class="nc" id="L996">				variableChar = new HashMap&lt;&gt;();</span>
+			}
+<span class="nc" id="L998">			variableChar.putAll(cdo.variableChar);</span>
+		}
+<span class="nc bnc" id="L1000" title="All 2 branches missed.">		if (cdo.listChar != null)</span>
+		{
+<span class="nc bnc" id="L1002" title="All 2 branches missed.">			if (listChar == null)</span>
+			{
+<span class="nc" id="L1004">				listChar = new ListKeyMapToList();</span>
+			}
+<span class="nc" id="L1006">			listChar.addAllLists(cdo.listChar);</span>
+		}
+<span class="nc bnc" id="L1008" title="All 2 branches missed.">		if (cdo.factSetChar != null)</span>
+		{
+<span class="nc bnc" id="L1010" title="All 2 branches missed.">			if (factSetChar == null)</span>
+			{
+<span class="nc" id="L1012">				factSetChar = new FactSetKeyMapToList();</span>
+			}
+<span class="nc" id="L1014">			factSetChar.addAllLists(cdo.factSetChar);</span>
+		}
+<span class="nc bnc" id="L1016" title="All 2 branches missed.">		if (cdo.mapChar != null)</span>
+		{
+<span class="nc bnc" id="L1018" title="All 2 branches missed.">			if (mapChar == null)</span>
+			{
+<span class="nc" id="L1020">				mapChar = new MapKeyMap();</span>
+			}
+<span class="nc" id="L1022">			mapChar.putAll(cdo.mapChar);</span>
+		}
+<span class="nc bnc" id="L1024" title="All 2 branches missed.">		if (cdo.cdomListMods != null)</span>
+		{
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">			if (cdomListMods == null)</span>
+			{
+<span class="nc" id="L1028">				cdomListMods = new DoubleKeyMapToList&lt;&gt;(HashMap.class, LinkedHashMap.class);</span>
+			}
+<span class="nc" id="L1030">			cdomListMods.addAll(cdo.cdomListMods);</span>
+		}
+<span class="nc" id="L1032">	}</span>
+
+	@Override
+	public CDOMObject clone() throws CloneNotSupportedException
+	{
+<span class="nc" id="L1037">		CDOMObject clone = (CDOMObject) super.clone();</span>
+<span class="nc bnc" id="L1038" title="All 2 branches missed.">		clone.integerChar = integerChar == null ? null : new HashMap&lt;&gt;(integerChar);</span>
+<span class="nc bnc" id="L1039" title="All 2 branches missed.">		clone.stringChar = stringChar == null ? null : new EnumMap&lt;&gt;(stringChar);</span>
+<span class="nc bnc" id="L1040" title="All 2 branches missed.">		clone.formulaChar = formulaChar == null ? null : new HashMap&lt;&gt;(formulaChar);</span>
+<span class="nc bnc" id="L1041" title="All 2 branches missed.">		clone.variableChar = variableChar == null ? null : new HashMap&lt;&gt;(variableChar);</span>
+<span class="nc bnc" id="L1042" title="All 2 branches missed.">		clone.objectChar = objectChar == null ? null : new HashMap&lt;&gt;(objectChar);</span>
+<span class="nc bnc" id="L1043" title="All 2 branches missed.">		clone.factChar = factChar == null ? null : new HashMap&lt;&gt;(factChar);</span>
+<span class="nc bnc" id="L1044" title="All 2 branches missed.">		if (listChar != null)</span>
+		{
+<span class="nc" id="L1046">			clone.listChar = new ListKeyMapToList();</span>
+<span class="nc" id="L1047">			clone.listChar.addAllLists(listChar);</span>
+		}
+<span class="nc bnc" id="L1049" title="All 2 branches missed.">		if (factSetChar != null)</span>
+		{
+<span class="nc" id="L1051">			clone.factSetChar = new FactSetKeyMapToList();</span>
+<span class="nc" id="L1052">			clone.factSetChar.addAllLists(factSetChar);</span>
+		}
+<span class="nc bnc" id="L1054" title="All 2 branches missed.">		if (mapChar != null)</span>
+		{
+<span class="nc" id="L1056">			clone.mapChar = new MapKeyMap();</span>
+<span class="nc" id="L1057">			clone.mapChar.putAll(mapChar);</span>
+		}
+<span class="nc bnc" id="L1059" title="All 2 branches missed.">		clone.cdomListMods = cdomListMods == null ? null : cdomListMods.clone();</span>
+<span class="nc" id="L1060">		clone.ownBonuses(clone);</span>
+<span class="nc" id="L1061">		return clone;</span>
+	}
+
+	public void removeAllFromList(CDOMReference&lt;? extends CDOMList&lt;?&gt;&gt; listRef)
+	{
+<span class="fc bfc" id="L1066" title="All 2 branches covered.">		if (cdomListMods != null)</span>
+		{
+<span class="fc" id="L1068">			MapToList&lt;CDOMReference&lt;?&gt;, AssociatedPrereqObject&gt; removed = cdomListMods.removeListsFor(listRef);</span>
+<span class="pc bpc" id="L1069" title="2 of 4 branches missed.">			if (removed != null &amp;&amp; cdomListMods.isEmpty())</span>
+			{
+<span class="fc" id="L1071">				cdomListMods = null;</span>
+			}
+		}
+<span class="fc" id="L1074">	}</span>
+
+	public &lt;T extends CDOMObject&gt; boolean hasObjectOnList(CDOMReference&lt;? extends CDOMList&lt;T&gt;&gt; list, T element)
+	{
+<span class="nc bnc" id="L1078" title="All 2 branches missed.">		if (element == null)</span>
+		{
+<span class="nc" id="L1080">			return false;</span>
+		}
+<span class="nc" id="L1082">		Collection&lt;CDOMReference&lt;T&gt;&gt; references = getListMods(list);</span>
+<span class="nc bnc" id="L1083" title="All 2 branches missed.">		if (references == null)</span>
+		{
+<span class="nc" id="L1085">			return false;</span>
+		}
+<span class="nc bnc" id="L1087" title="All 2 branches missed.">		for (CDOMReference&lt;T&gt; ref : references)</span>
+		{
+<span class="nc bnc" id="L1089" title="All 2 branches missed.">			if (ref.contains(element))</span>
+			{
+<span class="nc" id="L1091">				return true;</span>
+			}
+<span class="nc" id="L1093">		}</span>
+<span class="nc" id="L1094">		return false;</span>
+	}
+
+	public ListKey&lt;Description&gt; getDescriptionKey()
+	{
+<span class="nc" id="L1099">		return ListKey.DESCRIPTION;</span>
+	}
+
+	/**
+	 * Set's all the BonusObj's to this creator
+	 *
+	 * Hopefully this is a temporary import - thpr Oct 9, 2008
+	 * @throws CloneNotSupportedException
+	 */
+	public void ownBonuses(Object owner) throws CloneNotSupportedException
+	{
+<span class="fc" id="L1110">		List&lt;BonusObj&gt; bonusList = getListFor(ListKey.BONUS);</span>
+<span class="pc bpc" id="L1111" title="1 of 2 branches missed.">		if (bonusList != null)</span>
+		{
+<span class="nc" id="L1113">			removeListFor(ListKey.BONUS);</span>
+<span class="nc bnc" id="L1114" title="All 2 branches missed.">			for (BonusObj orig : bonusList)</span>
+			{
+<span class="nc" id="L1116">				BonusObj bonus = orig.clone();</span>
+<span class="nc" id="L1117">				addToListFor(ListKey.BONUS, bonus);</span>
+<span class="nc" id="L1118">			}</span>
+		}
+<span class="fc" id="L1120">	}</span>
+
+	/**
+	 * Hopefully this is a temporary import - thpr Oct 11, 2008
+	 *
+	 * Return the qualified key, ususally used as the source in a
+	 * getVariableValue call. Always returns an empty string, but
+	 * may be overridden by subclasses to return a required value.
+	 *
+	 * @return The qualified name of the object
+	 */
+	public String getQualifiedKey()
+	{
+<span class="nc" id="L1133">		return Constants.EMPTY_STRING;</span>
+	}
+
+	/**
+	 * Get the list of bonuses for this object
+	 * @param pc the current player character
+	 * @return the list of bonuses for this object
+	 */
+	public List&lt;BonusObj&gt; getRawBonusList(PlayerCharacter pc)
+	{
+<span class="fc" id="L1143">		List&lt;BonusObj&gt; bonusList = getSafeListFor(ListKey.BONUS);</span>
+<span class="pc bpc" id="L1144" title="1 of 2 branches missed.">		if (pc != null)</span>
+		{
+<span class="fc" id="L1146">			bonusList.addAll(pc.getAddedBonusList(this));</span>
+<span class="fc" id="L1147">			bonusList.addAll(pc.getSaveableBonusList(this));</span>
+		}
+<span class="fc" id="L1149">		return bonusList;</span>
+	}
+
+	/**
+	 * returns all BonusObj's that are &quot;active&quot;
+	 * @param pc A PlayerCharacter object.
+	 * @return active bonuses
+	 */
+	@Override
+	public List&lt;BonusObj&gt; getActiveBonuses(final PlayerCharacter pc)
+	{
+<span class="fc" id="L1160">		final List&lt;BonusObj&gt; aList = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L1162" title="1 of 2 branches missed.">		for (BonusObj bonus : getRawBonusList(pc))</span>
+		{
+<span class="nc bnc" id="L1164" title="All 2 branches missed.">			if (pc.isApplied(bonus))</span>
+			{
+<span class="nc" id="L1166">				aList.add(bonus);</span>
+			}
+<span class="nc" id="L1168">		}</span>
+
+<span class="fc" id="L1170">		return aList;</span>
+	}
+
+	public List&lt;BonusObj&gt; getBonusList(PlayerCharacter assocStore)
+	{
+<span class="nc" id="L1175">		return getRawBonusList(assocStore);</span>
+	}
+
+	public List&lt;BonusObj&gt; getBonusList(Equipment e)
+	{
+<span class="nc" id="L1180">		return getRawBonusList(null);</span>
+	}
+
+	/**
+	 * Set the source file for this object
+	 * @param source
+	 */
+	@Override
+	public final void setSourceURI(URI source)
+	{
+<span class="fc" id="L1190">		sourceURI = source;</span>
+<span class="fc" id="L1191">	}</span>
+
+	/**
+	 * Get the source file for this object
+	 * @return the source file for this object
+	 */
+	@Override
+	public final URI getSourceURI()
+	{
+<span class="fc" id="L1200">		return sourceURI;</span>
+	}
+
+	/**
+	 * Get name
+	 * @return name
+	 */
+	@Override
+	public final String getDisplayName()
+	{
+<span class="fc" id="L1210">		return displayName;</span>
+	}
+
+	/**
+	 * Sets all the BonusObj's to &quot;active&quot;
+	 * @param pc
+	 */
+	@Override
+	public void activateBonuses(final PlayerCharacter pc)
+	{
+<span class="fc" id="L1220">		BonusActivation.activateBonuses(this, pc);</span>
+<span class="fc" id="L1221">	}</span>
+
+	@Override
+	public boolean isInternal()
+	{
+<span class="fc" id="L1226">		return getSafe(ObjectKey.INTERNAL);</span>
+	}
+
+	@Override
+	public CDOMObject getCDOMObject()
+	{
+<span class="nc" id="L1232">		return this;</span>
+	}
+
+	@Override
+	public Optional&lt;String&gt; getLocalScopeName()
+	{
+		//I don't have one
+<span class="nc" id="L1239">		return Optional.empty();</span>
+	}
+
+	@Override
+	public Optional&lt;VarScoped&gt; getVariableParent()
+	{
+		//Fall back to Global
+<span class="fc" id="L1246">		return Optional.empty();</span>
+	}
+
+	@Override
+	public boolean hasPrerequisites()
+	{
+<span class="pc bpc" id="L1252" title="2 of 6 branches missed.">		return super.hasPrerequisites() || (getListFor(ListKey.ALLOW) != null) || (getListFor(ListKey.ENABLE) != null);</span>
+	}
+
+	@Override
+	public boolean isAvailable(PlayerCharacter aPC)
+	{
+<span class="nc" id="L1258">		List&lt;InfoBoolean&gt; prerequisites = getListFor(ListKey.ALLOW);</span>
+<span class="nc bnc" id="L1259" title="All 4 branches missed.">		if ((prerequisites == null) || prerequisites.isEmpty())</span>
+		{
+<span class="nc" id="L1261">			return true;</span>
+		}
+<span class="nc bnc" id="L1263" title="All 2 branches missed.">		for (InfoBoolean info : prerequisites)</span>
+		{
+<span class="nc bnc" id="L1265" title="All 2 branches missed.">			if (!aPC.solve(info.getFormula()))</span>
+			{
+<span class="nc" id="L1267">				return false;</span>
+			}
+<span class="nc" id="L1269">		}</span>
+<span class="nc" id="L1270">		return true;</span>
+	}
+
+	@Override
+	public boolean isActive(PlayerCharacter aPC)
+	{
+<span class="nc" id="L1276">		List&lt;InfoBoolean&gt; requirements = getListFor(ListKey.ENABLE);</span>
+<span class="nc bnc" id="L1277" title="All 4 branches missed.">		if ((requirements == null) || requirements.isEmpty())</span>
+		{
+<span class="nc" id="L1279">			return true;</span>
+		}
+<span class="nc bnc" id="L1281" title="All 2 branches missed.">		for (InfoBoolean info : requirements)</span>
+		{
+<span class="nc bnc" id="L1283" title="All 2 branches missed.">			if (!aPC.solve(info.getFormula()))</span>
+			{
+<span class="nc" id="L1285">				return false;</span>
+			}
+<span class="nc" id="L1287">		}</span>
+<span class="nc" id="L1288">		return true;</span>
+	}
+
+	/*
+	 * Begin implementation of methods for VarHolder interface
+	 */
+	@Override
+	public void addModifier(VarModifier&lt;?&gt; vm)
+	{
+<span class="fc" id="L1297">		varHolder.addModifier(vm);</span>
+<span class="fc" id="L1298">	}</span>
+
+	@Override
+	public VarModifier&lt;?&gt;[] getModifierArray()
+	{
+<span class="fc" id="L1303">		return varHolder.getModifierArray();</span>
+	}
+
+	@Override
+	public void addRemoteModifier(RemoteModifier&lt;?&gt; vm)
+	{
+<span class="fc" id="L1309">		varHolder.addRemoteModifier(vm);</span>
+<span class="fc" id="L1310">	}</span>
+
+	@Override
+	public RemoteModifier&lt;?&gt;[] getRemoteModifierArray()
+	{
+<span class="fc" id="L1315">		return varHolder.getRemoteModifierArray();</span>
+	}
+
+	@Override
+	public void addGrantedVariable(String variableName)
+	{
+<span class="fc" id="L1321">		varHolder.addGrantedVariable(variableName);</span>
+<span class="fc" id="L1322">	}</span>
+
+	@Override
+	public String[] getGrantedVariableArray()
+	{
+<span class="fc" id="L1327">		return varHolder.getGrantedVariableArray();</span>
+	}
+	/*
+	 * End implementation of methods supporting VarHolder.
+	 */
+
+	/**
+	 * Returns the local child of the given child type and child name. Returns null if no
+	 * such type or no child of that type with the given name exists.
+	 *
+	 * @param childType
+	 *            The child type for which the child should be returned
+	 * @param childName
+	 *            The name of the child of the given type that should be returned
+	 * @return The local child of the given child type and child name
+	 */
+	@Override
+	@SuppressWarnings(&quot;PMD.EmptyMethodInAbstractClassShouldBeAbstract&quot;)
+	public PCGenScoped getLocalChild(String childType, String childName)
+	{
+		//none by default
+<span class="nc" id="L1348">		return null;</span>
+	}
+
+	/**
+	 * Returns the List of child types that this CDOMObject contains.
+	 *
+	 * Contract for implementations of this method: Will not return null (return an empty
+	 * list instead).
+	 *
+	 * @return The List of child types that this CDOMObject contains
+	 */
+	@Override
+	@SuppressWarnings(&quot;PMD.EmptyMethodInAbstractClassShouldBeAbstract&quot;)
+	public List&lt;String&gt; getChildTypes()
+	{
+<span class="nc" id="L1363">		return Collections.emptyList();</span>
+	}
+
+	/**
+	 * Returns the List of children of the given child type. Returns null if this
+	 * CDOMObject has no children of the given type.
+	 *
+	 * @param childType
+	 *            The child type for which the list of children should be returned
+	 * @return The List of children of the given child type
+	 */
+	@Override
+	@SuppressWarnings(&quot;PMD.EmptyMethodInAbstractClassShouldBeAbstract&quot;)
+	public List&lt;PCGenScoped&gt; getChildren(String childType)
+	{
+		//none by default
+<span class="nc" id="L1379">		return null;</span>
+	}
+
+	/**
+	 * Indicates if this is the &quot;UNSELECTED&quot; item an object type for the loaded GameMode.
+	 *
+	 * @return true if this is the &quot;Unselected&quot; item; false otherwise
+	 */
+	public final boolean isUnselected()
+	{
+<span class="fc" id="L1389">		return getSafeListFor(ListKey.GROUP).stream()</span>
+<span class="fc" id="L1390">			.filter(&quot;Unselected&quot;::equalsIgnoreCase).findFirst().isPresent();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

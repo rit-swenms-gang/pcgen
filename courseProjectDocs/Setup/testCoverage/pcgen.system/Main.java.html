@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Main.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.system</a> &gt; <span class="el_source">Main.java</span></div><h1>Main.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2009 Connor Petty &lt;cpmeister@users.sourceforge.net&gt;
+ * Copyright 2019 Timothy Reaves &lt;treaves@silverfieldstech.com&gt;
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.system;
+
+import java.awt.Component;
+import java.awt.Font;
+import java.awt.FontFormatException;
+import java.awt.GraphicsEnvironment;
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
+import javax.swing.JOptionPane;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.SystemUtils;
+import pcgen.cdom.base.Constants;
+import pcgen.cdom.formula.PluginFunctionLibrary;
+import pcgen.core.CustomData;
+import pcgen.core.prereq.PrerequisiteTestFactory;
+import pcgen.facade.core.UIDelegate;
+import pcgen.gui2.PCGenUIManager;
+import pcgen.gui2.UIPropertyContext;
+import pcgen.gui2.converter.TokenConverter;
+import pcgen.gui2.dialog.RandomNameDialog;
+import pcgen.gui3.JFXPanelFromResource;
+import pcgen.gui3.dialog.OptionsPathDialogController;
+import pcgen.gui3.preloader.PCGenPreloader;
+import pcgen.io.ExportHandler;
+import pcgen.persistence.CampaignFileLoader;
+import pcgen.persistence.GameModeFileLoader;
+import pcgen.persistence.PersistenceLayerException;
+import pcgen.persistence.lst.TokenStore;
+import pcgen.persistence.lst.output.prereq.PrerequisiteWriterFactory;
+import pcgen.persistence.lst.prereq.PreParserFactory;
+import pcgen.pluginmgr.PluginManager;
+import pcgen.rules.persistence.TokenLibrary;
+import pcgen.system.application.DeadlockDetectorTask;
+import pcgen.system.application.LoggingUncaughtExceptionHandler;
+import pcgen.system.application.PCGenLoggingDeadlockHandler;
+import pcgen.util.Logging;
+import pcgen.util.PJEP;
+
+import javafx.embed.swing.JFXPanel;
+
+/**
+ * Main entry point for pcgen.
+ */
+public final class Main
+{
+
+	private static PropertyContextFactory configFactory;
+<span class="nc" id="L72">	private static CommandLineArguments commandLineArguments = new CommandLineArguments(new String[0]);</span>
+
+	private Main()
+	{
+	}
+
+	public static boolean shouldStartInCharacterSheet()
+	{
+<span class="nc" id="L80">		return commandLineArguments.getCharacterFile().isPresent();</span>
+	}
+
+	public static Optional&lt;String&gt; getStartupCampaign()
+	{
+<span class="nc" id="L85">		return commandLineArguments.getCampaignMode();</span>
+	}
+
+	public static Optional&lt;File&gt; getStartupCharacterFile()
+	{
+<span class="nc" id="L90">		return commandLineArguments.getCharacterFile();</span>
+	}
+
+	private static void logSystemProps()
+	{
+<span class="nc" id="L95">		StringBuilder builder = new StringBuilder(System.lineSeparator() + &quot;-- listing properties --&quot;);</span>
+<span class="nc" id="L96">		System.getProperties().forEach((key, value) -&gt; builder.append(System.lineSeparator()).append(key).append(&quot;=&quot;).append(value));</span>
+<span class="nc" id="L97">		Logging.log(Level.CONFIG, builder.toString());</span>
+<span class="nc" id="L98">	}</span>
+
+	/**
+	 * @param args the command line arguments
+	 */
+	public static void main(String... args)
+	{
+<span class="nc" id="L105">		Logging.log(Level.INFO, &quot;Starting PCGen v&quot; + PCGenPropBundle.getVersionNumber() //$NON-NLS-1$</span>
+<span class="nc" id="L106">			+ PCGenPropBundle.getAutobuildString());</span>
+
+<span class="nc" id="L108">		Thread.setDefaultUncaughtExceptionHandler(new LoggingUncaughtExceptionHandler());</span>
+<span class="nc" id="L109">		DeadlockDetectorTask deadlockDetectorTask = new DeadlockDetectorTask(new PCGenLoggingDeadlockHandler());</span>
+<span class="nc" id="L110">		deadlockDetectorTask.initialize();</span>
+
+<span class="nc" id="L112">		logSystemProps();</span>
+
+<span class="nc" id="L114">		commandLineArguments = parseCommands(args);</span>
+
+<span class="nc" id="L116">		configFactory = new PropertyContextFactory(getConfigPath());</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">		if (commandLineArguments.getConfigFileName().isPresent())</span>
+		{
+<span class="nc" id="L119">			configFactory.registerAndLoadPropertyContext(</span>
+<span class="nc" id="L120">					ConfigurationSettings.getInstance(commandLineArguments.getConfigFileName().get()));</span>
+		}
+		else
+		{
+<span class="nc" id="L124">			configFactory.registerAndLoadPropertyContext(ConfigurationSettings.getInstance());</span>
+		}
+
+<span class="nc bnc" id="L127" title="All 2 branches missed.">		if (commandLineArguments.isStartNameGenerator())</span>
+		{
+<span class="nc" id="L129">			Component dialog = new RandomNameDialog(null, null);</span>
+<span class="nc" id="L130">			dialog.setVisible(true);</span>
+<span class="nc" id="L131">			System.exit(0);</span>
+		}
+
+<span class="nc bnc" id="L134" title="All 2 branches missed.">		if (commandLineArguments.getExportSheet().isEmpty())</span>
+		{
+<span class="nc" id="L136">			startupWithGUI();</span>
+		}
+		else
+		{
+<span class="nc" id="L140">			shutdown(startupWithoutGUI());</span>
+		}
+<span class="nc" id="L142">	}</span>
+
+	private static String getConfigPath()
+	{
+<span class="nc" id="L146">		String aPath = System.getProperty(&quot;pcgen.config&quot;); //$NON-NLS-1$</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">		if (aPath != null)</span>
+		{
+<span class="nc" id="L149">			File testPath = new File(aPath);</span>
+			// Then make sure it's an existing folder
+<span class="nc bnc" id="L151" title="All 4 branches missed.">			if (testPath.exists() &amp;&amp; testPath.isDirectory())</span>
+			{
+<span class="nc" id="L153">				return aPath;</span>
+			}
+		}
+		// Otherwise return command line argument for the settings directory
+		// Otherwise return user dir
+<span class="nc" id="L158">		return commandLineArguments.getSettingsDir()</span>
+<span class="nc" id="L159">				.map(File::getPath)</span>
+<span class="nc" id="L160">				.orElse(SystemUtils.USER_DIR);</span>
+	}
+
+	/**
+	 * Initialize Main - must be called before any other getter can be used.
+	 *
+	 * @param argv the command line arguments to be parsed
+	 */
+	private static CommandLineArguments parseCommands(String[] argv)
+	{
+<span class="nc" id="L170">		CommandLineArguments result = new CommandLineArguments(argv);</span>
+
+<span class="nc bnc" id="L172" title="All 2 branches missed.">		if (result.isVerbose())</span>
+		{
+<span class="nc" id="L174">			Logging.setCurrentLoggingLevel(Logging.DEBUG);</span>
+		}
+
+<span class="nc" id="L177">		return result;</span>
+	}
+
+	private static void startupWithGUI()
+	{
+		// configure the UI before any type of user prompting may take place
+<span class="nc" id="L183">		configureUI();</span>
+<span class="nc" id="L184">		validateEnvironment(true);</span>
+<span class="nc" id="L185">		loadProperties(true);</span>
+<span class="nc" id="L186">		initPrintPreviewFonts();</span>
+
+<span class="nc" id="L188">		new JFXPanel();</span>
+
+<span class="nc" id="L190">		PCGenPreloader splash = new PCGenPreloader();</span>
+<span class="nc" id="L191">		PCGenTaskExecutor executor = new PCGenTaskExecutor();</span>
+<span class="nc" id="L192">		executor.addPCGenTask(createLoadPluginTask());</span>
+<span class="nc" id="L193">		executor.addPCGenTask(new GameModeFileLoader());</span>
+<span class="nc" id="L194">		executor.addPCGenTask(new CampaignFileLoader());</span>
+<span class="nc" id="L195">		executor.addPCGenTaskListener(splash);</span>
+<span class="nc" id="L196">		executor.run();</span>
+<span class="nc" id="L197">		splash.getController().setProgress(LanguageBundle.getString(&quot;in_taskInitUi&quot;), 1.0d);</span>
+<span class="nc" id="L198">		FacadeFactory.initialize();</span>
+<span class="nc" id="L199">		PCGenUIManager.initializeGUI();</span>
+<span class="nc" id="L200">		splash.done();</span>
+<span class="nc" id="L201">		PCGenUIManager.startGUI();</span>
+<span class="nc" id="L202">	}</span>
+
+	private static void configureUI()
+	{
+<span class="nc" id="L206">		String language = ConfigurationSettings.getLanguage();</span>
+<span class="nc" id="L207">		String country = ConfigurationSettings.getCountry();</span>
+<span class="nc bnc" id="L208" title="All 4 branches missed.">		if (StringUtils.isNotEmpty(language) &amp;&amp; StringUtils.isNotEmpty(country))</span>
+		{
+<span class="nc" id="L210">			Locale.setDefault(new Locale(language, country));</span>
+		}
+<span class="nc" id="L212">		LanguageBundle.init();</span>
+<span class="nc" id="L213">	}</span>
+
+	/**
+	 * Check that the runtime environment is suitable for PCGen to run.
+	 */
+	private static void validateEnvironment(boolean useGui)
+	{
+		// Check our main folders are present
+<span class="nc" id="L221">		String[] neededDirs = {</span>
+<span class="nc" id="L222">				ConfigurationSettings.getSystemsDir(), ConfigurationSettings.getPccFilesDir(),</span>
+<span class="nc" id="L223">				ConfigurationSettings.getPluginsDir(), ConfigurationSettings.getPreviewDir(),</span>
+<span class="nc" id="L224">				ConfigurationSettings.getOutputSheetsDir()</span>
+		};
+<span class="nc" id="L226">		String missingDirs = Arrays.stream(neededDirs)</span>
+<span class="nc" id="L227">				.map(File::new)</span>
+<span class="nc" id="L228">				.filter(Predicate.not(File::exists))</span>
+<span class="nc" id="L229">				.map(dir -&gt; {</span>
+					try
+					{
+<span class="nc" id="L232">						return dir.getCanonicalPath();</span>
+					}
+<span class="nc" id="L234">					catch (IOException e)</span>
+					{
+<span class="nc" id="L236">						Logging.errorPrint(&quot;Unable to find canonical path for &quot; + dir);</span>
+<span class="nc" id="L237">						return dir.getPath();</span>
+					}
+				})
+<span class="nc" id="L240">				.map(path -&gt; &quot;  &quot; + path)</span>
+<span class="nc" id="L241">				.collect(Collectors.joining(&quot;\n&quot;));</span>
+
+<span class="nc bnc" id="L243" title="All 2 branches missed.">		if (!missingDirs.isEmpty())</span>
+		{
+<span class="nc" id="L245">			String message = &quot;This installation of PCGen is missing the following required folders:\n&quot; + missingDirs;</span>
+<span class="nc" id="L246">			Logging.errorPrint(message);</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">			if (useGui)</span>
+			{
+<span class="nc" id="L249">				JOptionPane.showMessageDialog(null, message + &quot;\nPlease reinstall PCGen.&quot;, Constants.APPLICATION_NAME,</span>
+					JOptionPane.ERROR_MESSAGE);
+			}
+<span class="nc" id="L252">			System.exit(1);</span>
+		}
+<span class="nc" id="L254">	}</span>
+
+	public static void loadProperties(boolean useGui)
+	{
+<span class="nc bnc" id="L258" title="All 2 branches missed.">		if (commandLineArguments.getSettingsDir().isEmpty()</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">				&amp;&amp; (ConfigurationSettings.getSystemProperty(ConfigurationSettings.SETTINGS_FILES_PATH) == null))</span>
+		{
+<span class="nc bnc" id="L261" title="All 2 branches missed.">			if (!useGui)</span>
+			{
+<span class="nc" id="L263">				Logging.errorPrint(&quot;No settingsDir specified via -s in batch mode and no default exists.&quot;);</span>
+<span class="nc" id="L264">				System.exit(1);</span>
+			}
+<span class="nc" id="L266">			var panel = new JFXPanelFromResource&lt;&gt;(</span>
+					OptionsPathDialogController.class,
+					&quot;OptionsPathDialog.fxml&quot;
+			);
+<span class="nc" id="L270">			panel.showAndBlock(&quot;Directory for options.ini location&quot;);</span>
+		}
+<span class="nc" id="L272">		PropertyContextFactory.setDefaultFactory(commandLineArguments.getSettingsDir().map(File::getPath).orElse(null));</span>
+
+		//Existing PropertyContexts are registered here
+<span class="nc" id="L275">		PropertyContextFactory defaultFactory = PropertyContextFactory.getDefaultFactory();</span>
+<span class="nc" id="L276">		PropertyContext settingscontext = PCGenSettings.getInstance();</span>
+<span class="nc" id="L277">		defaultFactory.registerPropertyContext(settingscontext);</span>
+<span class="nc" id="L278">		defaultFactory.registerPropertyContext(UIPropertyContext.getInstance());</span>
+<span class="nc" id="L279">		defaultFactory.registerPropertyContext(LegacySettings.getInstance());</span>
+<span class="nc" id="L280">		defaultFactory.loadPropertyContexts();</span>
+		//Make savepath directory if it doesn't exist
+<span class="nc" id="L282">		String savepath = settingscontext.getProperty(PCGenSettings.PCG_SAVE_PATH);</span>
+<span class="nc" id="L283">		File savepath_dir = new File(savepath);</span>
+<span class="nc bnc" id="L284" title="All 4 branches missed.">		if (!savepath_dir.exists() &amp;&amp; !savepath_dir.isDirectory())</span>
+		{
+			try
+			{
+<span class="nc" id="L288">				Logging.log(Level.INFO, &quot;Making directory &quot; + savepath_dir);</span>
+<span class="nc" id="L289">				savepath_dir.mkdir();</span>
+			}
+<span class="nc" id="L291">			catch (Exception e)</span>
+			{
+<span class="nc" id="L293">				Logging.log(Level.SEVERE, &quot;Unable to create PCG_SAVE_PATH &quot; + savepath_dir + &quot;: &quot; + e );</span>
+<span class="nc" id="L294">			}</span>
+		}
+<span class="nc" id="L296">	}</span>
+
+	/**
+	 * Create a task to load all system plugins.
+	 *
+	 * @return The task to load plugins.
+	 */
+	public static PCGenTask createLoadPluginTask()
+	{
+<span class="nc" id="L305">		String pluginsDir = ConfigurationSettings.getPluginsDir();</span>
+<span class="nc" id="L306">		PluginClassLoader loader = new PluginClassLoader(new File(pluginsDir));</span>
+<span class="nc" id="L307">		loader.addPluginLoader(TokenLibrary.getInstance());</span>
+<span class="nc" id="L308">		loader.addPluginLoader(TokenStore.inst());</span>
+		try
+		{
+<span class="nc" id="L311">			loader.addPluginLoader(PreParserFactory.getInstance());</span>
+		}
+<span class="nc" id="L313">		catch (PersistenceLayerException ex)</span>
+		{
+<span class="nc" id="L315">			Logging.errorPrint(&quot;createLoadPluginTask failed&quot;, ex);</span>
+<span class="nc" id="L316">		}</span>
+<span class="nc" id="L317">		loader.addPluginLoader(PrerequisiteTestFactory.getInstance());</span>
+<span class="nc" id="L318">		loader.addPluginLoader(PrerequisiteWriterFactory.getInstance());</span>
+<span class="nc" id="L319">		loader.addPluginLoader(PJEP.getJepPluginLoader());</span>
+<span class="nc" id="L320">		loader.addPluginLoader(ExportHandler.getPluginLoader());</span>
+<span class="nc" id="L321">		loader.addPluginLoader(TokenConverter.getPluginLoader());</span>
+<span class="nc" id="L322">		loader.addPluginLoader(PluginManager.getInstance());</span>
+<span class="nc" id="L323">		loader.addPluginLoader(PluginFunctionLibrary.getInstance());</span>
+<span class="nc" id="L324">		return loader;</span>
+	}
+
+	private static boolean startupWithoutGUI()
+	{
+<span class="nc" id="L329">		loadProperties(false);</span>
+<span class="nc" id="L330">		validateEnvironment(false);</span>
+
+<span class="nc" id="L332">		PCGenTaskExecutor executor = new PCGenTaskExecutor();</span>
+<span class="nc" id="L333">		executor.addPCGenTask(createLoadPluginTask());</span>
+<span class="nc" id="L334">		executor.addPCGenTask(new GameModeFileLoader());</span>
+<span class="nc" id="L335">		executor.addPCGenTask(new CampaignFileLoader());</span>
+<span class="nc" id="L336">		executor.run();</span>
+
+<span class="nc" id="L338">		UIDelegate uiDelegate = new ConsoleUIDelegate();</span>
+
+<span class="nc" id="L340">		BatchExporter exporter = new BatchExporter(commandLineArguments.getExportSheet().map(File::getPath).orElse(null), uiDelegate);</span>
+
+<span class="nc" id="L342">		boolean result = true;</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">		if (commandLineArguments.getPartyFile().isPresent())</span>
+		{
+<span class="nc" id="L345">			result = exporter.exportParty(commandLineArguments.getPartyFile().map(File::getPath).orElseThrow(),</span>
+<span class="nc" id="L346">					commandLineArguments.getOutputFile().map(File::getPath).orElse(null));</span>
+		}
+
+<span class="nc bnc" id="L349" title="All 2 branches missed.">		if (commandLineArguments.getCharacterFile().isPresent())</span>
+		{
+<span class="nc" id="L351">			result = exporter.exportCharacter(commandLineArguments.getCharacterFile().map(File::getPath).orElseThrow(),</span>
+<span class="nc" id="L352">					commandLineArguments.getOutputFile().map(File::getPath).orElse(null));</span>
+		}
+
+<span class="nc" id="L355">		return result;</span>
+	}
+
+	public static void shutdown(boolean success)
+	{
+<span class="nc" id="L360">		configFactory.savePropertyContexts();</span>
+<span class="nc" id="L361">		BatchExporter.removeTemporaryFiles();</span>
+<span class="nc" id="L362">		PropertyContextFactory.getDefaultFactory().savePropertyContexts();</span>
+
+		// Need to (possibly) write customEquipment.lst
+<span class="nc bnc" id="L365" title="All 2 branches missed.">		if (PCGenSettings.OPTIONS_CONTEXT.getBoolean(PCGenSettings.OPTION_SAVE_CUSTOM_EQUIPMENT))</span>
+		{
+<span class="nc" id="L367">			CustomData.writeCustomItems();</span>
+		}
+
+<span class="nc bnc" id="L370" title="All 2 branches missed.">		System.exit(success ? 0 : 1);</span>
+<span class="nc" id="L371">	}</span>
+
+	private static void initPrintPreviewFonts()
+	{
+<span class="nc" id="L375">		GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();</span>
+<span class="nc" id="L376">		String fontDir = ConfigurationSettings.getOutputSheetsDir() + File.separator + &quot;fonts&quot; + File.separator</span>
+			+ &quot;NotoSans&quot; + File.separator;
+		try
+		{
+<span class="nc" id="L380">			ge.registerFont(Font.createFont(Font.TRUETYPE_FONT, new File(fontDir + &quot;NotoSans-Regular.ttf&quot;)));</span>
+<span class="nc" id="L381">			ge.registerFont(Font.createFont(Font.TRUETYPE_FONT, new File(fontDir + &quot;NotoSans-Bold.ttf&quot;)));</span>
+<span class="nc" id="L382">			ge.registerFont(Font.createFont(Font.TRUETYPE_FONT, new File(fontDir + &quot;NotoSans-Italic.ttf&quot;)));</span>
+<span class="nc" id="L383">			ge.registerFont(Font.createFont(Font.TRUETYPE_FONT, new File(fontDir + &quot;NotoSans-BoldItalic.ttf&quot;)));</span>
+		}
+<span class="nc" id="L385">		catch (IOException | FontFormatException ex)</span>
+		{
+<span class="nc" id="L387">			Logging.errorPrint(&quot;Unexpected exception loading fonts fo print p&quot;, ex);</span>
+<span class="nc" id="L388">		}</span>
+<span class="nc" id="L389">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

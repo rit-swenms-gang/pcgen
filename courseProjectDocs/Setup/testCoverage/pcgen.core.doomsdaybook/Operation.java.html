@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Operation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.core.doomsdaybook</a> &gt; <span class="el_source">Operation.java</span></div><h1>Operation.java</h1><pre class="source lang-java linenums">/*
+ *  RPGeneration - A role playing utility generate interesting things
+ *  Copyright (C) 2002 Devon Jones
+ *
+ *  This library is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public
+ *  License as published by the Free Software Foundation; either
+ *  version 2.1 of the License, or (at your option) any later version.
+ *
+ *  This library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  Lesser General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Lesser General Public
+ *  License along with this library; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.core.doomsdaybook;
+
+/**
+ * {@code Operation} encapsulates an action that can be performed
+ * on a variable. These are actions such as setting, adding or 
+ * multiplying the variable's current value.
+ */
+class Operation implements Comparable&lt;Object&gt;
+{
+	/** The identifying key of the variable the operation is to affect. */
+	private final String key;
+	/** The name of the operation. */
+	private final String name;
+	/** The type of action to take on the variable. */
+	private final String type;
+	/** The value to be used in the operation. */
+	private final String value;
+
+	/**
+	 * Create a new Operation instance.
+	 * 
+	 * @param type The type of action to take on the variable.
+	 * @param key The identifying key of the variable the operation is to affect.
+	 * @param value The value to be used in the operation.
+	 * @param name The name of the operation.
+	 */
+	private Operation(String type, String key, String value, String name)
+<span class="nc" id="L46">	{</span>
+<span class="nc" id="L47">		this.type = type;</span>
+<span class="nc" id="L48">		this.key = key;</span>
+<span class="nc" id="L49">		this.value = value;</span>
+<span class="nc" id="L50">		this.name = name;</span>
+<span class="nc" id="L51">	}</span>
+
+	/**
+	 * Create a new unnamed Operation instance.
+	 * 
+	 * @param type The type of action to take on the variable.
+	 * @param key The identifying key of the variable the operation is to affect.
+	 * @param value The value to be used in the operation.
+	 */
+	public Operation(String type, String key, String value)
+	{
+<span class="nc" id="L62">		this(type, key, value, &quot;&quot;);</span>
+<span class="nc" id="L63">	}</span>
+
+	/**
+	 * @return The current value of the key.
+	 */
+	public String getKey()
+	{
+<span class="nc" id="L70">		return key;</span>
+	}
+
+	/**
+	 * @return The current value of the type.
+	 */
+	public String getType()
+	{
+<span class="nc" id="L78">		return type;</span>
+	}
+
+	/**
+	 * @return The current value of the value.
+	 */
+	public String getValue()
+	{
+<span class="nc" id="L86">		return value;</span>
+	}
+
+	@Override
+	public int compareTo(Object obj)
+	{
+<span class="nc" id="L92">		String title = this.toString();</span>
+<span class="nc" id="L93">		String compared = obj.toString();</span>
+
+<span class="nc" id="L95">		return title.compareTo(compared);</span>
+	}
+
+	@Override
+	public String toString()
+	{
+<span class="nc" id="L101">		return name;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

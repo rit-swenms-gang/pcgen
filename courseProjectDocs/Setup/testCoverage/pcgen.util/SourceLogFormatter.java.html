@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SourceLogFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.util</a> &gt; <span class="el_source">SourceLogFormatter.java</span></div><h1>SourceLogFormatter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007 (C) James Dempsey
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package pcgen.util;
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.logging.Formatter;
+import java.util.logging.LogRecord;
+import java.util.regex.Pattern;
+
+/**
+ * {@code SourceLogFormatter} is a log formatter for the Java
+ * Logging API that ignores the call from the PCGen logging class.
+ */
+<span class="fc" id="L32">public final class SourceLogFormatter extends Formatter</span>
+{
+	private static final char SEPERATOR = ' ';
+<span class="fc" id="L35">	private static final Pattern JAVA_EXT_PATTERN = Pattern.compile(&quot;\\.java&quot;);</span>
+
+	@Override
+	public String format(LogRecord record)
+	{
+<span class="fc" id="L40">		StringBuilder sb = new StringBuilder();</span>
+
+<span class="fc" id="L42">		sb.append(LocalDateTime.now(Clock.systemUTC()));</span>
+
+<span class="fc" id="L44">		sb.append(SEPERATOR);</span>
+<span class="fc" id="L45">		sb.append(record.getLevel());</span>
+<span class="fc" id="L46">		sb.append(SEPERATOR);</span>
+<span class="fc" id="L47">		sb.append(Thread.currentThread().getName());</span>
+<span class="fc" id="L48">		sb.append(SEPERATOR);</span>
+
+		// Pick out the caller from the stack trace, ignoring the 
+		// logging classes themselves 
+<span class="fc" id="L52">		StackTraceElement[] stack = new Throwable().getStackTrace();</span>
+<span class="fc" id="L53">		StackTraceElement caller = null;</span>
+
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">		for (int i = 1; i &lt; stack.length; i++) //1 to skip this method</span>
+		{
+<span class="fc bfc" id="L57" title="All 2 branches covered.">			if (!stack[i].getClassName().startsWith(&quot;pcgen.util.Logging&quot;)</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">				&amp;&amp; !stack[i].getClassName().startsWith(&quot;java.util.logging&quot;)</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">				&amp;&amp; !stack[i].getClassName().startsWith(&quot;pcgen.system.LoggingRecorder&quot;))</span>
+			{
+<span class="fc" id="L61">				caller = stack[i];</span>
+<span class="fc" id="L62">				break;</span>
+			}
+		}
+
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">		if (caller != null)</span>
+		{
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">			if (caller.getLineNumber() &gt;= 0)</span>
+			{
+<span class="fc" id="L70">				sb.append(JAVA_EXT_PATTERN.matcher(caller.getFileName()).replaceFirst(&quot;&quot;));</span>
+<span class="fc" id="L71">				sb.append(':');</span>
+<span class="fc" id="L72">				sb.append(caller.getLineNumber());</span>
+			}
+			else
+			{
+<span class="nc" id="L76">				sb.append(caller.getClassName());</span>
+<span class="nc" id="L77">				sb.append(' ');</span>
+<span class="nc" id="L78">				sb.append(caller.getMethodName());</span>
+			}
+		}
+
+<span class="fc" id="L82">		sb.append(SEPERATOR);</span>
+
+<span class="fc" id="L84">		sb.append(formatMessage(record));</span>
+
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">		if (record.getThrown() != null)</span>
+		{
+<span class="nc" id="L88">			sb.append('\n');</span>
+<span class="nc" id="L89">			StringWriter sw = new StringWriter();</span>
+<span class="nc" id="L90">			PrintWriter pw = new PrintWriter(sw);</span>
+<span class="nc" id="L91">			record.getThrown().printStackTrace(pw);</span>
+<span class="nc" id="L92">			pw.flush();</span>
+<span class="nc" id="L93">			sb.append(sw);</span>
+		}
+
+<span class="fc" id="L96">		sb.append('\n');</span>
+
+<span class="fc" id="L98">		return sb.toString();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

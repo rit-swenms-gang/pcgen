@@ -1,0 +1,767 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DataInstaller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">pcgen.gui2.dialog</a> &gt; <span class="el_source">DataInstaller.java</span></div><h1>DataInstaller.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2007 (C) James Dempsey
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+
+package pcgen.gui2.dialog;
+
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+
+import javax.swing.ButtonGroup;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JRadioButton;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+
+import pcgen.cdom.enumeration.Destination;
+import pcgen.cdom.enumeration.ObjectKey;
+import pcgen.cdom.enumeration.StringKey;
+import pcgen.core.InstallableCampaign;
+import pcgen.core.utils.CoreUtility;
+import pcgen.core.utils.MessageType;
+import pcgen.core.utils.ShowMessageDelegate;
+import pcgen.gui2.tools.CommonMenuText;
+import pcgen.gui2.tools.Icons;
+import pcgen.gui2.tools.Utility;
+import pcgen.gui3.GuiUtility;
+import pcgen.gui3.JFXPanelFromResource;
+import pcgen.gui3.SimpleHtmlPanelController;
+import pcgen.persistence.PersistenceLayerException;
+import pcgen.persistence.lst.InstallLoader;
+import pcgen.system.ConfigurationSettings;
+import pcgen.system.FacadeFactory;
+import pcgen.system.LanguageBundle;
+import pcgen.system.PCGenSettings;
+import pcgen.util.Logging;
+
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.stage.FileChooser;
+
+/**
+ * {@code DataInstaller} is responsible for managing the installation of
+ * a data set including the selection of the set and the install options.
+ */
+public final class DataInstaller extends JFrame
+{
+    /**
+     * The listener for receiving and processing action events from installer
+     * buttons.
+     */
+<span class="nc" id="L91">    private final class InstallerButtonListener implements ActionListener</span>
+    {
+
+        /**
+         * Gets the currently selected destination.
+         *
+         * @return the selected destination
+         */
+        private Destination getSelectedDestination()
+        {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (locDataButton.isSelected())</span>
+            {
+<span class="nc" id="L103">                return Destination.DATA;</span>
+            }
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (locVendorDataButton.isSelected())</span>
+            {
+<span class="nc" id="L107">                return Destination.VENDORDATA;</span>
+            }
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            if (locHomebrewDataButton.isSelected())</span>
+            {
+<span class="nc" id="L111">                return Destination.HOMEBREWDATA;</span>
+            }
+<span class="nc" id="L113">            return null;</span>
+        }
+
+        /**
+         * Install a data set (campaign) into the current PCGen install.
+         *
+         * @param dataSet the data set (campaign) to be installed.
+         * @param dest    The location the data is to be installed to.
+         * @return true, if install data source
+         */
+        private boolean installDataSource(File dataSet, Destination dest)
+        {
+            // Get the directory the data is to be stored in
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (dataSet == null)</span>
+            {
+<span class="nc" id="L128">                ShowMessageDelegate.showMessageDialog(LanguageBundle.getFormattedString(&quot;in_diDataSetNotSelected&quot;),</span>
+                        TITLE, MessageType.ERROR);
+<span class="nc" id="L130">                return false;</span>
+            }
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (dest == null)</span>
+            {
+<span class="nc" id="L134">                ShowMessageDelegate.showMessageDialog(LanguageBundle.getFormattedString(&quot;in_diDataFolderNotSelected&quot;),</span>
+                        TITLE, MessageType.ERROR);
+<span class="nc" id="L136">                return false;</span>
+            }
+<span class="nc bnc" id="L138" title="All 4 branches missed.">            File destDir = switch (dest)</span>
+                    {
+<span class="nc" id="L140">                        case VENDORDATA -&gt; new File(PCGenSettings.getVendorDataDir());</span>
+<span class="nc" id="L141">                        case HOMEBREWDATA -&gt; new File(PCGenSettings.getHomebrewDataDir());</span>
+<span class="nc" id="L142">                        case DATA -&gt; new File(ConfigurationSettings.getPccFilesDir());</span>
+<span class="nc" id="L143">                        default -&gt; new File(ConfigurationSettings.getPccFilesDir());</span>
+                    };
+
+            // Check chosen dir exists
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            if (!destDir.exists())</span>
+            {
+<span class="nc" id="L149">                ShowMessageDelegate.showMessageDialog(</span>
+<span class="nc" id="L150">                        LanguageBundle.getFormattedString(&quot;in_diDataFolderNotExist&quot;, destDir.getAbsoluteFile()), TITLE,</span>
+                        MessageType.ERROR);
+<span class="nc" id="L152">                return false;</span>
+            }
+
+            // Scan for non standard files and files that would be overwritten
+<span class="nc" id="L156">            List&lt;String&gt; directories = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L157">            List&lt;String&gt; files = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">            if (!populateFileAndDirLists(dataSet, directories, files))</span>
+            {
+<span class="nc" id="L160">                return false;</span>
+            }
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            if (!checkNonStandardOK(files))</span>
+            {
+<span class="nc" id="L164">                return false;</span>
+            }
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            if (!checkOverwriteOK(files, destDir))</span>
+            {
+<span class="nc" id="L168">                return false;</span>
+            }
+
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (!createDirectories(directories, destDir))</span>
+            {
+<span class="nc" id="L173">                return false;</span>
+            }
+
+            // Navigate through the zip file, processing each file
+<span class="nc" id="L177">            return createFiles(dataSet, destDir, files);</span>
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent actionEvent)
+        {
+<span class="nc" id="L183">            JButton source = (JButton) actionEvent.getSource();</span>
+
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            if (source == null)</span>
+            {
+<span class="nc" id="L187">                Logging.log(Logging.DEBUG, &quot;Source was null, but that's OK&quot;);</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">            } else if (source.equals(closeButton))</span>
+            {
+<span class="nc" id="L190">                setVisible(false);</span>
+<span class="nc" id="L191">                dispose();</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            } else if (source.equals(selectButton))</span>
+            {
+<span class="nc" id="L194">                FileChooser fileChooser = new FileChooser();</span>
+<span class="nc" id="L195">                fileChooser.setInitialDirectory(currFolder);</span>
+<span class="nc" id="L196">                fileChooser.setTitle(LanguageBundle.getString(&quot;in_diChooserTitle&quot;));</span>
+<span class="nc" id="L197">                FileChooser.ExtensionFilter dataSetFilter = new FileChooser.ExtensionFilter(</span>
+                        &quot;Data Sets&quot;, &quot;*.pcz&quot;, &quot;*.zip&quot;
+                );
+<span class="nc" id="L200">                fileChooser.getExtensionFilters().add(dataSetFilter);</span>
+<span class="nc" id="L201">                fileChooser.setSelectedExtensionFilter(dataSetFilter);</span>
+<span class="nc" id="L202">                File dataset = GuiUtility.runOnJavaFXThreadNow(() -&gt; fileChooser.showOpenDialog(null));</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">                if (dataset == null)</span>
+                {
+<span class="nc" id="L205">                    return;</span>
+                }
+<span class="nc" id="L207">                currFolder = dataset.getParentFile();</span>
+<span class="nc" id="L208">                readDataSet(dataset);</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            } else if (source.equals(installButton))</span>
+            {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                if (installDataSource(currDataSet, getSelectedDestination()))</span>
+                {
+                    //PCGen_Frame1.getInst().getMainSource().refreshCampaigns();
+                    //TODO: Refresh the data cleanly.
+                    //					PersistenceManager.getInstance().refreshCampaigns();
+                    //					FacadeFactory.refresh();
+<span class="nc" id="L217">                    ShowMessageDelegate.showMessageDialog(</span>
+<span class="nc" id="L218">                            LanguageBundle.getFormattedString(&quot;in_diInstalled&quot;, campaign //$NON-NLS-1$</span>
+<span class="nc" id="L219">                                    .getDisplayName()), TITLE, MessageType.INFORMATION);</span>
+                }
+            }
+<span class="nc" id="L222">        }</span>
+
+        /**
+         * Read data set.
+         *
+         * @param dataSet the data set
+         * @return true, if successful
+         */
+        private boolean readDataSet(File dataSet)
+        {
+            // Open the ZIP file
+<span class="nc" id="L233">            try (ZipFile in = new ZipFile(dataSet))</span>
+            {
+                // Get the install file in a case insensitive manner
+<span class="nc" id="L236">                ZipEntry installEntry = null;</span>
+                @SuppressWarnings(&quot;rawtypes&quot;)
+<span class="nc" id="L238">                Enumeration entries = in.entries();</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">                while (entries.hasMoreElements())</span>
+                {
+<span class="nc" id="L241">                    ZipEntry entry = (ZipEntry) entries.nextElement();</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">                    if (entry.getName().equalsIgnoreCase(&quot;install.lst&quot;))</span>
+                    {
+<span class="nc" id="L244">                        installEntry = entry;</span>
+<span class="nc" id="L245">                        break;</span>
+                    }
+<span class="nc" id="L247">                }</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                if (installEntry == null)</span>
+                {
+                    // Report that it isn't a valid data set
+<span class="nc" id="L251">                    Logging.errorPrint(&quot;File &quot; + dataSet + &quot; is not a valid datsset - no Install.lst file&quot;);</span>
+<span class="nc" id="L252">                    ShowMessageDelegate.showMessageDialog(</span>
+<span class="nc" id="L253">                            LanguageBundle.getFormattedString(&quot;in_diNoInstallFile&quot;, dataSet.getName()), TITLE,</span>
+                            MessageType.WARNING);
+<span class="nc" id="L255">                    return false;</span>
+                }
+
+                // Parse the install file
+<span class="nc" id="L259">                try (InputStream inStream = in.getInputStream(installEntry); BufferedReader reader = new BufferedReader(new InputStreamReader(inStream, StandardCharsets.UTF_8)))</span>
+                { //$NON-NLS-1$
+<span class="nc" id="L261">                    String installInfo = reader.lines().collect(Collectors.joining(&quot;\n&quot;));</span>
+
+<span class="nc" id="L263">                    final InstallLoader loader = new InstallLoader();</span>
+<span class="nc" id="L264">                    loader.loadLstString(null, dataSet.toURI(), installInfo);</span>
+<span class="nc" id="L265">                    campaign = loader.getCampaign();</span>
+                }
+<span class="nc" id="L267">            } catch (IOException e)</span>
+            {
+                // Report the error
+<span class="nc" id="L270">                Logging.errorPrint(&quot;Failed to read data set &quot; + dataSet + &quot; due to &quot;, e);</span>
+<span class="nc" id="L271">                ShowMessageDelegate.showMessageDialog(LanguageBundle.getFormattedString(&quot;in_diBadDataSet&quot;, dataSet),</span>
+                        TITLE, MessageType.ERROR);
+<span class="nc" id="L273">                return false;</span>
+<span class="nc" id="L274">            } catch (PersistenceLayerException e)</span>
+            {
+<span class="nc" id="L276">                Logging.errorPrint(&quot;Failed to parse data set &quot; + dataSet + &quot; due to &quot;, e);</span>
+<span class="nc" id="L277">                ShowMessageDelegate.showMessageDialog(LanguageBundle.getFormattedString(&quot;in_diBadDataSet&quot;, dataSet),</span>
+                        TITLE, MessageType.ERROR);
+<span class="nc" id="L279">                return false;</span>
+<span class="nc" id="L280">            }</span>
+
+            // Validate that the campaign is compatible with our version
+<span class="nc" id="L283">            campaign.getSafe(StringKey.MINDEVVER);</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">            if (!CoreUtility.isPriorToCurrent(campaign.getSafe(StringKey.MINDEVVER)))</span>
+            {
+<span class="nc bnc" id="L286" title="All 2 branches missed.">                if (CoreUtility.isCurrMinorVer(campaign.getSafe(StringKey.MINDEVVER)))</span>
+                {
+<span class="nc" id="L288">                    Logging.errorPrint(&quot;Dataset &quot; + campaign.getDisplayName() + &quot; needs at least PCGen version &quot;</span>
+<span class="nc" id="L289">                            + campaign.getSafe(StringKey.MINDEVVER) + &quot; to run. It could not be installed.&quot;);</span>
+<span class="nc" id="L290">                    ShowMessageDelegate.showMessageDialog(</span>
+<span class="nc" id="L291">                            LanguageBundle.getFormattedString(&quot;in_diVersionTooOldDev&quot;,</span>
+<span class="nc" id="L292">                                    campaign.getSafe(StringKey.MINDEVVER), campaign.getSafe(StringKey.MINVER)),</span>
+                            TITLE, MessageType.WARNING);
+<span class="nc" id="L294">                    return false;</span>
+                }
+            }
+<span class="nc" id="L297">            campaign.getSafe(StringKey.MINVER);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            if (!CoreUtility.isPriorToCurrent(campaign.getSafe(StringKey.MINVER)))</span>
+            {
+<span class="nc" id="L300">                Logging.errorPrint(&quot;Dataset &quot; + campaign.getDisplayName() + &quot; needs at least PCGen version &quot;</span>
+<span class="nc" id="L301">                        + campaign.getSafe(StringKey.MINVER) + &quot; to run. It could not be installed.&quot;);</span>
+<span class="nc" id="L302">                ShowMessageDelegate.showMessageDialog(</span>
+<span class="nc" id="L303">                        LanguageBundle.getFormattedString(&quot;in_diVersionTooOld&quot;, campaign.getSafe(StringKey.MINVER)), TITLE,</span>
+                        MessageType.WARNING);
+<span class="nc" id="L305">                return false;</span>
+            }
+
+            // Display the info
+<span class="nc" id="L309">            dataSetSel.setText(dataSet.getAbsolutePath());</span>
+<span class="nc" id="L310">            dataSetDetails.getController().setHtml(FacadeFactory.getCampaignInfoFactory().getHTMLInfo(campaign));</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">            if (campaign.get(ObjectKey.DESTINATION) == null)</span>
+            {
+<span class="nc" id="L313">                locDataButton.setSelected(false);</span>
+<span class="nc" id="L314">                locVendorDataButton.setSelected(false);</span>
+<span class="nc" id="L315">                locHomebrewDataButton.setSelected(false);</span>
+            } else
+            {
+<span class="nc bnc" id="L318" title="All 4 branches missed.">	            switch (campaign.get(ObjectKey.DESTINATION))</span>
+	            {
+<span class="nc" id="L320">		            case DATA -&gt; locDataButton.setSelected(true);</span>
+<span class="nc" id="L321">		            case VENDORDATA -&gt; locVendorDataButton.setSelected(true);</span>
+<span class="nc" id="L322">		            case HOMEBREWDATA -&gt; locHomebrewDataButton.setSelected(true);</span>
+		            default -&gt; {
+		            }
+		            //Case not caught, should this cause an error?
+	            }
+            }
+<span class="nc" id="L328">            currDataSet = dataSet;</span>
+
+<span class="nc" id="L330">            toFront();</span>
+<span class="nc" id="L331">            return true;</span>
+        }
+    }
+
+    /**
+     * The name of the OUTPUTSHEETS folder.
+     */
+    private static final String OUTPUTSHEETS_FOLDER = &quot;outputsheets/&quot;;
+
+    /**
+     * The name of the DATA folder.
+     */
+    private static final String DATA_FOLDER = &quot;data/&quot;;
+
+    /**
+     * The standard window title.
+     */
+<span class="nc" id="L348">    private static final String TITLE = LanguageBundle.getString(&quot;in_dataInstaller&quot;);</span>
+
+    /**
+     * The component to display the path of the selected data set.
+     */
+    private JTextField dataSetSel;
+
+    /**
+     * The select button.
+     */
+    private JButton selectButton;
+
+    /**
+     * The data set detail display component.
+     */
+    private JFXPanelFromResource&lt;SimpleHtmlPanelController&gt; dataSetDetails;
+
+    /**
+     * The button for the data location.
+     */
+    private JRadioButton locDataButton;
+
+    /**
+     * The button for the vendor data location.
+     */
+    private JRadioButton locVendorDataButton;
+
+    /**
+     * The button for the homebrew data location.
+     */
+    private JRadioButton locHomebrewDataButton;
+
+    /**
+     * The install button.
+     */
+    private JButton installButton;
+
+    /**
+     * The close button.
+     */
+    private JButton closeButton;
+
+    /**
+     * The listener.
+     */
+<span class="nc" id="L393">    private final ActionListener listener = new InstallerButtonListener();</span>
+
+    /**
+     * The campaign.
+     */
+    private InstallableCampaign campaign;
+
+    /**
+     * The current data set.
+     */
+    private File currDataSet;
+
+    /**
+     * The current folder
+     */
+    private File currFolder;
+
+    /**
+     * Instantiates a new data installer.
+     */
+    public DataInstaller()
+<span class="nc" id="L414">    {</span>
+<span class="nc" id="L415">        currFolder = new File(System.getProperty(&quot;user.dir&quot;));</span>
+<span class="nc" id="L416">        initComponents();</span>
+
+<span class="nc" id="L418">        setIconImage(Icons.PCGenApp.getImageIcon().getImage());</span>
+<span class="nc" id="L419">        this.pack();</span>
+<span class="nc" id="L420">        this.setLocationRelativeTo(null);</span>
+<span class="nc" id="L421">    }</span>
+
+    /**
+     * Check for any non standard files being installed and check with the
+     * user if there are. Note if the user says no to installing the non
+     * standard files they will be removed from the file list
+     *
+     * @param files the names of the files being installed.
+     * @return Should the install process continue
+     */
+    private boolean checkNonStandardOK(Collection&lt;String&gt; files)
+    {
+<span class="nc" id="L433">        Collection&lt;String&gt; nonStandardFiles = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">        for (String filename : files)</span>
+        {
+<span class="nc bnc" id="L436" title="All 2 branches missed.">            if (!filename.toLowerCase().startsWith(DATA_FOLDER)</span>
+<span class="nc bnc" id="L437" title="All 2 branches missed.">                    &amp;&amp; !filename.toLowerCase().startsWith(OUTPUTSHEETS_FOLDER))</span>
+            {
+<span class="nc" id="L439">                nonStandardFiles.add(filename);</span>
+            }
+<span class="nc" id="L441">        }</span>
+
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        if (!nonStandardFiles.isEmpty())</span>
+        {
+<span class="nc" id="L445">            StringBuilder msg = new StringBuilder();</span>
+<span class="nc bnc" id="L446" title="All 2 branches missed.">            for (String filename : nonStandardFiles)</span>
+            {
+<span class="nc" id="L448">                msg.append(' ').append(filename).append('\n');</span>
+<span class="nc" id="L449">            }</span>
+
+<span class="nc" id="L451">            Alert diWarningDialog = GuiUtility.runOnJavaFXThreadNow(() -&gt; new Alert(Alert.AlertType.CONFIRMATION));</span>
+<span class="nc" id="L452">            ButtonType noButton = new ButtonType(LanguageBundle.getString(&quot;in_no&quot;), ButtonBar.ButtonData.NO);</span>
+            // default for confirm is yes/cancel
+<span class="nc" id="L454">            diWarningDialog.getButtonTypes().add(noButton);</span>
+<span class="nc" id="L455">            diWarningDialog.setTitle(LanguageBundle.getString(&quot;in_dataInstaller&quot;));</span>
+<span class="nc" id="L456">            diWarningDialog.setHeaderText(LanguageBundle.getString(&quot;in_diNonStandardFiles&quot;));</span>
+<span class="nc" id="L457">            diWarningDialog.setContentText(msg.toString());</span>
+<span class="nc" id="L458">            Optional&lt;ButtonType&gt; warningResult = GuiUtility.runOnJavaFXThreadNow(diWarningDialog::showAndWait);</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">            if (warningResult.isPresent())</span>
+            {
+<span class="nc" id="L461">                ButtonType buttonType = warningResult.get();</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">                if (buttonType.equals(ButtonType.CANCEL))</span>
+                {
+<span class="nc" id="L464">                    return false;</span>
+                }
+<span class="nc bnc" id="L466" title="All 2 branches missed.">                if (buttonType.equals(ButtonType.NO))</span>
+                {
+<span class="nc" id="L468">                    files.removeAll(nonStandardFiles);</span>
+<span class="nc" id="L469">                    return false;</span>
+                }
+            }
+        }
+
+<span class="nc" id="L474">        return true;</span>
+    }
+
+    /**
+     * Check for any files that would be overwritten and confirm it is ok
+     * with the user.
+     *
+     * @param files   the names of the files being installed.
+     * @param destDir the destination data directory
+     * @return true, if successful
+     */
+    private static boolean checkOverwriteOK(Collection&lt;String&gt; files, File destDir)
+    {
+<span class="nc" id="L487">        Collection&lt;String&gt; existingFiles = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L488">        Collection&lt;String&gt; existingFilesCorr = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">        for (String filename : files)</span>
+        {
+<span class="nc" id="L491">            String correctedFilename = correctFileName(destDir, filename);</span>
+<span class="nc bnc" id="L492" title="All 2 branches missed.">            if (new File(correctedFilename).exists())</span>
+            {
+<span class="nc" id="L494">                existingFiles.add(filename);</span>
+<span class="nc" id="L495">                existingFilesCorr.add(correctedFilename);</span>
+            }
+<span class="nc" id="L497">        }</span>
+
+<span class="nc bnc" id="L499" title="All 2 branches missed.">        if (!existingFiles.isEmpty())</span>
+        {
+<span class="nc" id="L501">            StringBuilder msg = new StringBuilder();</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">            for (String filename : existingFilesCorr)</span>
+            {
+<span class="nc" id="L504">                msg.append(' ').append(filename).append(&quot;\n&quot;);</span>
+<span class="nc" id="L505">            }</span>
+
+<span class="nc" id="L507">            Alert diWarningDialog = new Alert(Alert.AlertType.CONFIRMATION);</span>
+<span class="nc" id="L508">            ButtonType noButton = new ButtonType(LanguageBundle.getString(&quot;in_no&quot;), ButtonBar.ButtonData.NO);</span>
+            // default for confirm is yes/cancel
+<span class="nc" id="L510">            diWarningDialog.getButtonTypes().add(noButton);</span>
+<span class="nc" id="L511">            diWarningDialog.setTitle(LanguageBundle.getString(&quot;in_dataInstaller&quot;));</span>
+<span class="nc" id="L512">            diWarningDialog.setHeaderText(LanguageBundle.getString(&quot;in_diOverwriteFiles&quot;));</span>
+<span class="nc" id="L513">            diWarningDialog.setContentText(msg.toString());</span>
+<span class="nc" id="L514">            Optional&lt;ButtonType&gt; warningResult = diWarningDialog.showAndWait();</span>
+<span class="nc bnc" id="L515" title="All 2 branches missed.">            if (warningResult.isPresent())</span>
+            {
+<span class="nc" id="L517">                ButtonType buttonType = warningResult.get();</span>
+<span class="nc bnc" id="L518" title="All 2 branches missed.">                if (buttonType.equals(ButtonType.CANCEL))</span>
+                {
+<span class="nc" id="L520">                    return false;</span>
+                }
+<span class="nc bnc" id="L522" title="All 2 branches missed.">                if (buttonType.equals(ButtonType.NO))</span>
+                {
+<span class="nc" id="L524">                    files.removeAll(existingFiles);</span>
+<span class="nc" id="L525">                    return false;</span>
+                }
+            }
+        }
+
+<span class="nc" id="L530">        return true;</span>
+    }
+
+    /**
+     * Copy the contents of the input stream to the output stream. Used
+     * here to write the zipped file to the install location.
+     *
+     * @param in  the input stream
+     * @param out the output stream
+     * @throws IOException Signals that an I/O exception has occurred.
+     */
+    private static void copyInputStream(InputStream in, OutputStream out) throws IOException
+    {
+<span class="nc" id="L543">        in.transferTo(out);</span>
+
+<span class="nc" id="L545">        in.close();</span>
+<span class="nc" id="L546">        out.close();</span>
+<span class="nc" id="L547">    }</span>
+
+    /**
+     * Correct the file name to account for the selected data directory and
+     * preference based folder locations such as output sheets.
+     *
+     * @param destDir  the destination data directory
+     * @param fileName the file name to be corrected.
+     * @return the corrected file name.
+     */
+    private static String correctFileName(File destDir, String fileName)
+    {
+<span class="nc bnc" id="L559" title="All 2 branches missed.">        if (fileName.toLowerCase().startsWith(DATA_FOLDER))</span>
+        {
+<span class="nc" id="L561">            fileName = destDir.getAbsolutePath() + fileName.substring(4);</span>
+<span class="nc bnc" id="L562" title="All 2 branches missed.">        } else if (fileName.toLowerCase().startsWith(OUTPUTSHEETS_FOLDER))</span>
+        {
+<span class="nc" id="L564">            fileName = new File(ConfigurationSettings.getOutputSheetsDir()).getAbsolutePath() + fileName.substring(12);</span>
+        }
+<span class="nc" id="L566">        return fileName;</span>
+    }
+
+    /**
+     * Creates the directories needed by the installer, where they
+     * do not already exist.
+     *
+     * @param directories the directories
+     * @param destDir     the destination data directory
+     * @return true, if successful
+     */
+    private static boolean createDirectories(Iterable&lt;String&gt; directories, File destDir)
+    {
+<span class="nc bnc" id="L579" title="All 2 branches missed.">        for (String dirname : directories)</span>
+        {
+<span class="nc" id="L581">            String corrDirname = correctFileName(destDir, dirname);</span>
+<span class="nc" id="L582">            File dir = new File(corrDirname);</span>
+<span class="nc bnc" id="L583" title="All 2 branches missed.">            if (!dir.exists())</span>
+            {
+<span class="nc" id="L585">                Logging.log(Logging.INFO, &quot;Creating directory: &quot; + dir);</span>
+<span class="nc bnc" id="L586" title="All 2 branches missed.">                if (!dir.mkdirs())</span>
+                {
+<span class="nc" id="L588">                    ShowMessageDelegate.showMessageDialog(</span>
+<span class="nc" id="L589">                            LanguageBundle.getFormattedString(&quot;in_diDirNotCreated&quot;, dir.getAbsoluteFile()), TITLE,</span>
+                            MessageType.ERROR);
+<span class="nc" id="L591">                    return false;</span>
+                }
+            }
+<span class="nc" id="L594">        }</span>
+<span class="nc" id="L595">        return true;</span>
+    }
+
+    /**
+     * Creates the files in the archive, as filtered by previous user actions.
+     *
+     * @param dataSet the data set (campaign) to be installed.
+     * @param destDir the destination data directory
+     * @param files   the list of file names
+     * @return true, if all files created ok
+     */
+    private static boolean createFiles(File dataSet, File destDir, Iterable&lt;String&gt; files)
+    {
+<span class="nc" id="L608">        String corrFilename = &quot;&quot;;</span>
+<span class="nc" id="L609">        try (ZipFile in = new ZipFile(dataSet))</span>
+        {
+<span class="nc bnc" id="L611" title="All 2 branches missed.">            for (String filename : files)</span>
+            {
+<span class="nc" id="L613">                ZipEntry entry = in.getEntry(filename);</span>
+<span class="nc" id="L614">                corrFilename = correctFileName(destDir, filename);</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">                if (Logging.isDebugMode())</span>
+                {
+<span class="nc" id="L617">                    Logging.debugPrint(&quot;Extracting file: &quot; + filename + &quot; to &quot; + corrFilename);</span>
+                }
+<span class="nc" id="L619">                copyInputStream(in.getInputStream(entry), new BufferedOutputStream(new FileOutputStream(corrFilename)));</span>
+<span class="nc" id="L620">            }</span>
+<span class="nc" id="L621">            return true;</span>
+<span class="nc" id="L622">        } catch (IOException e)</span>
+        {
+            // Report the error
+<span class="nc" id="L625">            Logging.errorPrint(&quot;Failed to read data set &quot; + dataSet + &quot; or write file &quot; + corrFilename + &quot; due to &quot;, e);</span>
+<span class="nc" id="L626">            ShowMessageDelegate.showMessageDialog(LanguageBundle.getFormattedString(&quot;in_diWriteFail&quot;, corrFilename),</span>
+                    TITLE, MessageType.ERROR);
+<span class="nc" id="L628">            return false;</span>
+        }
+    }
+
+    /**
+     * Build the user interface ready for display.
+     */
+    private void initComponents()
+    {
+<span class="nc" id="L637">        GridBagConstraints gbc = new GridBagConstraints();</span>
+<span class="nc" id="L638">        gbc.fill = GridBagConstraints.HORIZONTAL;</span>
+<span class="nc" id="L639">        gbc.anchor = GridBagConstraints.WEST;</span>
+<span class="nc" id="L640">        gbc.insets = new Insets(2, 2, 2, 2);</span>
+<span class="nc" id="L641">        GridBagLayout gridbag = new GridBagLayout();</span>
+<span class="nc" id="L642">        setTitle(TITLE);</span>
+<span class="nc" id="L643">        setLayout(gridbag);</span>
+
+        // Data set selection row
+<span class="nc" id="L646">        Utility.buildConstraints(gbc, 0, 0, 1, 1, 0.0, 0.0);</span>
+<span class="nc" id="L647">        JLabel dataSetLabel = new JLabel(LanguageBundle.getString(&quot;in_diDataSet&quot;), SwingConstants.RIGHT);</span>
+<span class="nc" id="L648">        gridbag.setConstraints(dataSetLabel, gbc);</span>
+<span class="nc" id="L649">        add(dataSetLabel, gbc);</span>
+
+<span class="nc" id="L651">        Utility.buildConstraints(gbc, 1, 0, 2, 1, 1.0, 0.0);</span>
+<span class="nc" id="L652">        dataSetSel = new JTextField(&quot;&quot;, SwingConstants.WEST);</span>
+<span class="nc" id="L653">        dataSetSel.setEditable(false);</span>
+<span class="nc" id="L654">        gridbag.setConstraints(dataSetSel, gbc);</span>
+<span class="nc" id="L655">        add(dataSetSel, gbc);</span>
+
+<span class="nc" id="L657">        Utility.buildConstraints(gbc, 3, 0, 1, 1, 0.0, 0.0);</span>
+<span class="nc" id="L658">        gbc.fill = GridBagConstraints.NONE;</span>
+<span class="nc" id="L659">        selectButton = new JButton();</span>
+<span class="nc" id="L660">        CommonMenuText.name(selectButton, &quot;select&quot;); //$NON-NLS-1$</span>
+<span class="nc" id="L661">        gridbag.setConstraints(selectButton, gbc);</span>
+<span class="nc" id="L662">        add(selectButton, gbc);</span>
+<span class="nc" id="L663">        selectButton.addActionListener(listener);</span>
+
+        // Data set details row
+<span class="nc" id="L666">        Utility.buildConstraints(gbc, 0, 1, 4, 1, 1.0, 1.0);</span>
+<span class="nc" id="L667">        dataSetDetails = new JFXPanelFromResource&lt;&gt;(</span>
+                SimpleHtmlPanelController.class,
+                &quot;SimpleHtmlPanel.fxml&quot;
+        );
+<span class="nc" id="L671">        dataSetDetails.setPreferredSize(new Dimension(400, 200));</span>
+<span class="nc" id="L672">        dataSetDetails.setBackground(getBackground());</span>
+<span class="nc" id="L673">        gbc.fill = GridBagConstraints.BOTH;</span>
+<span class="nc" id="L674">        JScrollPane jScrollPane = new JScrollPane();</span>
+<span class="nc" id="L675">        jScrollPane.setViewportView(dataSetDetails);</span>
+<span class="nc" id="L676">        gridbag.setConstraints(jScrollPane, gbc);</span>
+<span class="nc" id="L677">        add(jScrollPane, gbc);</span>
+
+        // Location row
+<span class="nc" id="L680">        Utility.buildConstraints(gbc, 0, 2, 1, 1, 0.0, 0.0);</span>
+<span class="nc" id="L681">        gbc.fill = GridBagConstraints.HORIZONTAL;</span>
+<span class="nc" id="L682">        JLabel locLabel = new JLabel(LanguageBundle.getString(&quot;in_diLocation&quot;), SwingConstants.RIGHT);</span>
+<span class="nc" id="L683">        gridbag.setConstraints(locLabel, gbc);</span>
+<span class="nc" id="L684">        add(locLabel, gbc);</span>
+
+<span class="nc" id="L686">        ButtonGroup exclusiveGroup = new ButtonGroup();</span>
+<span class="nc" id="L687">        locDataButton = new JRadioButton(LanguageBundle.getString(&quot;in_diData&quot;));</span>
+<span class="nc" id="L688">        locDataButton.setToolTipText(LanguageBundle.getString(&quot;in_diData_tip&quot;));</span>
+<span class="nc" id="L689">        exclusiveGroup.add(locDataButton);</span>
+<span class="nc" id="L690">        locVendorDataButton = new JRadioButton(LanguageBundle.getString(&quot;in_diVendorData&quot;));</span>
+<span class="nc" id="L691">        locVendorDataButton.setToolTipText(LanguageBundle.getString(&quot;in_diVendorData_tip&quot;));</span>
+<span class="nc" id="L692">        exclusiveGroup.add(locVendorDataButton);</span>
+<span class="nc" id="L693">        locHomebrewDataButton = new JRadioButton(LanguageBundle.getString(&quot;in_diHomebrewData&quot;));</span>
+<span class="nc" id="L694">        locHomebrewDataButton.setToolTipText(LanguageBundle.getString(&quot;in_diHomebrewData_tip&quot;));</span>
+<span class="nc" id="L695">        exclusiveGroup.add(locHomebrewDataButton);</span>
+<span class="nc" id="L696">        JPanel optionsPanel = new JPanel();</span>
+<span class="nc" id="L697">        optionsPanel.add(locDataButton);</span>
+<span class="nc" id="L698">        optionsPanel.add(locVendorDataButton);</span>
+<span class="nc" id="L699">        optionsPanel.add(locHomebrewDataButton);</span>
+<span class="nc" id="L700">        Utility.buildConstraints(gbc, 1, 2, 3, 1, 0.0, 0.0);</span>
+<span class="nc" id="L701">        gridbag.setConstraints(optionsPanel, gbc);</span>
+<span class="nc" id="L702">        gbc.fill = GridBagConstraints.NONE;</span>
+<span class="nc" id="L703">        gbc.anchor = GridBagConstraints.WEST;</span>
+<span class="nc" id="L704">        add(optionsPanel, gbc);</span>
+
+        // Buttons row
+<span class="nc" id="L707">        installButton = new JButton();</span>
+<span class="nc" id="L708">        CommonMenuText.name(installButton, &quot;diInstall&quot;); //$NON-NLS-1$</span>
+<span class="nc" id="L709">        installButton.addActionListener(listener);</span>
+<span class="nc" id="L710">        closeButton = new JButton();</span>
+<span class="nc" id="L711">        CommonMenuText.name(closeButton, &quot;close&quot;); //$NON-NLS-1$</span>
+<span class="nc" id="L712">        closeButton.addActionListener(listener);</span>
+
+<span class="nc" id="L714">        JPanel buttonsPanel = new JPanel();</span>
+<span class="nc" id="L715">        buttonsPanel.add(installButton);</span>
+<span class="nc" id="L716">        buttonsPanel.add(closeButton);</span>
+<span class="nc" id="L717">        Utility.buildConstraints(gbc, 2, 3, 2, 1, 0.0, 0.0);</span>
+<span class="nc" id="L718">        gridbag.setConstraints(buttonsPanel, gbc);</span>
+<span class="nc" id="L719">        gbc.fill = GridBagConstraints.NONE;</span>
+<span class="nc" id="L720">        gbc.anchor = GridBagConstraints.EAST;</span>
+<span class="nc" id="L721">        add(buttonsPanel, gbc);</span>
+
+<span class="nc" id="L723">        pack();</span>
+<span class="nc" id="L724">    }</span>
+
+    /**
+     * Populate the lists of files and directories to be installed.
+     *
+     * @param dataSet     the data set (campaign) to be installed.
+     * @param directories the list of directory names
+     * @param files       the list of file names
+     * @return true, if populate file and dir lists
+     */
+    @SuppressWarnings(&quot;rawtypes&quot;)
+    private static boolean populateFileAndDirLists(File dataSet,
+                                                   Collection&lt;String&gt; directories,
+                                                   Collection&lt;String&gt; files)
+    {
+        // Navigate through the zip file, processing each file
+        // Open the ZIP file
+<span class="nc" id="L741">        try (ZipFile in = new ZipFile(dataSet))</span>
+        {
+
+<span class="nc" id="L744">            Enumeration entries = in.entries();</span>
+<span class="nc bnc" id="L745" title="All 2 branches missed.">            while (entries.hasMoreElements())</span>
+            {
+<span class="nc" id="L747">                ZipEntry entry = (ZipEntry) entries.nextElement();</span>
+<span class="nc bnc" id="L748" title="All 2 branches missed.">                if (entry.isDirectory())</span>
+                {
+<span class="nc" id="L750">                    directories.add(entry.getName());</span>
+<span class="nc bnc" id="L751" title="All 2 branches missed.">                } else if (!entry.getName().equalsIgnoreCase(&quot;install.lst&quot;))</span>
+                {
+<span class="nc" id="L753">                    files.add(entry.getName());</span>
+                }
+<span class="nc" id="L755">            }</span>
+<span class="nc" id="L756">        } catch (IOException e)</span>
+        {
+            // Report the error
+<span class="nc" id="L759">            Logging.errorPrint(&quot;Failed to read data set &quot; + dataSet + &quot; due to &quot;, e);</span>
+<span class="nc" id="L760">            ShowMessageDelegate.showMessageDialog(LanguageBundle.getFormattedString(&quot;in_diBadDataSet&quot;, dataSet), TITLE,</span>
+                    MessageType.ERROR);
+<span class="nc" id="L762">            return false;</span>
+<span class="nc" id="L763">        }</span>
+<span class="nc" id="L764">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

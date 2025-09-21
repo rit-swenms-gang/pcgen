@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModifyOtherLst.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pcgen</a> &gt; <a href="index.source.html" class="el_package">plugin.lsttokens</a> &gt; <span class="el_source">ModifyOtherLst.java</span></div><h1>ModifyOtherLst.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2014-18 (C) Thomas Parker &lt;thpr@users.sourceforge.net&gt;
+ * 
+ * This library is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
+ * 
+ * This library is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation, Inc.,
+ * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+package plugin.lsttokens;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.StringJoiner;
+
+import pcgen.base.formula.base.FormulaManager;
+import pcgen.base.formula.base.FunctionLibrary;
+import pcgen.base.formula.base.LegalScope;
+import pcgen.base.text.ParsingSeparator;
+import pcgen.base.util.FormatManager;
+import pcgen.cdom.base.Constants;
+import pcgen.cdom.base.VarContainer;
+import pcgen.cdom.base.VarHolder;
+import pcgen.cdom.content.RemoteModifier;
+import pcgen.cdom.content.VarModifier;
+import pcgen.cdom.formula.local.DefinedWrappingLibrary;
+import pcgen.cdom.formula.scope.PCGenScope;
+import pcgen.cdom.grouping.GroupingCollection;
+import pcgen.rules.context.AbstractObjectContext.DummyCDOMObject;
+import pcgen.rules.context.LoadContext;
+import pcgen.rules.persistence.token.AbstractNonEmptyToken;
+import pcgen.rules.persistence.token.CDOMInterfaceToken;
+import pcgen.rules.persistence.token.ParseResult;
+
+import plugin.lsttokens.ModifyLst.ModifyException;
+
+/**
+ * Implements the MODIFYOTHER token for remotely modifying variables in the new variable
+ * system.
+ */
+<span class="fc" id="L50">public class ModifyOtherLst extends AbstractNonEmptyToken&lt;VarHolder&gt;</span>
+		implements CDOMInterfaceToken&lt;VarContainer, VarHolder&gt;
+{
+
+	@Override
+	public String getTokenName()
+	{
+<span class="fc" id="L57">		return &quot;MODIFYOTHER&quot;;</span>
+	}
+
+	//MODIFYOTHER:EQUIPMENT|GROUP=Martial|EqCritRange|ADD|1
+	@Override
+	public ParseResult parseNonEmptyToken(LoadContext context, VarHolder obj, String value)
+	{
+<span class="fc" id="L64">		ParsingSeparator sep = new ParsingSeparator(value, '|');</span>
+<span class="fc" id="L65">		sep.addGroupingPair('[', ']');</span>
+<span class="fc" id="L66">		sep.addGroupingPair('(', ')');</span>
+
+<span class="fc" id="L68">		String scopeName = sep.next();</span>
+<span class="fc" id="L69">		PCGenScope lvs = context.getVariableContext().getScope(scopeName);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">		if (lvs == null)</span>
+		{
+<span class="fc" id="L72">			return new ParseResult.Fail(</span>
+<span class="fc" id="L73">				getTokenName() + &quot; found illegal variable scope: &quot; + scopeName + &quot; as first argument: &quot; + value);</span>
+		}
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">		if (lvs.getParentScope() == null)</span>
+		{
+<span class="nc" id="L77">			return new ParseResult.Fail(</span>
+<span class="nc" id="L78">				getTokenName() + &quot; found illegal variable scope: &quot; + scopeName + &quot; is a global scope&quot;);</span>
+		}
+<span class="fc bfc" id="L80" title="All 2 branches covered.">		if (!sep.hasNext())</span>
+		{
+<span class="fc" id="L82">			return new ParseResult.Fail(getTokenName() + &quot; needed 2nd argument: &quot; + value);</span>
+		}
+<span class="fc" id="L84">		String fullName = LegalScope.getFullName(lvs);</span>
+<span class="fc" id="L85">		LoadContext subContext = context.dropIntoContext(fullName);</span>
+
+<span class="fc" id="L87">		String groupingName = sep.next();</span>
+<span class="fc" id="L88">		GroupingCollection&lt;?&gt; group = subContext.getGrouping(lvs, groupingName);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">		if (group == null)</span>
+		{
+<span class="nc" id="L91">			return new ParseResult.Fail(getTokenName() + &quot; unable to build group from: &quot; + groupingName);</span>
+		}
+<span class="fc" id="L93">		StringJoiner sb = new StringJoiner(&quot;|&quot;);</span>
+<span class="fc" id="L94">		sep.forEachRemaining(sb::add);</span>
+<span class="fc" id="L95">		PCGenScope scope = subContext.getActiveScope();</span>
+		try
+		{
+<span class="fc" id="L98">			VarModifier&lt;?&gt; vm = ModifyLst.parseModifyInfo(subContext, sb.toString(),</span>
+<span class="fc" id="L99">				scope, generateFormulaManager(context, scope), getTokenName(), 2);</span>
+<span class="fc" id="L100">			obj.addRemoteModifier(new RemoteModifier&lt;&gt;(group, vm));</span>
+		}
+<span class="fc" id="L102">		catch (ModifyException e)</span>
+		{
+<span class="fc" id="L104">			return new ParseResult.Fail(e.getMessage());</span>
+<span class="fc" id="L105">		}</span>
+<span class="fc" id="L106">		return ParseResult.SUCCESS;</span>
+	}
+
+	private final FormulaManager generateFormulaManager(LoadContext context, PCGenScope scope)
+	{
+<span class="fc" id="L111">		FormulaManager formulaManager =</span>
+<span class="fc" id="L112">				context.getVariableContext().getFormulaManager();</span>
+<span class="fc" id="L113">		FunctionLibrary functionManager = formulaManager.get(FormulaManager.FUNCTION);</span>
+<span class="fc" id="L114">		boolean modified = false;</span>
+<span class="fc" id="L115">		Optional&lt;FormatManager&lt;?&gt;&gt; sourceFormatManager = scope.getFormatManager(context);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">		if (sourceFormatManager.isPresent())</span>
+		{
+<span class="fc" id="L118">			functionManager = new DefinedWrappingLibrary(functionManager,</span>
+<span class="fc" id="L119">				&quot;source&quot;, new DummyCDOMObject(), sourceFormatManager.get());</span>
+<span class="fc" id="L120">			modified = true;</span>
+		}
+<span class="fc" id="L122">		Optional&lt;FormatManager&lt;?&gt;&gt; targetFormatManager = scope.getFormatManager(context);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">		if (targetFormatManager.isPresent())</span>
+		{
+<span class="fc" id="L125">			functionManager = new DefinedWrappingLibrary(functionManager,</span>
+<span class="fc" id="L126">				&quot;target&quot;, new DummyCDOMObject(), targetFormatManager.get());</span>
+<span class="fc" id="L127">			modified = true;</span>
+		}
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">		if (!modified)</span>
+		{
+			//Fine then :P
+<span class="nc" id="L132">			return formulaManager;</span>
+		}
+<span class="fc" id="L134">		return formulaManager.getWith(FormulaManager.FUNCTION, functionManager);</span>
+	}
+
+	@Override
+	public String[] unparse(LoadContext context, VarContainer obj)
+	{
+<span class="fc" id="L140">		RemoteModifier&lt;?&gt;[] added = obj.getRemoteModifierArray();</span>
+<span class="fc" id="L141">		List&lt;String&gt; modifiers = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">		for (RemoteModifier&lt;?&gt; rm : added)</span>
+		{
+<span class="fc" id="L144">			VarModifier&lt;?&gt; vm = rm.getVarModifier();</span>
+<span class="fc" id="L145">			StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L146">			GroupingCollection&lt;?&gt; og = rm.getGrouping();</span>
+<span class="fc" id="L147">			sb.append(LegalScope.getFullName(vm.getLegalScope()));</span>
+<span class="fc" id="L148">			sb.append(Constants.PIPE);</span>
+<span class="fc" id="L149">			sb.append(og.getInstructions());</span>
+<span class="fc" id="L150">			sb.append(Constants.PIPE);</span>
+<span class="fc" id="L151">			sb.append(vm.getVarName());</span>
+<span class="fc" id="L152">			sb.append(Constants.PIPE);</span>
+<span class="fc" id="L153">			sb.append(ModifyLst.unparseModifier(vm));</span>
+<span class="fc" id="L154">			modifiers.add(sb.toString());</span>
+		}
+<span class="fc bfc" id="L156" title="All 2 branches covered.">		if (modifiers.isEmpty())</span>
+		{
+			//Legal
+<span class="fc" id="L159">			return null;</span>
+		}
+<span class="fc" id="L161">		return modifiers.toArray(new String[0]);</span>
+	}
+
+	@Override
+	public Class&lt;VarHolder&gt; getTokenClass()
+	{
+<span class="fc" id="L167">		return VarHolder.class;</span>
+	}
+
+	@Override
+	public Class&lt;VarContainer&gt; getReadInterface()
+	{
+<span class="fc" id="L173">		return VarContainer.class;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
