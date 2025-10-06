@@ -109,4 +109,5 @@ class DiceFormatTest
 	{
 		assertTrue(TestConstants.DICE_MANAGER.getComponentManager().isEmpty());
 	}
+
 }

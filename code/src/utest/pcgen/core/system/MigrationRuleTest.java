@@ -18,6 +18,7 @@
 package pcgen.core.system;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -130,4 +131,5 @@ class MigrationRuleTest
 	{
 		return pcgVer[0]+"."+pcgVer[1]+"."+pcgVer[2];
 	}
+
 }

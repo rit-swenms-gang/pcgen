@@ -118,4 +118,6 @@ class AddingFormulaTest
         AddingFormula plusOne = new AddingFormula(1);
         assertThrows(IllegalArgumentException.class, () -> plusOne.resolve(4, 2.5));
     }
+    
+    
 }
