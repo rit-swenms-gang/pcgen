@@ -102,12 +102,13 @@ def run_gradle_tests(project_root: Path) -> int:
     except Exception:
         pass
     proc = subprocess.run(
-        [gradlew, "test", "jacocoTestReport", "--no-daemon"],
+        [gradlew, "cleanTest", "test", "jacocoTestReport", "--no-daemon"],
         cwd=str(project_root),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True
     )
+    #print(proc.stdout)
     return proc.returncode
 
 def parse_test_results(project_root: Path):
@@ -182,5 +183,3 @@ if __name__ == "__main__":
     print("\n-- Testability --")
     print(f"Tests: {tests['tests']}  Failures: {tests['failures']}  Errors: {tests['errors']}  Skipped: {tests['skipped']}")
     print(f"Line coverage: {cov_pct:.2f}%  (covered={cov_cov}, missed={cov_miss})")
-    
-
