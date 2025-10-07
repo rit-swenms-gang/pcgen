@@ -5,7 +5,7 @@
 - **Goal:** Extend unit test coverage by exercising uncovered/edge-case logic in version-gated migration rules.
 - **Targeted code:** `pcgen.core.system.MigrationRule.changeAppliesToVer(int[])`
 - **Framework:** JUnit 5 (project standard).
-- **New file:** `src/test/java/pcgen/core/system/MigrationRuleExtendedCoverageTest.java`
+- **New file:** `src/utest/pcgen/core/system/MigrationRuleExtendedCoverageTest.java`
 - **New tests:** 15 focused cases (see list below).
 
 ## New test cases & rationale
