@@ -153,7 +153,7 @@ Line coverage: 26.08%  (covered=137361, missed=389404)
 - hitWhenTotalMeetsAC
    - Mocks DiceRoller.d20() --> 12. Checks that a roll + bonus ≥ AC registers HIT. Tests inclusive boundary.
 - missWhenBelowAC
-   - Mocks DiceRoller.d20() --> 5 with low bonus. Ensures branch for roll + bonus < AC → MISS.
+   - Mocks DiceRoller.d20() --> 5 with low bonus. Ensures branch for roll + bonus < AC --> MISS.
 - critOnNatural20
    - Mocks DiceRoller.d20() --> 20 and verifies CRIT path regardless of attack bonus.
 
@@ -176,8 +176,3 @@ Running the new tests:
 ```
 
 Expected output is the JaCoCo report which is also available as a .xml file in `build/reports/jacoco/test/jacocoTestReport.xml`
-
-
-
-
-
