@@ -52,7 +52,7 @@ All tests instantiate a `MigrationRule` and set explicit wide defaults to avoid 
 
 12. **`conflictingDevBounds_yieldNoMatch`**  
     **minDevVer > maxDevVer** and stable capped ≤6.0.1  
-    ⇒ dev path is impossible and stable cannot allow 6.1.x; verify rejections.
+    --> dev path is impossible and stable cannot allow 6.1.x; verify rejections.
 
 13. **`nullArray_throwsNPE`**  
     API should reject `null` version arrays with `NullPointerException`.
@@ -134,45 +134,3 @@ Line coverage: 26.08%  (covered=137361, missed=389404)
  - The testability metrics improved with 15 new test cases and a measureable coverage gain.
  - The increast from 26.07% to 26.08% represents roughly 10 additional lines covered, reflecting successful execution of new edge-case and boundary logic.
  - Improvements were concentrated in the MigrationRule class's version comparison paths, particularly dev/stable overlap handling and invalid input branches
-
- # Unit Testing II - Report
-
- ## Summary
-
- - Goal: Introduce deterministic, isolated unit tests through mocking and stubbing to remove randomness as a source of nondeterminism.
- - Targeted code: pcgen.util.AttackCalculator (newly added) and its dependency pcgen.util.DiceRoller.
- - Frameworks: JUnit 5 + Mockito (Mockito was added to the gradle build by our team).
- - New files:
-   - code/src/java/pcgen/util/DiceRoller.java
-	- code/src/java/pcgen/util/DefaultDiceRoller.java
-	- code/src/java/pcgen/util/AttackCalculator.java
-	- code/src/utest/org/pcgen/unittesting/mocking/AttackCalculatorTest.java
-- Concept introduced: Replace random dice roles with mockable dependency injection to enable reproducability while testing.
-
-## Tests
-- hitWhenTotalMeetsAC
-   - Mocks DiceRoller.d20() --> 12. Checks that a roll + bonus ≥ AC registers HIT. Tests inclusive boundary.
-- missWhenBelowAC
-   - Mocks DiceRoller.d20() --> 5 with low bonus. Ensures branch for roll + bonus < AC --> MISS.
-- critOnNatural20
-   - Mocks DiceRoller.d20() --> 20 and verifies CRIT path regardless of attack bonus.
-
-Each case deterministically triggers one of the three outcomes (MISS, HIT, CRIT) and verifies both behavior and mock interactions.
-
-## Mocking Strategy
-
-- Why mock? Randomness (new Random()) introduces non-repeatable results that make regression tests unreliable.
-- How: Refactored randomness behind a new DiceRoller interface and injected it into AttackCalculator.
-- Mocks: Mockito is used to force specific d20() returns and verify calls.
-- Stub: A lightweight FakeDiceRoller implements the interface with fixed output to demonstrate stub vs. mock.
-- Design decision: Keep seam minimal – interface + default implementation – so production behavior is unchanged while testing gains control over randomness.
-
-## How to reproduce results
-
-Running the new tests:
-
-```bash
-./gradlew test --tests "org.pcgen.unittesting.mocking.*"
-```
-
-Expected output is the JaCoCo report which is also available as a .xml file in `build/reports/jacoco/test/jacocoTestReport.xml`
