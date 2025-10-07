@@ -6,7 +6,7 @@
  - Coverage: Hit all branches of the attack outcome logic `MISS/HIT/CRIT` with minimal production changes.
 
 ## Selected Seam
- - Seam: Seam: pcgen.util.DiceRoller (interface) with pcgen.util.DefaultDiceRoller (real implementation).
+ - Seam: pcgen.util.DiceRoller (interface) with pcgen.util.DefaultDiceRoller (real implementation).
  - Consumer under test: pcgen.util.AttackCalculator which depends on DiceRoller.
  - Why this seam: Randomness is an external factor like I/O or an API. Abstracting it behind an interface enables mocks/stubs and keeps production behavior intact.
 
