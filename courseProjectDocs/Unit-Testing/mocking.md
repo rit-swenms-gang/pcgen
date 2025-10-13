@@ -43,6 +43,24 @@ public class AttackCalculator {
 }
 ```
 
+```java
+public class HpCalculator {
+	private int con;
+	private int maxHp;
+	private int minHp;
+	private int hitDie;
+	private final DiceRoller dice;
+	public HpCalculator(DiceRoller dice, int dieNum, int con) {
+		this.dice = dice;
+		this.hitDie = dieNum;
+		this.con = con;
+
+		this.maxHp = Math.max(dieNum + con, 1);
+		this.minHp = Math.max(1 + con, 1);
+	}
+}
+```
+
 Reasoning: Constructor injection is simple, explicit, and test-friendly
 
 ## Mocking Strategy
@@ -50,7 +68,9 @@ Reasoning: Constructor injection is simple, explicit, and test-friendly
 - Library: 
     - Mockito (Added Mockito to the gradle build for this project, JUnit 5 was already included and being used)
 - Pattern:
-    - Mock DiceRoller, override d20() to return exact values (5, 12, 20)
+    - Mock DiceRoller
+        - Override d20() to return exact values (5, 12, 20)
+        - Override roll(sides) to return exact values (sides, 1, ceil(sides/2))
     - Verify interaction (verify(dice).d20() where relevant)
 
 
@@ -60,13 +80,19 @@ Reasoning: Constructor injection is simple, explicit, and test-friendly
 - missWhenBelowAC: Force d20() --> 5 with low bonus vs higher AC; ensures MISS path
 - stubbedHit (optional): Use FakeDiceRoller(15) stub to demonstrate pure stubbing (no Mockito)
 
+- rollMaxHp: Force roll(sides) --> sides; asserts maximum possible HP
+- rollMinHp: Force roll(sides) --> 1; asserts minimum possible HP
+- rollAvgHp: Force roll(sides) --> ceil(sides/2); asserts correct HP calculation without rolling (D&D 5e)
+
 ## Test Location & Execution
 - Production files:
 	- code/src/java/pcgen/util/DiceRoller.java
 	- code/src/java/pcgen/util/DefaultDiceRoller.java
 	- code/src/java/pcgen/util/AttackCalculator.java
+    - code/src/java/pcgen/util/HpCalculator.java
 - Unit tests:
 	- code/src/utest/org/pcgen/unittesting/mocking/AttackCalculatorTest.java
+    - code/src/utest/org/pcgen/unittesting/mocking/HpCalculatorTest.java
 
 ## Running the Tests
 
