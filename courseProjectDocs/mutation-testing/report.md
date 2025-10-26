@@ -81,7 +81,7 @@ These tests specifically targeted previously surviving mutants in return stateme
 
 **Global Project Change**:
 | **Metric** | **Before** | **After** | 
-| ----- | ----- |
+| ----- | ----- | ----- |
 | Total Mutations Killed | 1613 | 1623 |
 | Total Mutations | 40240 | 40240 |
 | Overall Mutation Coverage | 4% | 4% |
@@ -93,12 +93,12 @@ These tests specifically targeted previously surviving mutants in return stateme
 ## Mutant Analysis
 
 | **Category** | **Description** | **Status** |
-| ----- | ----- |
-| Return Replacement | Mutants that replaced return converter.convert(orig, filter) with Collections.emptyList() | Killed
-| Boolean Conditional | Mutants that negated conditions in equals() and allow() | Killed
-Forced Boolean Returns | Mutants that replaced returns with true or false | Killed
-| Null Return | Mutants replacing normal return with null | Survived (partially untested code paths in equals/hashCode)
-| Conditional Boundary | Mutants that changed logical operators in filter equality comparison | Survived (indirect logic not fully exercised)
+| ----- | ----- | ----- |
+| Return Replacement | Mutants that replaced return converter.convert(orig, filter) with Collections.emptyList() | Killed |
+| Boolean Conditional | Mutants that negated conditions in equals() and allow() | Killed |
+Forced Boolean Returns | Mutants that replaced returns with true or false | Killed |
+| Null Return | Mutants replacing normal return with null | Survived (partially untested code paths in equals/hashCode) |
+| Conditional Boundary | Mutants that changed logical operators in filter equality comparison | Survived (indirect logic not fully exercised) |
 
 **Summary**:
 The newly added test suite successfully validated the filter logic and equality/hash consistency, killing most mutants associated with control flow and return paths. Some survived mutants remain in rarely executed conditions inside nested private structures.
@@ -111,5 +111,6 @@ The newly added test suite successfully validated the filter logic and equality/
 ## Group Contributions
 
 | **Member** | **Task / Contribution** | **Notes** |
+| ----- | ----- | ----- | 
 | Shahmir M. Khan | Added, and configured, PIT in Gradle (for the mutation testing requirements), ran initial and final mutation tests (for `AddFilterConverter.java`), and prepared full mutation-testing documentation. | Improved coverage of pcgen.cdom.converter package from 0% to 45% line coverage and 0% to 38% mutation coverage. |
 
