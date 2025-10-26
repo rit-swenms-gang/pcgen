@@ -5,7 +5,7 @@
 - **Goal:** Extend unit test coverage by exercising uncovered/edge-case logic in version-gated migration rules.
 - **Targeted code:** `pcgen.core.system.MigrationRule.changeAppliesToVer(int[])`
 - **Framework:** JUnit 5 (project standard).
-- **New file:** `src/test/java/pcgen/core/system/MigrationRuleExtendedCoverageTest.java`
+- **New file:** `src/utest/pcgen/core/system/MigrationRuleExtendedCoverageTest.java`
 - **New tests:** 15 focused cases (see list below).
 
 ## New test cases & rationale
@@ -52,7 +52,7 @@ All tests instantiate a `MigrationRule` and set explicit wide defaults to avoid 
 
 12. **`conflictingDevBounds_yieldNoMatch`**  
     **minDevVer > maxDevVer** and stable capped ≤6.0.1  
-    ⇒ dev path is impossible and stable cannot allow 6.1.x; verify rejections.
+    --> dev path is impossible and stable cannot allow 6.1.x; verify rejections.
 
 13. **`nullArray_throwsNPE`**  
     API should reject `null` version arrays with `NullPointerException`.
