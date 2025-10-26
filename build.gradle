@@ -38,6 +38,7 @@ plugins {
     id 'org.openjfx.javafxplugin' version '0.1.0'       // JavaFX support
     id 'org.beryx.runtime' version '1.13.1'             // Creates custom runtimes
     id 'jacoco'
+    id 'info.solidsoft.pitest' version '1.15.0'
 }
 
 jacoco {
@@ -56,6 +57,16 @@ jacocoTestReport {
         html.required = true
         csv.required = false
     }
+}
+
+pitest {
+    pitestVersion = '1.15.0'
+    targetClasses = ['pcgen.*']       
+    targetTests = ['pcgen.*']
+    outputFormats = ['HTML']
+    timestampedReports = false
+    threads = 4
+    junit5PluginVersion = '1.2.0'
 }
 
 /**
