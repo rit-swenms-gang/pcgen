@@ -4,7 +4,7 @@
 This assignment focused on introducing **mutation testing** into our PCGen codebase to evaluate the quality and effectiveness of existing unit tests.  
 Before this work, the project did not have any mutation testing configured. We integrated **PIT (Pitest)** with Gradle, ran an initial baseline analysis, and then added new targeted tests to improve coverage and kill surviving mutants.  
 
-Our selected target file was:
+Our selected target files were:
 `pcgen/cdom/converter/AddFilterConverter.java`
 
 ## How to Run Mutation Testing
