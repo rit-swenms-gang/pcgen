@@ -34,10 +34,11 @@ pitest {
 - File: pcgen/core/character/SpellBook.java
 - Purpose: The SpellBook class tracks a certain set of actions (spells) available to a player character. Almost every attribute of a SpellBook can be modified, and a SpellBook instance can be cloned.
 
-This file had 0% line coverage and 0% mutation coverage initially.
+Both files had 0% line coverage and 0% mutation coverage initially.
 
 ## Initial Results (Before Adding Tests)
 
+**AddFilterConverter**
 | **Metric** | **Value** |
 | ----- | ----- |
 | Line Coverage | 0 / 38 (0%) |
@@ -45,6 +46,15 @@ This file had 0% line coverage and 0% mutation coverage initially.
 | Test Strength | 0% |
 | Mutants Killed | 0 |
 | Mutants Survived | 26 |
+
+**SpellBook**
+| **Metric** | **Value** |
+| ----- | ----- |
+| Line Coverage | 0 / 74 (0%) |
+| Mutation Coverage | 0 / 42 (0%) |
+| Test Strength | 0% |
+| Mutants Killed | 0 |
+| Mutants Survived | 0 |
 
 **Observations**:
 - The class was completely untested
@@ -81,6 +91,7 @@ These tests specifically targeted previously surviving mutants in return stateme
 
 ## Final Results (After Adding Tests)
 
+**AddFilterConverter**
 | **Metric** | **Value** |
 | ----- | ----- |
 | Line Coverage | 17 / 38 (45%) |
@@ -89,6 +100,15 @@ These tests specifically targeted previously surviving mutants in return stateme
 | Mutants Killed | 10 |
 | Mutants Survived | 12 |
 | Mutants Timed Out | 0 |
+
+**SpellBook**
+| **Metric** | **Value** |
+| ----- | ----- |
+| Line Coverage | 47 / 74 (64%) |
+| Mutation Coverage | 22 / 42 (52%) |
+| Test Strength | 92% |
+| Mutants Killed | 22 |
+| Mutants Survived | 2 |
 
 **Global Project Change**:
 | **Metric** | **Before** | **After** | 
@@ -124,5 +144,5 @@ The newly added test suite successfully validated the filter logic and equality/
 | **Member** | **Task / Contribution** | **Notes** |
 | ----- | ----- | ----- | 
 | Shahmir M. Khan | Added, and configured, PIT in Gradle (for the mutation testing requirements), ran initial and final mutation tests (for `AddFilterConverter.java`), and prepared full mutation-testing documentation. | Improved coverage of pcgen.cdom.converter package from 0% to 45% line coverage and 0% to 38% mutation coverage. |
-| Tyler Jaafari | Added SpellBookTest.java and corresponding documentation. | For some reason PITest was not working for me. I'll have to try it on another machine in order to actually gather metrics. |
+| Tyler Jaafari | Added SpellBookTest.java and corresponding documentation. Ran PiTest and recorded results. | PiTest issues have been resolved and statistics have been gathered. |
 
