@@ -29,7 +29,10 @@ pitest {
 ## Component Under Test
 
 - File: pcgen/cdom/converter/AddFilterConverter.java
-- Purpose: The AddFilterConverter class acts as a wrapper for another Converter and PrimitiveFilter. It combines filter logic, allowing conditional transormations of objects in ObjectContainers. It also defines equality and hash code behavior.
+- Purpose: The AddFilterConverter class acts as a wrapper for another Converter and PrimitiveFilter. It combines filter logic, allowing conditional transformations of objects in ObjectContainers. It also defines equality and hash code behavior.
+
+- File: pcgen/core/character/SpellBook.java
+- Purpose: The SpellBook class tracks a certain set of actions (spells) available to a player character. Almost every attribute of a SpellBook can be modified, and a SpellBook instance can be cloned.
 
 This file had 0% line coverage and 0% mutation coverage initially.
 
@@ -49,8 +52,9 @@ This file had 0% line coverage and 0% mutation coverage initially.
 
 ## Tests Added
 
-A new test suite was added at: 
+New test suites were added at:
 code/src/utest/pcgen/cdom/converter/AddFilterConverterTest.java
+code/src/utest/pcgen/core/character/SpellBookTest.java
 
 **Key Additions**:
 - Created stub implementations for Converter, PrimitiveFilter, and ObjectContainer
@@ -61,10 +65,17 @@ code/src/utest/pcgen/cdom/converter/AddFilterConverterTest.java
     - Null and non-object comparisons
 
 **Added Test Methods**:
-- testConvertWithoutLimits()
-- testConvertWithLimit()
-- testEqualsAndHashCode()
-- testNotEqualsToOtherObject()
+- AddFilterConverterTest
+    - testConvertWithoutLimits()
+    - testConvertWithLimit()
+    - testEqualsAndHashCode()
+    - testNotEqualsToOtherObject()
+
+- SpellBookTest
+    - testSetEquip()
+    - testToString()
+    - testIdenticalBooksEqual()
+    - testClone()
 
 These tests specifically targeted previously surviving mutants in return statements and conditionals.
 
@@ -113,4 +124,5 @@ The newly added test suite successfully validated the filter logic and equality/
 | **Member** | **Task / Contribution** | **Notes** |
 | ----- | ----- | ----- | 
 | Shahmir M. Khan | Added, and configured, PIT in Gradle (for the mutation testing requirements), ran initial and final mutation tests (for `AddFilterConverter.java`), and prepared full mutation-testing documentation. | Improved coverage of pcgen.cdom.converter package from 0% to 45% line coverage and 0% to 38% mutation coverage. |
+| Tyler Jaafari | Added SpellBookTest.java and corresponding documentation. | For some reason PITest was not working for me. I'll have to try it on another machine in order to actually gather metrics. |
 
