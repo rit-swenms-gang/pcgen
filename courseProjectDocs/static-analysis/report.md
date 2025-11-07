@@ -16,7 +16,7 @@ SonarQube for IDE
 Removed multiple commented-out code sections in `CDOMObject.java` that were no longer used.
 The lines were remnants of older logic and are now tracked in version control, so manual preservation is unnecessary.
 
-**Before:**
+**CDOMObject.java | Before:**
 ```java
 if (integerChar == null ? cdo.integerChar != null : !integerChar.equals(cdo.integerChar))
 		{
@@ -51,7 +51,7 @@ if (integerChar == null ? cdo.integerChar != null : !integerChar.equals(cdo.inte
         ...
 ```
 
-**After:**
+**CDOMObject.java | After:**
 
 ```java
 if (integerChar == null ? cdo.integerChar != null : !integerChar.equals(cdo.integerChar))
@@ -77,9 +77,43 @@ if (integerChar == null ? cdo.integerChar != null : !integerChar.equals(cdo.inte
         ...
 ```
 
+**SpellCasterChoiceSet.java | Before:**
+```java
+	for (PCClass pcc : allClasses.getContainedObjects())
+	{
+		TYPE: for (String type : spelltypes)
+		{
+			String spelltype = pcc.getResolved(fk);
+			if (type.equalsIgnoreCase(spelltype) && pc.getClassKeyed(pcc.getKeyName()) != null)
+			{
+				returnSet.add(pcc);
+				break TYPE;
+			}
+		}
+	}
+```
+
+**SpellCasterChoiceSet.java | After:**
+```java
+	for (PCClass pcc : allClasses.getContainedObjects())
+	{
+		int i = 0;
+		while (i < spelltypes.size())
+		{
+			String type = spelltypes.get(i);
+			String spelltype = pcc.getResolved(fk);
+			if (type.equalsIgnoreCase(spelltype) && pc.getClassKeyed(pcc.getKeyName()) != null)
+			{
+				returnSet.add(pcc);
+			}
+			i++;
+		}
+	}
+```
+
 ## Group Contributions
 
 | **Member** | **Task / Contribution** | **Notes** |
 | ----- | ----- | ----- | 
 | Shahmir Khan | Ran SonarQube analysis and identified the commented-out code smell in `CDOMObject.java`. Removed all obsolete commented sections and verified the fix. | Ensured the cleanup followed Rule S125 and improved readability. |
-
+| Tyler Jaafari | Ran SonarQube analysis and identified unnecessary label usage in `SpellCasterChoiceSet.java`. Refactored to use a while loop so that the loop can be repeated without label usage.|
