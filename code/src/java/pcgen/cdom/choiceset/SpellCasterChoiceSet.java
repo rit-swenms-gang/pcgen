@@ -255,14 +255,16 @@ public class SpellCasterChoiceSet extends ChoiceSet<PCClass> implements Primitiv
 		{
 			for (PCClass pcc : allClasses.getContainedObjects())
 			{
-				TYPE: for (String type : spelltypes)
+				int i = 0;
+				while (i < spelltypes.size())
 				{
+					String type = spelltypes.get(i);
 					String spelltype = pcc.getResolved(fk);
 					if (type.equalsIgnoreCase(spelltype) && pc.getClassKeyed(pcc.getKeyName()) != null)
 					{
 						returnSet.add(pcc);
-						break TYPE;
 					}
+					i++;
 				}
 			}
 		}
