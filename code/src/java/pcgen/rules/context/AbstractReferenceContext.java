@@ -239,14 +239,7 @@ public abstract class AbstractReferenceContext
 
 	public <T extends Loadable> Collection<T> getConstructedCDOMObjects(Class<T> c)
 	{
-		// if (CategorizedCDOMObject.class.isAssignableFrom(c))
-		// {
-		// return categorized.getAllConstructedCDOMObjects((Class) c);
-		// }
-		// else
-		// {
 		return getManufacturer(c).getAllObjects();
-		// }
 	}
 
 	public Set<Object> getAllConstructedObjects()
@@ -256,8 +249,6 @@ public abstract class AbstractReferenceContext
 		{
 			set.addAll(ref.getAllObjects());
 		}
-		// Collection otherSet = categorized.getAllConstructedCDOMObjects();
-		// set.addAll(otherSet);
 		return set;
 	}
 
@@ -298,11 +289,6 @@ public abstract class AbstractReferenceContext
 				csl.addType(Type.getConstant(spelltype));
 			}
 			pcc.put(ObjectKey.CLASS_SPELLLIST, csl);
-			// simple.constructCDOMObject(SPELLPROGRESSION_CLASS, key);
-			// Collection<CDOMSubClass> subclasses = categorized
-			// .getConstructedCDOMObjects(SUBCLASS_CLASS, SubClassCategory
-			// .getConstant(key));
-			// for (CDOMSubClass subcl : subclasses)
 			if (pcc.containsListFor(ListKey.SUB_CLASS))
 			{
 				SubClassCategory cat = SubClassCategory.getConstant(key);
@@ -332,7 +318,6 @@ public abstract class AbstractReferenceContext
 						csl.addType(Type.getConstant(spelltype));
 					}
 					subcl.put(ObjectKey.CLASS_SPELLLIST, csl);
-					// constructCDOMObject(SPELLPROGRESSION_CLASS, subKey);
 					/*
 					 * CONSIDER For right now, this is easiest to do here, though
 					 * doing this 'live' may be more appropriate in the end.
