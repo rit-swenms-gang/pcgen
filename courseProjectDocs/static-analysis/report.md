@@ -110,6 +110,157 @@ if (integerChar == null ? cdo.integerChar != null : !integerChar.equals(cdo.inte
 		}
 	}
 ```
+**AbstractReferenceContext.java | Before:**
+```java
+...
+public <T extends Loadable> Collection<T> getConstructedCDOMObjects(Class<T> c)
+	{
+		// if (CategorizedCDOMObject.class.isAssignableFrom(c))
+		// {
+		// return categorized.getAllConstructedCDOMObjects((Class) c);
+		// }
+		// else
+		// {
+		return getManufacturer(c).getAllObjects();
+		// }
+	}
+...
+public Set<Object> getAllConstructedObjects()
+	{
+		Set<Object> set = new HashSet<>();
+		for (ReferenceManufacturer<?> ref : getAllManufacturers())
+		{
+			set.addAll(ref.getAllObjects());
+		}
+		// Collection otherSet = categorized.getAllConstructedCDOMObjects();
+		// set.addAll(otherSet);
+		return set;
+	}
+...
+public void buildDerivedObjects()
+			...
+
+			pcc.put(ObjectKey.CLASS_SPELLLIST, csl);
+			// simple.constructCDOMObject(SPELLPROGRESSION_CLASS, key);
+			// Collection<CDOMSubClass> subclasses = categorized
+			// .getConstructedCDOMObjects(SUBCLASS_CLASS, SubClassCategory
+			// .getConstant(key));
+			// for (CDOMSubClass subcl : subclasses)
+			if (pcc.containsListFor(ListKey.SUB_CLASS))
+			{
+				SubClassCategory cat = SubClassCategory.getConstant(key);
+				boolean needSelf = pcc.getSafe(ObjectKey.ALLOWBASECLASS);
+				for (SubClass subcl : pcc.getListFor(ListKey.SUB_CLASS))
+				{
+					String subKey = subcl.getKeyName();
+					if (subKey.equalsIgnoreCase(key))
+					{
+						//Now an error to explicitly create this match, see CODE-1928
+						Logging.errorPrint("Cannot explicitly create a SUBCLASS that matches the parent class.  "
+							+ "Use ALLOWBASECLASS.  " + "Tokens on the offending SUBCLASS line will be ignored");
+						pcc.removeFromListFor(ListKey.SUB_CLASS, subcl);
+						continue;
+					}
+					skl = constructCDOMObject(CLASSSKILLLIST_CLASS, subKey);
+					if (isMonster)
+					{
+						skl.addType(Type.MONSTER);
+					}
+					subcl.put(ObjectKey.CLASS_SKILLLIST, skl);
+					// TODO Need to limit which are built to only
+					// spellcasters...
+					csl = constructCDOMObject(CLASSSPELLLIST_CLASS, subKey);
+					if (spelltype != null)
+					{
+						csl.addType(Type.getConstant(spelltype));
+					}
+					subcl.put(ObjectKey.CLASS_SPELLLIST, csl);
+					// constructCDOMObject(SPELLPROGRESSION_CLASS, subKey);
+					/*
+					 * CONSIDER For right now, this is easiest to do here, though
+					 * doing this 'live' may be more appropriate in the end.
+					 */
+					subcl.setCDOMCategory(cat);
+					importObject(subcl);
+				}
+				if (needSelf)
+				{
+					SubClass self = cat.newInstance();
+					self.setKeyName(key);
+					importObject(self);
+				}
+			}
+
+```
+
+**AbstractReferenceContext.java | After:**
+```java
+...
+public <T extends Loadable> Collection<T> getConstructedCDOMObjects(Class<T> c)
+	{
+		return getManufacturer(c).getAllObjects();
+	}
+	...
+public Set<Object> getAllConstructedObjects()
+	{
+		Set<Object> set = new HashSet<>();
+		for (ReferenceManufacturer<?> ref : getAllManufacturers())
+		{
+			set.addAll(ref.getAllObjects());
+		}
+		return set;
+	}
+	...
+public void buildDerivedObjects()
+			...
+			pcc.put(ObjectKey.CLASS_SPELLLIST, csl);
+			if (pcc.containsListFor(ListKey.SUB_CLASS))
+			{
+				SubClassCategory cat = SubClassCategory.getConstant(key);
+				boolean needSelf = pcc.getSafe(ObjectKey.ALLOWBASECLASS);
+				for (SubClass subcl : pcc.getListFor(ListKey.SUB_CLASS))
+				{
+					String subKey = subcl.getKeyName();
+					if (subKey.equalsIgnoreCase(key))
+					{
+						//Now an error to explicitly create this match, see CODE-1928
+						Logging.errorPrint("Cannot explicitly create a SUBCLASS that matches the parent class.  "
+							+ "Use ALLOWBASECLASS.  " + "Tokens on the offending SUBCLASS line will be ignored");
+						pcc.removeFromListFor(ListKey.SUB_CLASS, subcl);
+						continue;
+					}
+					skl = constructCDOMObject(CLASSSKILLLIST_CLASS, subKey);
+					if (isMonster)
+					{
+						skl.addType(Type.MONSTER);
+					}
+					subcl.put(ObjectKey.CLASS_SKILLLIST, skl);
+					// TODO Need to limit which are built to only
+					// spellcasters...
+					csl = constructCDOMObject(CLASSSPELLLIST_CLASS, subKey);
+					if (spelltype != null)
+					{
+						csl.addType(Type.getConstant(spelltype));
+					}
+					subcl.put(ObjectKey.CLASS_SPELLLIST, csl);
+					/*
+					 * CONSIDER For right now, this is easiest to do here, though
+					 * doing this 'live' may be more appropriate in the end.
+					 */
+					subcl.setCDOMCategory(cat);
+					importObject(subcl);
+				}
+				if (needSelf)
+				{
+					SubClass self = cat.newInstance();
+					self.setKeyName(key);
+					importObject(self);
+				}
+			}
+
+
+```
+
 
 ## Group Contributions
 
@@ -117,3 +268,4 @@ if (integerChar == null ? cdo.integerChar != null : !integerChar.equals(cdo.inte
 | ----- | ----- | ----- | 
 | Shahmir Khan | Ran SonarQube analysis and identified the commented-out code smell in `CDOMObject.java`. Removed all obsolete commented sections and verified the fix. | Ensured the cleanup followed Rule S125 and improved readability. |
 | Tyler Jaafari | Ran SonarQube analysis and identified unnecessary label usage in `SpellCasterChoiceSet.java`. Refactored to use a while loop so that the loop can be repeated without label usage.|
+| JoJo Kaler | Ran SonarQube analysis and identified the commented-out code smell in `AbstractReferenceContext.java`. Deleted all deprocated code checked it. |
