@@ -22,10 +22,10 @@ These tests run using the standard Gradle build process.
 ```
 
 This will:
-    - Compile all source code
-    - Compile all tests
-    - run the entire test suite (unit + integration)
-    - Produce a JaCoCo .html report
+- Compile all source code
+- Compile all tests
+- Run the entire test suite (unit + integration)
+- Produce a JaCoCo .html report
 
 ## Test Location
 
