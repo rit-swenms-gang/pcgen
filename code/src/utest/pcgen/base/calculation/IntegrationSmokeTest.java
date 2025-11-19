@@ -71,4 +71,59 @@ public class IntegrationSmokeTest
 
         assertEquals(20.0, result, 0.001);
     }
+
+    /**
+     * Simple NEPCalculation that reads the Input TypedKey and raises it to the power of 2.
+     */
+    private static class SquareInputCalc implements NEPCalculation<Double>
+    {
+        @Override
+        public Double process(EvaluationManager mgr)
+        {
+            Object input = mgr.get(EvaluationManager.INPUT);
+            double v = (double) input;
+            return Math.pow(v, 2);
+        }
+
+        @Override
+        public void getDependencies(DependencyManager mgr)
+        {
+            // no dependencies for this simple test
+        }
+
+        @Override
+        public String getInstructions()
+        {
+            return "SQUARE";
+        }
+
+        @Override
+        public String getIdentification()
+        {
+            return "SquareInputCalc";
+        }
+
+        @Override
+        public int getInherentPriority()
+        {
+            return 0;
+        }
+
+        @Override
+        public void isValid(FormulaSemantics sem)
+        {
+            // always valid
+        }
+    }
+
+    @Test
+    public void TestSquareInputCalculation() {
+        SquareInputCalc calc = new SquareInputCalc();
+
+        EvaluationManager manager = new EvaluationManager().getWith(EvaluationManager.INPUT, 10.0);
+
+        double result = calc.process(manager);
+
+        assertEquals(100.0, result, 0.001);
+    }
 }

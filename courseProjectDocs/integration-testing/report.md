@@ -9,7 +9,7 @@ This integration test validates the interaction between two modules within the P
 - **EvaluationManager** — a typed key–value store used throughout PCGen to provide runtime evaluation data to formula components.
 
 ### **Interaction Tested**
-A custom NEPCalculation implementation (`DoubleInputCalc`) retrieves an input value from the EvaluationManager using the `INPUT` TypedKey, performs a computation (doubling the value), and returns the result.
+Two custom NEPCalculation implementations (`DoubleInputCalc` and `SquareInputCalc`) retrieve an input value from the EvaluationManager using the `INPUT` TypedKey, perform a computation (doubling the value), and return the result.
 
 This verifies:
 - Correct TypedKey-based data flow between modules  
@@ -35,6 +35,12 @@ If the calculation doubles the input:
 Expected = 20.0
 ```
 
+If the calculation squares the input:
+
+```
+Expected = 100.0
+```
+
 ### **Rationale**
 Numeric input keeps the test simple and directly focuses on validating the module interaction, not peripheral functionality.
 
@@ -47,6 +53,7 @@ The integration tests were executed using the project’s Gradle test suite.
 | Test Case | Expected Output | Actual Output | Status |
 |-----------|-----------------|----------------|--------|
 | `testDoubleInputCalculation` | 20.0 | 20.0 | PASS |
+| `testSquareInputCalculation` | 100.0 | 100.0 | PASS |
 
 ### **Outcome Summary**
 - The EvaluationManager correctly delivered typed input to the calculation.  
@@ -76,5 +83,6 @@ No defects were discovered in the actual module interaction tested (`EvaluationM
 | Team Member | Contribution Summary | Notes |
 |-------------|----------------------|-------|
 | **Shahmir Khan** | Designed and implemented integration test, resolved subsystem incompatibilities, cleaned failing tests, authored documentation. | N/A |
+| **Tyler Jaafari** | Implemented additional integration test case. | N/A |
 
 
