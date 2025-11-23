@@ -1,5 +1,4 @@
 # Security Testing README  
-PCGen – SWEN 777
 
 This README explains how to execute the security testing workflow used for the PCGen project.
 
