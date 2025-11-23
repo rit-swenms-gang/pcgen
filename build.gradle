@@ -262,6 +262,9 @@ tasks.register("cleanMasterSheets", Delete) {
  * https://docs.gradle.org/current/userguide/dependency_downgrade_and_exclude.html
  */
 dependencies {
+
+    spotbugsPlugins "com.h3xstream.findsecbugs:findsecbugs-plugin:1.12.0"
+
     implementation group: 'commons-io', name: 'commons-io', version: '2.20.0'
 
     implementation group: 'commons-io', name: 'commons-io', version:'2.20.0'
@@ -319,6 +322,16 @@ dependencies {
 
     pmd 'net.sourceforge.pmd:pmd-ant:7.16.0'
     pmd 'net.sourceforge.pmd:pmd-java:7.16.0'
+}
+
+spotbugsMain {
+    reports {
+        xml.enabled = false
+        html.enabled = true
+        text {
+            enabled = true
+        }
+    }
 }
 
 // Properties to support Ant builds
