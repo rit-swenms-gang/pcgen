@@ -9,7 +9,7 @@ This integration test validates the interaction between two modules within the P
 - **EvaluationManager** — a typed key–value store used throughout PCGen to provide runtime evaluation data to formula components.
 
 ### **Interaction Tested**
-Two custom NEPCalculation implementations (`DoubleInputCalc` and `SquareInputCalc`) retrieve an input value from the EvaluationManager using the `INPUT` TypedKey, perform a computation (doubling the value), and return the result.
+Two custom NEPCalculation implementations (`DoubleInputCalc`, `HalfInputCalc` `SquareInputCalc`) retrieve an input value from the EvaluationManager using the `INPUT` TypedKey, perform a computation, and return the result.
 
 This verifies:
 - Correct TypedKey-based data flow between modules  
@@ -22,23 +22,32 @@ This verifies:
 The EvaluationManager was initialized and populated using:
 
 ```java
-EvaluationManager mgr = new EvaluationManager().getWith(EvaluationManager.INPUT, 10.0);
+EvaluationManager mgr = new EvaluationManager().getWith(EvaluationManager.INPUT, 11.0);
 ```
 
-- The input (`10.0`) was chosen for clarity and predictable expected behavior.  
+- The input (`11.0`) was chosen for clarity and predictable expected behavior.  
 - The use of `getWith` mirrors how PCGen typically injects values into execution contexts.
 
 ### **Expected Output**
 If the calculation doubles the input:
 
 ```
-Expected = 20.0
+Expected = 22.0
 ```
 
 If the calculation squares the input:
 
 ```
-Expected = 100.0
+Expected = 110.0
+```
+
+If the calculation halves the input, rounding down:
+```
+Expected = 5.0
+```
+If the calculation halves the input, rounding up:
+```
+Expected = 6.0
 ```
 
 ### **Rationale**
@@ -52,8 +61,10 @@ The integration tests were executed using the project’s Gradle test suite.
 ### **Results**
 | Test Case | Expected Output | Actual Output | Status |
 |-----------|-----------------|----------------|--------|
-| `testDoubleInputCalculation` | 20.0 | 20.0 | PASS |
-| `testSquareInputCalculation` | 100.0 | 100.0 | PASS |
+| `testDoubleInputCalculation` | 22.0 | 20.0 | PASS |
+| `testSquareInputCalculation` | 110.0 | 100.0 | PASS |
+| `testHalfRoundUpInputCalculation`   | 6.0 | 6.0 | PASS|
+| `testHalfRoundDownInputCalculation`   | 6.0 | 6.0 | PASS|
 
 ### **Outcome Summary**
 - The EvaluationManager correctly delivered typed input to the calculation.  
@@ -84,5 +95,4 @@ No defects were discovered in the actual module interaction tested (`EvaluationM
 |-------------|----------------------|-------|
 | **Shahmir Khan** | Designed and implemented integration test, resolved subsystem incompatibilities, cleaned failing tests, authored documentation. | N/A |
 | **Tyler Jaafari** | Implemented additional integration test case. | N/A |
-
-
+|**JoJo Kaler**| Implemented additional integration test cases for halfing. Refactored previous tests for consistent input. | There are times in the domain that both halving rounded down and rounded up is used, thus testing for both is neccessary.  |

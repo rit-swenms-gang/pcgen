@@ -63,13 +63,13 @@ public class IntegrationSmokeTest
     {
         DoubleInputCalc calc = new DoubleInputCalc();
 
-        // Create manager and store 10.0 in the INPUT TypedKey
+        // Create manager and store 11.0 in the INPUT TypedKey
         EvaluationManager mgr = new EvaluationManager()
-                .getWith(EvaluationManager.INPUT, 10.0);
+                .getWith(EvaluationManager.INPUT, 11.0);
 
         double result = calc.process(mgr);
 
-        assertEquals(20.0, result, 0.001);
+        assertEquals(22.0, result, 0.001);
     }
 
     /**
@@ -120,10 +120,122 @@ public class IntegrationSmokeTest
     public void TestSquareInputCalculation() {
         SquareInputCalc calc = new SquareInputCalc();
 
-        EvaluationManager manager = new EvaluationManager().getWith(EvaluationManager.INPUT, 10.0);
+        EvaluationManager manager = new EvaluationManager().getWith(EvaluationManager.INPUT, 11.0);
 
         double result = calc.process(manager);
 
-        assertEquals(100.0, result, 0.001);
+        assertEquals(110.0, result, 0.001);
     }
+
+    private static class HalfRoundUpInputCalc implements NEPCalculation<Double>
+    {
+        @Override
+        public Double process(EvaluationManager mgr)
+        {
+            Object input = mgr.get(EvaluationManager.INPUT);
+            double v = (double) input;
+            return Math.ceil(v/2);
+        }
+
+        @Override
+        public void getDependencies(DependencyManager mgr)
+        {
+            // no dependencies for this simple test
+        }
+
+        @Override
+        public String getInstructions()
+        {
+            return "HALFROUNDUP";
+        }
+
+        @Override
+        public String getIdentification()
+        {
+            return "HalfRoundUpInputCalc";
+        }
+
+        @Override
+        public int getInherentPriority()
+        {
+            return 0;
+        }
+
+        @Override
+        public void isValid(FormulaSemantics sem)
+        {
+            // always valid
+        }
+    }
+
+    @Test
+    public void testHalfRoundUpInputCalculation()
+    {
+        HalfRoundUpInputCalc calc = new HalfRoundUpInputCalc();
+
+        EvaluationManager mgr = new EvaluationManager()
+                .getWith(EvaluationManager.INPUT, 11.0);
+
+        double result = calc.process(mgr);
+
+        assertEquals(6.0, result, 0.001);
+    }
+
+
+//round down
+
+private static class HalfRoundDownInputCalc implements NEPCalculation<Double>
+    {
+        @Override
+        public Double process(EvaluationManager mgr)
+        {
+            Object input = mgr.get(EvaluationManager.INPUT);
+            double v = (double) input;
+            return Math.floor(v / 2);
+        }
+
+        @Override
+        public void getDependencies(DependencyManager mgr)
+        {
+            // no dependencies for this simple test
+        }
+
+        @Override
+        public String getInstructions()
+        {
+            return "HALFROUNDDOWN";
+        }
+
+        @Override
+        public String getIdentification()
+        {
+            return "HalfRoundDownInputCalc";
+        }
+
+        @Override
+        public int getInherentPriority()
+        {
+            return 0;
+        }
+
+        @Override
+        public void isValid(FormulaSemantics sem)
+        {
+            // always valid
+        }
+    }
+
+    @Test
+    public void testHalfRoundDownInputCalculation()
+    {
+        HalfRoundDownInputCalc calc = new HalfRoundDownInputCalc();
+
+        EvaluationManager mgr = new EvaluationManager()
+                .getWith(EvaluationManager.INPUT, 11.0);
+
+        double result = calc.process(mgr);
+
+        assertEquals(5.0, result, 0.001);
+    }
+    
 }
