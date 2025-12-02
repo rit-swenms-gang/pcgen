@@ -1,5 +1,9 @@
 package java.system;
 
-public class SystemTest_Spellcaster {
+import org.junit.jupiter.api.Test;
 
+import pcgen.core.character.*;
+
+public class SystemTest_Spellcaster {
+	
 }
