@@ -51,7 +51,7 @@ Below is a summarized table of representative findings from the FindSecBugs repo
 | **Member** | **Task / Contribution** | **Notes** |
 | ----- | ----- | ----- | 
 | Shahmir Khan | Integrated FindSecBugs into the Gradle build, executed security scan, and documented the “Exposure of Internal Representation (EI/EI2)” vulnerabilities. | Verified that these issues stem from legacy design patterns; fixes would require large-scale architectural changes. |
-| Tyler Jaafari | Ran FindSecBugs and documented vulnerabilities on constructor exceptions, overridable method calls, and mutable fields/objects. | |
+| Tyler Jaafari | Ran FindSecBugs and documented vulnerabilities on constructor exceptions, overridable method calls, and mutable fields/objects. | N/A |
 
 ## 3. Results
 
