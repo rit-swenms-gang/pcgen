@@ -9,7 +9,7 @@ This integration test validates the interaction between two modules within the P
 - **EvaluationManager** — a typed key–value store used throughout PCGen to provide runtime evaluation data to formula components.
 
 ### **Interaction Tested**
-Two custom NEPCalculation implementations (`DoubleInputCalc`, `HalfInputCalc` `SquareInputCalc`) retrieve an input value from the EvaluationManager using the `INPUT` TypedKey, perform a computation, and return the result.
+Four custom NEPCalculation implementations (`DoubleInputCalc`, `HalfRoundDownInputCalc`, `HalfRoundUpInputCalc`, and `SquareInputCalc`) retrieve an input value from the EvaluationManager using the `INPUT` TypedKey, perform a computation, and return the result.
 
 This verifies:
 - Correct TypedKey-based data flow between modules  
@@ -64,7 +64,7 @@ The integration tests were executed using the project’s Gradle test suite.
 | `testDoubleInputCalculation` | 22.0 | 20.0 | PASS |
 | `testSquareInputCalculation` | 110.0 | 100.0 | PASS |
 | `testHalfRoundUpInputCalculation`   | 6.0 | 6.0 | PASS|
-| `testHalfRoundDownInputCalculation`   | 6.0 | 6.0 | PASS|
+| `testHalfRoundDownInputCalculation`   | 5.0 | 5.0 | PASS|
 
 ### **Outcome Summary**
 - The EvaluationManager correctly delivered typed input to the calculation.  
