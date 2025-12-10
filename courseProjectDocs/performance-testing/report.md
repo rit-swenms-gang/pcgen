@@ -81,19 +81,36 @@ The spike scenario measured how the system reacts to sudden bursts following idl
 - Idle interval: 2 seconds
 
 ### Results
-Observed output:
+#### Average Latency (nanoseconds)
 
-Burst 1: avg 2487 ns  
-Burst 2: avg 553 ns  
-Burst 3: avg 143 ns  
-Burst 4: avg 424 ns  
-Burst 5: avg 337 ns  
+Iteration 1: 1786.08 ns
+Iteration 2: 236.75 ns
+Iteration 3: 39.25 ns
+Iteration 4: 38.76 ns
+Iteration 5: 40.07 ns
 
-### Interpretation
-The first burst was slower due to JVM warm up. After initial execution latency dropped and stabilized as just-in-time compilation optimized execution.
+#### Wall Time (seconds)
+
+Iteration 1: 0.03 s
+Iteration 2: 0.02 s
+Iteration 3: 0.01 s
+Iteration 4: 0.01 s
+Iteration 5: 0.01 s
+
+#### Heap Delta (bytes)
+
+Iteration 1: 190,296 bytes
+Iteration 2: 189,160 bytes
+Iteration 3: 197,544 bytes
+Iteration 4: 288,496 bytes
+Iteration 5: 355,640 bytes
 
 ### Findings
-Spikes after warm up remained fast and memory stable. This indicates that PCGen runs best if prewarmed before handling burst load.
+We notice the average latency in the first iteration has an extremely high average latency. The next takes a significant decrease before evening out at iterations three four and five. This pattern is reflected in the real world time per iteration, or wall time. The amount of memory used for each shows an opposite pattern, starting stable and then increasing between iterations 3-5.
+
+### Interpretation
+The slow start in average latency and wall time is likely because it is being ran on a java virtual machine which uses just in time compliation. Thus, you get the warm up effect of the time efficency beginning slow. Because it stablizes after just a couple iterations, this is not a major worry. The increased heap delta as iterations go on could be a cause of worry if they were on a greater scale. However, as they are only increasing by less than a kilobyte, it is not a strong worry. 
+
 
 ## Group Contributions
 
@@ -101,3 +118,4 @@ Spikes after warm up remained fast and memory stable. This indicates that PCGen 
 | ----- | ----- | ----- | 
 | Shahmir M. Khan | Added FormulaPerformanceScenarios.java, ran load testing, prepared documentation | N/A |
 | Tyler Jaafari | Added documentation and refactored FormulaPerformanceScenarios to handle exceptions. Ran stress testing. | N/A |
+|JoJo Kaler| Ran and reported on spike testing |N/A|
