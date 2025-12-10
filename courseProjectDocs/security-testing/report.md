@@ -42,11 +42,16 @@ Below is a summarized table of representative findings from the FindSecBugs repo
 | Unicode Normalization Issues (SECUNI) | Input Validation | Low | Apply `Normalizer` when case-folding strings that originate from user input. |
 | Potential Null Pointer Dereference (NP) | Stability | Low | Add null checks or refactor flow; PCGen sometimes intentionally uses null as a signal. |
 | equals()/hashCode() Inconsistency (EQ) | Integrity / Object Identity | Low | Regenerate equals/hashCode via IDE; requires structural refactor. |
+| Exceptions Thrown in Constructors (OBJ-11) | Finalizer Attack Vulnerability | Medium | Attacks can be prevented by declaring relevant classes as final or by using private constructors. |
+| Overridable Method Call Through clone() (MET06-J) | Injection / Override Risk | Medium | Only static, final, or private methods should be invoked by the clone() method. |
+| Mutable Static Fields | Integrity / Object Identity | Medium | Storing copies of mutable objects stored in static fields is a potential fix. |
+| References to Mutable Objects | Integrity / Object Identity | Medium | Storing copies of mutable objects is a better approach in most cases. |
 
-### Team Member Contributions  
+### Team Member Contributions
 | **Member** | **Task / Contribution** | **Notes** |
 | ----- | ----- | ----- | 
 | Shahmir Khan | Integrated FindSecBugs into the Gradle build, executed security scan, and documented the “Exposure of Internal Representation (EI/EI2)” vulnerabilities. | Verified that these issues stem from legacy design patterns; fixes would require large-scale architectural changes. |
+| Tyler Jaafari | Ran FindSecBugs and documented vulnerabilities on constructor exceptions, overridable method calls, and mutable fields/objects. | N/A |
 
 ## 3. Results
 

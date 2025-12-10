@@ -38,7 +38,8 @@ This achieves complete functional coverage for the subsystem under our ownership
 
 | **Test Case** | **Title** | **Pre-conditions** | **Test Steps** | **Expected Result** |
 | ----- | ----- | ----- | ----- | ----- |
-| 01 | testFullFormulaWorkflow() | PCGen builds successfully; fomula subsystem is available; `./gradlew test` runs properly. | Create base input value; apply add; apply subtract; apply divide; capture final computed result | Final output = `6` |
+| 01 | testFullFormulaWorkflow() | PCGen builds successfully; formula subsystem is available; `./gradlew test` runs properly. | Create base input value; apply add; apply subtract; apply divide; capture final computed result | Final output = `6` |
+| 02 | testMultipleBooks() | PCGen builds successfully; formula subsystem is available; `./gradlew test ` runs properly. | Create two spell books, add two spells to one, and one to the other, confirm that both spellbooks are differentiated and accurate. | Final output = `true` |
 
 ## Detailed Test Case Descriptions
 
@@ -81,3 +82,4 @@ Execution method:
 | **Team Member**| **Contribution Summary** | **Notes** |
 |-------------|----------------------|-------|
 | **Shahmir Khan** | Implemented the full system-level test case (01). Ensured the test compiled with black-box requirements. Performed Gradle configuration corrections to ensure the subsystem compiled. Troubleshot missing PCGen-base/PCGen-formula module dependencies. Authored documentation. | N/A |
+| **Tyler Jaafari** | Implemented minor system-level test case (02). Ensured the test compiled with black-box requirements. Performed Gradle build to ensure system compiled. Updated documentation. | N/A |
