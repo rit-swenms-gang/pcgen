@@ -100,4 +100,4 @@ Spikes after warm up remained fast and memory stable. This indicates that PCGen 
 | **Member** | **Task / Contribution** | **Notes** |
 | ----- | ----- | ----- | 
 | Shahmir M. Khan | Added FormulaPerformanceScenarios.java, ran load testing, prepared documentation | N/A |
-| Tyler Jaafari | Added SpellBookTest.java and corresponding documentation. Ran PiTest and recorded results. | PiTest issues have been resolved and statistics have been gathered. |
+| Tyler Jaafari | Added documentation and refactored FormulaPerformanceScenarios to handle exceptions. Ran stress testing. | N/A |
