@@ -65,27 +65,44 @@ public class FormulaPerformanceScenarios {
         return result.intValue();
     }
 
-    private static void runLoadTest() throws Exception {
-        System.out.println("TEST_TYPE=LOAD");
+    /**
+     * Executes a load test.
+     */
+    private static void runLoadTest() {
+        System.out.println("TEST_TYPE: LOAD");
         int threads = 4;           // steady moderate load
         int operationsPerThread = 100_000;
 
-        runScenario("LOAD", threads, operationsPerThread, 0);
+        try {
+            runScenario("LOAD", threads, operationsPerThread, 0);
+        } catch (Exception e) {
+            System.err.println("Exception thrown: " + e.getMessage());
+        }
     }
 
-    private static void runStressTest() throws Exception {
-        System.out.println("TEST_TYPE=STRESS");
+    /**
+     * Executes a stress test.
+     */
+    private static void runStressTest() {
+        System.out.println("TEST_TYPE: STRESS");
         // Increase concurrency step by step, watch when latency / errors blow up
         int[] threadLevels = {1, 2, 4, 8, 16, 32};
         int operationsPerThread = 30_000;
 
         for (int level : threadLevels) {
-            runScenario("STRESS_THREADS_" + level, level, operationsPerThread, 0);
+            try {
+                runScenario("STRESS_THREADS_" + level, level, operationsPerThread, 0);
+            } catch (Exception e) {
+                System.err.println("Exception thrown: " + e.getMessage());
+            }
         }
     }
 
-    private static void runSpikeTest() throws Exception {
-        System.out.println("TEST_TYPE=SPIKE");
+    /**
+     * Executes a spike test.
+     */
+    private static void runSpikeTest() {
+        System.out.println("TEST_TYPE: SPIKE");
         // Alternate idle and heavy bursts
         int idleMillis = 2000;
         int spikeThreads = 32;
@@ -93,9 +110,15 @@ public class FormulaPerformanceScenarios {
 
         for (int i = 1; i <= 5; i++) {
             System.out.println("SPIKE_ITERATION=" + i + " (idle)");
-            Thread.sleep(idleMillis);
+            try {
+                Thread.sleep(idleMillis);
 
-            runScenario("SPIKE_BURST_" + i, spikeThreads, operationsPerThread, 0);
+                runScenario("SPIKE_BURST_" + i, spikeThreads, operationsPerThread, 0);
+            } catch (InterruptedException ie) {
+                System.err.println("Sleeping thread interrupted: " + ie.getMessage());
+            } catch (Exception e) {
+                System.err.println("Exception thrown: " + e.getMessage());
+            }
         }
     }
 
