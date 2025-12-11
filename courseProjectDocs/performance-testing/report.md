@@ -117,7 +117,8 @@ Iteration 4: 288,496 bytes
 
 Iteration 5: 355,640 bytes
 
-| Iteration # | Average Latency (ns) | Wall Time (s) | Heap Delta (bytes |
+| **Iteration #** | **Average Latency (ns)** | **Wall Time (s)** | **Heap Delta (bytes)** |
+| ----- | ----- | ----- | ----- |
 | Iteration 1 | 1786.08 ns | 0.03 s | 190,296 bytes |
 
 ### Findings
