@@ -81,45 +81,14 @@ The spike scenario measured how the system reacts to sudden bursts following idl
 - Idle interval: 2 seconds
 
 ### Results
-#### Average Latency (nanoseconds)
-
-Iteration 1: 1786.08 ns
-
-Iteration 2: 236.75 ns
-
-Iteration 3: 39.25 ns
-
-Iteration 4: 38.76 ns
-
-Iteration 5: 40.07 ns
-
-#### Wall Time (seconds)
-
-Iteration 1: 0.03 s
-
-Iteration 2: 0.02 s
-
-Iteration 3: 0.01 s
-
-Iteration 4: 0.01 s
-
-Iteration 5: 0.01 s
-
-#### Heap Delta (bytes)
-
-Iteration 1: 190,296 bytes
-
-Iteration 2: 189,160 bytes
-
-Iteration 3: 197,544 bytes
-
-Iteration 4: 288,496 bytes
-
-Iteration 5: 355,640 bytes
 
 | **Iteration #** | **Average Latency (ns)** | **Wall Time (s)** | **Heap Delta (bytes)** |
 | ----- | ----- | ----- | ----- |
-| Iteration 1 | 1786.08 ns | 0.03 s | 190,296 bytes |
+| Iteration 1 | 1786.08 | 0.03 s | 190,296 bytes |
+| Iteration 2 | 236.75 | 0.02 s | 189,160 bytes |
+| Iteration 3 | 39.25 | 0.01 s | 197,544 bytes |
+| Iteration 4 | 38.76 | 0.01 s | 288,496 bytes |
+| Iteration 5 | 40.07 | 0.01 s | 355,640 bytes |
 
 ### Findings
 We notice the average latency in the first iteration has an extremely high average latency. The next takes a significant decrease before evening out at iterations three four and five. This pattern is reflected in the real world time per iteration, or wall time. The amount of memory used for each shows an opposite pattern, starting stable and then increasing between iterations 3-5.
