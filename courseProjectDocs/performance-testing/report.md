@@ -92,9 +92,13 @@ Iteration 5: 40.07 ns
 #### Wall Time (seconds)
 
 Iteration 1: 0.03 s
+
 Iteration 2: 0.02 s
+
 Iteration 3: 0.01 s
+
 Iteration 4: 0.01 s
+
 Iteration 5: 0.01 s
 
 #### Heap Delta (bytes)
