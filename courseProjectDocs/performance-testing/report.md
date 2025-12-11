@@ -117,6 +117,9 @@ Iteration 4: 288,496 bytes
 
 Iteration 5: 355,640 bytes
 
+| Iteration # | Average Latency (ns) | Wall Time (s) | Heap Delta (bytes |
+| Iteration 1 | 1786.08 ns | 0.03 s | 190,296 bytes |
+
 ### Findings
 We notice the average latency in the first iteration has an extremely high average latency. The next takes a significant decrease before evening out at iterations three four and five. This pattern is reflected in the real world time per iteration, or wall time. The amount of memory used for each shows an opposite pattern, starting stable and then increasing between iterations 3-5.
 
