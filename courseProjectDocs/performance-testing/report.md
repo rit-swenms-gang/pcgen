@@ -84,9 +84,13 @@ The spike scenario measured how the system reacts to sudden bursts following idl
 #### Average Latency (nanoseconds)
 
 Iteration 1: 1786.08 ns
+
 Iteration 2: 236.75 ns
+
 Iteration 3: 39.25 ns
+
 Iteration 4: 38.76 ns
+
 Iteration 5: 40.07 ns
 
 #### Wall Time (seconds)
@@ -104,9 +108,13 @@ Iteration 5: 0.01 s
 #### Heap Delta (bytes)
 
 Iteration 1: 190,296 bytes
+
 Iteration 2: 189,160 bytes
+
 Iteration 3: 197,544 bytes
+
 Iteration 4: 288,496 bytes
+
 Iteration 5: 355,640 bytes
 
 ### Findings
